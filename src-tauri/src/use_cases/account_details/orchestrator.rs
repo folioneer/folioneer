@@ -98,11 +98,13 @@ pub struct HoldingDetail {
     pub management_fees: i64,
     /// Market value of the holding in account-currency micros (ACD-052) — exactly
     /// its contribution to `total_global_value` (CSH-094): the balance for the Cash
-    /// Holding, price × quantity × FX for a priced non-cash holding. None when no
-    /// price is recorded or a foreign holding has no usable rate (FXR-034).
+    /// Holding, price × quantity × FX for a priced non-cash holding, its cost for one
+    /// with no recorded price (PRF-022A). None when a recorded price has no usable rate
+    /// (FXR-034).
     pub market_value: Option<i64>,
-    /// Current price × quantity in the asset's own currency, micros (MKT-143). None
-    /// when no price is recorded; independent of any exchange rate.
+    /// Current price × quantity in the asset's own currency, micros (MKT-143); with no
+    /// recorded price, the holding's cost when the asset is in the account's currency
+    /// (PRF-022A), none otherwise.
     pub current_value: Option<i64>,
     /// Share of `total_global_value` in micro-percent (55 % = 55_000_000, ACD-052).
     /// None when the holding has no market value or the Global Value is not positive.
@@ -487,12 +489,18 @@ impl AccountDetailsUseCase {
             // converted price × quantity for a priced non-cash holding, None when no
             // price or no usable rate (FXR-034). Every valued holding contributes it
             // to the Global Value exactly once.
+            // PRF-022A — a holding with no recorded price is worth its cost; the price
+            // shown stays none.
+            let at_cost = (!is_cash && latest_price.is_none()).then_some(cost_basis);
+            let at_cost_in_asset_currency = at_cost.filter(|_| asset.currency == account.currency);
             let market_value: Option<i64> = if is_cash {
                 Some(holding.quantity)
             } else {
-                converted_price.map(|converted| {
-                    (holding.quantity as i128 * converted as i128 / QUANTITY_UNIT) as i64
-                })
+                converted_price
+                    .map(|converted| {
+                        (holding.quantity as i128 * converted as i128 / QUANTITY_UNIT) as i64
+                    })
+                    .or(at_cost)
             };
             if let Some(value) = market_value {
                 total_global_value = total_global_value.saturating_add(value);
@@ -576,7 +584,10 @@ impl AccountDetailsUseCase {
                 fx_rate_date,
                 management_fees, // FEE-052
                 market_value,    // ACD-052
-                current_value: current_value_of(holding.quantity, current_price), // MKT-143
+                // MKT-143, or its cost with no recorded price (PRF-022A): the cost is in the
+                // account's currency, so only an asset in that currency takes it.
+                current_value: current_value_of(holding.quantity, current_price)
+                    .or(at_cost_in_asset_currency),
                 weight_pct: None, // ACD-052 — set once the Global Value is known
                 fee_rate_percent_micros, // FEE-074
                 period_performance, // ACD-054
@@ -925,9 +936,14 @@ impl AccountDetailsUseCase {
             // CSH-094 / FXR-041 / ACD-052 — market value in account currency as of
             // the date; a priced holding contributes it to the Global Value, a
             // holding with no price or no usable rate carries None.
-            let market_value: Option<i64> = converted_price.map(|converted| {
-                (reconstruction.quantity as i128 * converted as i128 / QUANTITY_UNIT) as i64
-            });
+            // PRF-022A — a holding with no recorded price as of the date is worth its cost.
+            let at_cost = price_as_of.is_none().then_some(cost_basis);
+            let at_cost_in_asset_currency = at_cost.filter(|_| asset.currency == account.currency);
+            let market_value: Option<i64> = converted_price
+                .map(|converted| {
+                    (reconstruction.quantity as i128 * converted as i128 / QUANTITY_UNIT) as i64
+                })
+                .or(at_cost);
             if let Some(value) = market_value {
                 total_global_value = total_global_value.saturating_add(value);
             }
@@ -965,7 +981,9 @@ impl AccountDetailsUseCase {
                 fx_rate_date,
                 management_fees: *management_fees_by_asset.get(asset_id).unwrap_or(&0), // FEE-052
                 market_value,                                                           // ACD-052
-                current_value: current_value_of(reconstruction.quantity, current_price), // MKT-143
+                // MKT-143, or its cost with no recorded price (PRF-022A)
+                current_value: current_value_of(reconstruction.quantity, current_price)
+                    .or(at_cost_in_asset_currency),
                 weight_pct: None, // ACD-052 — set once the Global Value is known
                 fee_rate_percent_micros: None, // FEE-074 — as-of view carries no schedule info
                 // ACD-054 — windowed returns are live-view only; the as-of view carries all-None.
@@ -2221,6 +2239,60 @@ mod tests {
         assert!(resp.holdings[0].performance_pct.is_none());
     }
 
+    // #824 / PRF-022A / ACD-052 / MKT-143 — a holding with no recorded price shows its cost
+    // as its value, and no price.
+    #[tokio::test]
+    async fn prf_022a_an_unpriced_holding_shows_its_cost_as_value_and_no_price() {
+        let pool = make_pool().await;
+        let (account_svc, asset_svc) = setup(&pool).await;
+        let account = account_svc
+            .create("A".to_string(), String::new(), "EUR".to_string(), false)
+            .await
+            .unwrap();
+        let asset = asset_svc
+            .create_asset(CreateAssetDTO {
+                kind: None,
+                name: "Family Company".to_string(),
+                reference: "FAM".to_string(),
+                isin: None,
+                class: AssetClass::Stocks,
+                currency: "EUR".to_string(),
+                risk_level: 1,
+                category_id: SYSTEM_CATEGORY_ID.to_string(),
+                exchange: None,
+                interest_bearing: false,
+            })
+            .await
+            .unwrap();
+        account_svc
+            .open_holding(
+                &account.id,
+                asset.id.clone(),
+                "2023-03-01".to_string(),
+                crate::shared::domain::quantity::from_surface(2_000_000),
+                26_000_000_000,
+            )
+            .await
+            .unwrap();
+
+        let uc = AccountDetailsUseCase::new(
+            account_svc,
+            asset_svc,
+            make_currency_service_with_no_rate(),
+        );
+        // Live, and on a past date: 2 units that came in for 26 000.
+        for as_of in [None, Some("2024-06-30")] {
+            let resp = uc.get_account_details(&account.id, as_of).await.unwrap();
+            let holding = &resp.holdings[0];
+            assert_eq!(holding.market_value, Some(26_000_000_000));
+            assert_eq!(holding.current_value, Some(26_000_000_000));
+            assert_eq!(resp.total_global_value, 26_000_000_000);
+            assert_eq!(holding.current_price, None, "the price shown stays none");
+            assert_eq!(holding.current_price_date, None);
+            assert_eq!(holding.unrealized_pnl, None);
+        }
+    }
+
     // ACD-052 — market_value is the priced holding's value in account currency and
     // matches its contribution to total_global_value
     #[tokio::test]
@@ -2589,8 +2661,10 @@ mod tests {
         let us = resp.holdings.iter().find(|h| h.asset_name == "US").unwrap();
         assert_eq!(us.current_value, Some(220_000_000));
         assert_eq!(us.market_value, None, "no USD→EUR rate");
+        // PRF-022A — no recorded price: its cost, the asset being in the account's currency.
         let unpriced = resp.holdings.iter().find(|h| h.asset_name == "NP").unwrap();
-        assert_eq!(unpriced.current_value, None);
+        assert_eq!(unpriced.current_value, Some(100_000_000));
+        assert_eq!(unpriced.current_price, None);
     }
 
     // ACD-052 / DEBT-033 — the weight is the holding's share of the Global Value in
@@ -2639,16 +2713,17 @@ mod tests {
                 .unwrap()
                 .weight_pct
         };
-        assert_eq!(resp.total_global_value, 400_000_000);
-        assert_eq!(weight("X"), Some(55_000_000), "220 / 400 = 55 %");
-        assert_eq!(weight("Y"), Some(45_000_000));
-        assert_eq!(weight("NP"), None);
+        // PRF-022A — NP has no recorded price and is worth its cost, 100.
+        assert_eq!(resp.total_global_value, 500_000_000);
+        assert_eq!(weight("X"), Some(44_000_000), "220 / 500 = 44 %");
+        assert_eq!(weight("Y"), Some(36_000_000));
+        assert_eq!(weight("NP"), Some(20_000_000));
     }
 
-    // ACD-052 — market_value is None for an unpriced holding and for a foreign
-    // holding with no usable FX rate (FXR-034)
+    // ACD-052 / PRF-022A — market_value is its cost for a holding with no recorded price,
+    // and None for a foreign holding with a price and no usable FX rate (FXR-034)
     #[tokio::test]
-    async fn market_value_none_when_unpriced_or_no_usable_rate() {
+    async fn market_value_at_cost_when_unpriced_and_none_without_a_usable_rate() {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
@@ -2714,9 +2789,14 @@ mod tests {
         );
         let resp = uc.get_account_details(&account.id, None).await.unwrap();
         for holding in &resp.holdings {
-            assert_eq!(holding.market_value, None, "asset {}", holding.asset_name);
+            let expected = (holding.asset_name == "NoPrice").then_some(100_000_000);
+            assert_eq!(
+                holding.market_value, expected,
+                "asset {}",
+                holding.asset_name
+            );
         }
-        assert_eq!(resp.total_global_value, 0);
+        assert_eq!(resp.total_global_value, 100_000_000);
     }
 
     // ACD-052 — the Cash Holding's market_value is its balance (already account currency)
@@ -3617,10 +3697,10 @@ mod tests {
             "total_cost_basis must exclude the cash holding (CSH-093)"
         );
 
-        // CSH-094: with no recorded price for the bond, global value is cash only.
+        // CSH-094 / PRF-022A: with no recorded price, the bond is worth its cost.
         assert_eq!(
-            resp.total_global_value, 250_000_000,
-            "global value = cash (250) + bond (0, unpriced) = 250"
+            resp.total_global_value, 450_000_000,
+            "global value = cash (250) + bond (its cost, 200) = 450"
         );
     }
 

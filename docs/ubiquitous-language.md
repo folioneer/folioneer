@@ -342,7 +342,7 @@ What an account, the portfolio or a holding earned over a month or a year, the o
 
 > Status: confirmed
 
-What a holding is worth at its latest recorded price, in the asset's own currency: price × quantity, with no exchange rate involved. Shown in the Current Value column of an account's holdings; none when no price has been recorded.
+What a holding is worth in the asset's own currency, with no exchange rate involved: price × quantity at its latest recorded price, or its cost basis (PRF-022A) when none is recorded and the asset is in its account's currency; none otherwise. Shown in the Current Value column of an account's holdings.
 
 ### Capital brought in
 

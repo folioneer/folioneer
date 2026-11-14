@@ -3,7 +3,9 @@
 //! read. Composed by both the `account_performance` and `global_performance` use
 //! cases, so neither imports from the other (B18).
 
-use crate::context::account::{AccountError, AccountServiceContract, Transaction, TransactionType};
+use crate::context::account::{
+    AccountError, AccountServiceContract, CostBasisMethod, Transaction, TransactionType,
+};
 use crate::context::asset::AssetServiceContract;
 use crate::context::currency::CurrencyService;
 use crate::use_cases::shared::valuation::{
@@ -168,6 +170,7 @@ pub(crate) async fn account_performance_series(
         &priced_assets,
         &rate_map,
         &account.currency,
+        account.cost_basis_method,
         earliest_date,
         today,
         asset_id,
@@ -177,6 +180,7 @@ pub(crate) async fn account_performance_series(
         &priced_assets,
         &rate_map,
         &account.currency,
+        account.cost_basis_method,
         earliest_date,
         today,
         asset_id,
@@ -234,6 +238,7 @@ fn build_yearly(
     priced_assets: &HashMap<String, PricedAsset>,
     rate_map: &RateMap,
     account_currency: &str,
+    method: CostBasisMethod,
     earliest_date: NaiveDate,
     today: NaiveDate,
     asset_scope: Option<&str>,
@@ -256,6 +261,7 @@ fn build_yearly(
             priced_assets,
             rate_map,
             account_currency,
+            method,
             period_end,
             asset_scope,
         );
@@ -328,6 +334,7 @@ fn build_monthly(
     priced_assets: &HashMap<String, PricedAsset>,
     rate_map: &RateMap,
     account_currency: &str,
+    method: CostBasisMethod,
     earliest_date: NaiveDate,
     today: NaiveDate,
     asset_scope: Option<&str>,
@@ -353,6 +360,7 @@ fn build_monthly(
             priced_assets,
             rate_map,
             account_currency,
+            method,
             period_end,
             asset_scope,
         );
@@ -384,6 +392,7 @@ fn build_monthly(
             priced_assets,
             rate_map,
             account_currency,
+            method,
             year_start_baseline,
             asset_scope,
         );
@@ -544,6 +553,7 @@ fn end_value_for_scope(
     priced_assets: &HashMap<String, PricedAsset>,
     rate_map: &RateMap,
     account_currency: &str,
+    method: CostBasisMethod,
     period_end: NaiveDate,
     asset_scope: Option<&str>,
 ) -> i64 {
@@ -553,6 +563,7 @@ fn end_value_for_scope(
             priced_assets,
             rate_map,
             account_currency,
+            method,
             period_end,
         ),
         Some(asset_id) => holding_end_value_as_of(
@@ -561,6 +572,7 @@ fn end_value_for_scope(
             priced_assets,
             rate_map,
             account_currency,
+            method,
             period_end,
         ),
     }

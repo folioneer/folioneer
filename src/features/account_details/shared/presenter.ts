@@ -265,7 +265,11 @@ export interface HoldingRowViewModel {
   /** Holding quantity as decimal text — used to pass to SellTransactionModal (SEL-010). */
   heldQuantity: string;
   averagePrice: string;
-  /** Market value = current_price × quantity, asset currency; "—" when no price (MKT-143). */
+  /**
+   * Current Value in the asset's currency (MKT-143): the current price × quantity, or the
+   * holding's cost basis when no price is recorded and the asset is in its account's
+   * currency (PRF-022A); "—" otherwise.
+   */
   currentValue: string;
   /** Formatted realized P&L string (2 decimal places, SEL-042). */
   realizedPnl: string;
@@ -596,7 +600,9 @@ export function toHoldingRow(detail: HoldingDetail): HoldingRowViewModel {
     heldQuantity: detail.quantity,
     averagePrice: microToFormattedPrice(detail.average_price),
     averagePriceMicro: detail.average_price,
-    // MKT-143 — the backend's current price × quantity, asset currency.
+    // MKT-143 — the backend's current value, asset currency: current price × quantity, or
+    // the holding's cost basis when no price is recorded and the asset is in its account's
+    // currency (PRF-022A).
     currentValue: detail.current_value !== null ? microToFormatted(detail.current_value, 2) : DASH,
     realizedPnl: microToFormatted(detail.realized_pnl, 2),
     realizedPnlRaw: detail.realized_pnl,

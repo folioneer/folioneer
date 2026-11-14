@@ -2139,8 +2139,9 @@ holder: string | null;
 /**
  * Total economic value in account-currency micros (CSH-094 / FXR-041): cash
  * quantity plus the sum of `quantity × latest_price` over priced active non-cash
- * holdings, with foreign holdings converted to account currency. Unpriced holdings,
- * or foreign holdings with no usable rate (FXR-034), contribute 0.
+ * holdings, with foreign holdings converted to account currency. A holding with no
+ * recorded price counts at its cost (PRF-022A); a foreign one with a price and no
+ * usable rate (FXR-034) contributes 0.
  */
 total_global_value: number; 
 /**
@@ -4217,13 +4218,15 @@ management_fees: number;
 /**
  * Market value of the holding in account-currency micros (ACD-052) — exactly
  * its contribution to `total_global_value` (CSH-094): the balance for the Cash
- * Holding, price × quantity × FX for a priced non-cash holding. None when no
- * price is recorded or a foreign holding has no usable rate (FXR-034).
+ * Holding, price × quantity × FX for a priced non-cash holding, its cost for one
+ * with no recorded price (PRF-022A). None when a recorded price has no usable rate
+ * (FXR-034).
  */
 market_value: number | null; 
 /**
- * Current price × quantity in the asset's own currency, micros (MKT-143). None
- * when no price is recorded; independent of any exchange rate.
+ * Current price × quantity in the asset's own currency, micros (MKT-143); with no
+ * recorded price, the holding's cost when the asset is in the account's currency
+ * (PRF-022A), none otherwise.
  */
 current_value: number | null; 
 /**

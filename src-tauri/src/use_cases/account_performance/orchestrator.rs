@@ -1418,9 +1418,10 @@ mod tests {
         assert_eq!(june.pnl, 25_000_000);
     }
 
-    // PRF-022 — an asset with no recorded price on or before the period end contributes 0
+    // PRF-022A — a holding with no recorded price on or before the period end is worth its
+    // cost
     #[tokio::test]
-    async fn unpriced_holding_contributes_zero_to_end_value() {
+    async fn an_unpriced_holding_is_worth_its_cost() {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
@@ -1467,8 +1468,8 @@ mod tests {
             )
             .await
             .unwrap();
-        // No price recorded for the stock → it contributes 0.
-        // end_value for 2024 = cash(2000−1000=1000 EUR) + stock(0) = 1_000_000_000 micros.
+        // No price recorded for the stock → it is worth its cost (PRF-022A).
+        // end_value for 2024 = cash(2000−1000=1000 EUR) + stock(1000) = 2_000_000_000 micros.
         let uc = AccountPerformanceUseCase::new(
             account_svc,
             asset_svc,
@@ -1481,8 +1482,8 @@ mod tests {
             .find(|p| p.year == 2024)
             .expect("2024 row");
         assert_eq!(
-            year_2024.end_value, 1_000_000_000,
-            "unpriced holding contributes 0 to end_value; expected cash residual 1000 EUR"
+            year_2024.end_value, 2_000_000_000,
+            "an unpriced holding is worth its cost: cash 1000 + stock 1000 EUR"
         );
     }
 
@@ -1648,7 +1649,7 @@ mod tests {
 
     // DIV-023 / PRF-031 — a dividend credits the cash balance (raising end
     // value) but is internal income, excluded from net external flow. The
-    // paying asset stays unpriced and contributes 0 to end value.
+    // paying asset has no recorded price and is worth its cost (PRF-022A).
     #[tokio::test]
     async fn dividend_credits_end_value_but_excluded_from_net_external_flow() {
         let pool = make_pool().await;
@@ -1709,10 +1710,10 @@ mod tests {
             .await
             .unwrap();
         // end_value = cash[deposit 2000 − purchase 1000 + dividend 100 = 1100]
-        //             + unpriced stock(0) = 1100.
+        //             + the stock at its cost (1000, PRF-022A) = 2100.
         // net_flow  = deposit 2000 only (Purchase + Dividend excluded).
-        // gain      = 1100 − 0 − 2000 = −900 EUR. The −900 (vs −1000) proves the
-        // dividend both raised end value AND stayed out of net_flow.
+        // gain      = 2100 − 0 − 2000 = +100 EUR: the dividend both raised end value
+        // AND stayed out of net_flow.
         let uc = AccountPerformanceUseCase::new(
             account_svc,
             asset_svc,
@@ -1729,7 +1730,7 @@ mod tests {
             .as_ref()
             .expect("since_inception present for first period");
         assert_eq!(
-            since_inception.gain, -900_000_000,
+            since_inception.gain, 100_000_000,
             "dividend (+100) raises end value via cash but must stay out of net_flow"
         );
     }
@@ -1869,9 +1870,8 @@ mod tests {
             )
             .await
             .unwrap();
-        // No price → end_value = 0 for the stock (PRF-022).
-        // gain = 0 − 0 − 1000 = −1000 EUR (invested but not valued yet).
-        // We just verify the flow is counted (gain ≠ end_value − 0).
+        // No price → the stock is worth its cost (PRF-022A): 1000.
+        // gain = 1000 − 0 − 1000 = 0: the flow is counted (gain ≠ end_value − 0).
         let uc = AccountPerformanceUseCase::new(
             account_svc,
             asset_svc,
@@ -1887,10 +1887,10 @@ mod tests {
             .since_inception
             .as_ref()
             .expect("since_inception present for first period");
-        // gain = end(0) − start(0) − net_flow(1000) = −1000_000_000
+        // gain = end(1000) − start(0) − net_flow(1000) = 0
         assert_eq!(
-            since_inception.gain, -1_000_000_000,
-            "OpeningBalance cost 1000 EUR must appear as inflow; gain = 0 − 0 − 1000 = −1000"
+            since_inception.gain, 0,
+            "OpeningBalance cost 1000 EUR must appear as inflow; gain = 1000 − 0 − 1000 = 0"
         );
     }
 
@@ -1970,9 +1970,8 @@ mod tests {
         );
     }
 
-    // PRF-040 — empty period (no transactions, between first and current period) has end_value = 0
-    // We verify that an intermediate month with no activity has end_value = 0 when the
-    // asset held in that month has no price (PRF-022 else-0 branch).
+    // PRF-040 — a month with no transactions, between the first period and the current one,
+    // is in the span.
     #[tokio::test]
     async fn intermediate_months_included_in_monthly_span() {
         let pool = make_pool().await;
@@ -2682,8 +2681,8 @@ mod tests {
             })
             .await
             .unwrap();
-        // Deposit 100, buy a stock that is never priced → end_value 0, net invested 100.
-        // since-inception gain = −100, denominator = 100 → pct = −100% (base 1 + (−1) = 0).
+        // Deposit 100, buy a stock and write the whole of it off → end_value 0, net invested
+        // 100. since-inception gain = −100, denominator = 100 → pct = −100% (base 1 + (−1) = 0).
         account_svc
             .record_deposit(&account.id, "2024-01-01".to_string(), 100_000_000, None)
             .await
@@ -2698,6 +2697,17 @@ mod tests {
                 1_000_000,
                 0,
                 None,
+                None,
+            )
+            .await
+            .unwrap();
+        account_svc
+            .record_write_off(
+                &account.id,
+                stock.id.clone(),
+                "2024-01-02".to_string(),
+                from_surface(1_000_000),
+                crate::context::account::WriteOffReason::Lost,
                 None,
             )
             .await

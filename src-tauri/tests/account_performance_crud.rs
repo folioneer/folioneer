@@ -377,3 +377,144 @@ async fn zero_cost_opening_balance_suppresses_lifetime_metrics_until_corrected()
         "annualized yield must compute once the opening capital is declared"
     );
 }
+
+// #824 / PRF-022A — a holding with no recorded price is worth its cost: brought in by an
+// opening balance and never priced, it shows no loss; a later purchase adds its own cost
+// and revalues nothing; a recorded price takes over from its date.
+#[tokio::test]
+async fn prf_022a_an_unpriced_holding_is_worth_its_cost() {
+    let pool = make_pool().await;
+    let ctx = build_ctx(&pool).await;
+    ctx.asset_service.seed_cash_asset("EUR").await.unwrap();
+    let account = ctx
+        .account_service
+        .create(
+            "Private".to_string(),
+            String::new(),
+            "EUR".to_string(),
+            false,
+        )
+        .await
+        .unwrap();
+    let asset = ctx
+        .asset_service
+        .create_asset(CreateAssetDTO {
+            kind: None,
+            name: "Family Company".to_string(),
+            reference: "FAM".to_string(),
+            isin: None,
+            class: folioneer_lib::context::asset::AssetClass::Stocks,
+            currency: "EUR".to_string(),
+            risk_level: 3,
+            category_id: SYSTEM_CATEGORY_ID.to_string(),
+            exchange: None,
+            interest_bearing: false,
+        })
+        .await
+        .unwrap();
+    let one = folioneer_lib::shared::domain::quantity::from_surface(1_000_000);
+    ctx.account_service
+        .open_holding(
+            &account.id,
+            asset.id.clone(),
+            "2023-03-01".to_string(),
+            one,
+            13_000_000_000,
+        )
+        .await
+        .unwrap();
+
+    let year = |resp: &AccountPerformanceResponse, year: i32| {
+        resp.yearly
+            .iter()
+            .find(|period| period.year == year)
+            .map(|period| {
+                (
+                    period.end_value,
+                    period.since_inception.as_ref().map(|metric| metric.gain),
+                )
+            })
+            .expect("the year's row")
+    };
+    let resp = ctx
+        .use_case
+        .get_account_performance(&account.id, None)
+        .await
+        .unwrap();
+    assert_eq!(
+        year(&resp, 2023),
+        (13_000_000_000, Some(0)),
+        "worth what it came in at: no loss that never happened"
+    );
+
+    // A purchase at 14 000 adds its cost: 13 000 + 14 000, the first unit not revalued.
+    ctx.account_service
+        .record_deposit(&account.id, "2024-06-01".to_string(), 14_000_000_000, None)
+        .await
+        .unwrap();
+    ctx.account_service
+        .buy_holding(
+            &account.id,
+            asset.id.clone(),
+            "2024-06-01".to_string(),
+            one,
+            14_000_000_000,
+            1_000_000,
+            0,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+    let resp = ctx
+        .use_case
+        .get_account_performance(&account.id, None)
+        .await
+        .unwrap();
+    assert_eq!(
+        year(&resp, 2023).0,
+        13_000_000_000,
+        "2023 keeps its own cost"
+    );
+    assert_eq!(year(&resp, 2024).0, 27_000_000_000);
+
+    // A sale at 20 000 realizes its gain and revalues nothing: one unit left at the average
+    // cost of 13 500, and 20 000 of cash.
+    ctx.account_service
+        .sell_holding(
+            &account.id,
+            asset.id.clone(),
+            "2024-09-01".to_string(),
+            one,
+            20_000_000_000,
+            1_000_000,
+            0,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+    let resp = ctx
+        .use_case
+        .get_account_performance(&account.id, None)
+        .await
+        .unwrap();
+    assert_eq!(year(&resp, 2024).0, 33_500_000_000);
+
+    // A recorded price takes over from its date.
+    ctx.asset_service
+        .record_asset_price(&asset.id, "2024-12-31", 15000.0)
+        .await
+        .unwrap();
+    let resp = ctx
+        .use_case
+        .get_account_performance(&account.id, None)
+        .await
+        .unwrap();
+    assert_eq!(
+        year(&resp, 2024).0,
+        35_000_000_000,
+        "one unit at 15 000, and the cash"
+    );
+    assert_eq!(year(&resp, 2023).0, 13_000_000_000);
+}

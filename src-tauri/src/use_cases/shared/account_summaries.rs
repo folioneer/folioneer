@@ -37,8 +37,9 @@ pub struct AccountSummary {
     pub holder: Option<String>,
     /// Total economic value in account-currency micros (CSH-094 / FXR-041): cash
     /// quantity plus the sum of `quantity × latest_price` over priced active non-cash
-    /// holdings, with foreign holdings converted to account currency. Unpriced holdings,
-    /// or foreign holdings with no usable rate (FXR-034), contribute 0.
+    /// holdings, with foreign holdings converted to account currency. A holding with no
+    /// recorded price counts at its cost (PRF-022A); a foreign one with a price and no
+    /// usable rate (FXR-034) contributes 0.
     pub total_global_value: i64,
     /// Account-wide unrealized P&L in account-currency micros (ACC-023, ADR-001):
     /// the sum of per-holding unrealized P&L (current value − cost basis) over
@@ -142,6 +143,7 @@ impl SummaryReader {
                 .await?;
             let ytd_performance_pct = compute_current_ytd_pct(
                 &account.currency,
+                account.cost_basis_method,
                 self.asset_service.as_ref(),
                 &self.currency_service,
                 &transactions,

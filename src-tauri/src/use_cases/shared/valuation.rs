@@ -2,7 +2,9 @@
 //! performance, account summary and global performance use cases
 //! (PRF / GPF / FXR / ADR-013). Owned by no use case.
 
-use crate::context::account::{Account, AccountError, Transaction, TransactionType};
+use crate::context::account::{
+    Account, AccountError, CostBasisMethod, Transaction, TransactionType,
+};
 use crate::context::asset::{AssetClass, AssetPrice, AssetServiceContract};
 use crate::context::currency::CurrencyService;
 use crate::core::logger::BACKEND;
@@ -63,6 +65,36 @@ impl PricedAsset {
             .find(|p| parse_date(&p.date).is_some_and(|d| d <= date))
             .map(|p| p.price)
     }
+}
+
+/// PRF-022 / PRF-022A — what one unit of a holding is worth in the account's currency as
+/// of `date`: the asset's carry-forward recorded price, converted at `rate` when the asset
+/// is in another currency — none without a usable rate (FXR-034); where no price is
+/// recorded on or before `date`, the holding's average cost on that date, under the
+/// account's `method`. None when nothing is held then.
+pub(crate) fn unit_value_as_of(
+    priced: &PricedAsset,
+    transactions: &[Transaction],
+    asset_id: &str,
+    account_currency: &str,
+    method: CostBasisMethod,
+    rate: Option<i64>,
+    date: NaiveDate,
+) -> Option<i128> {
+    if let Some(price) = priced.price_as_of(date) {
+        return if priced.currency == account_currency {
+            Some(price as i128)
+        } else {
+            rate.map(|rate| at_rate(price as i128, rate))
+        };
+    }
+    let held = Account::reconstruct_holding_as_of(
+        transactions,
+        asset_id,
+        &date.format("%Y-%m-%d").to_string(),
+        method,
+    );
+    (held.quantity > 0).then_some(held.average_price as i128)
 }
 
 /// Net-of-flows performance figures for one period (PRF-031, PRF-032).
@@ -256,6 +288,7 @@ pub(crate) async fn load_rate_map_for_dates(
 /// baseline of 0 and is present (denominator is the weighted current-year flow).
 pub(crate) async fn compute_current_ytd_pct(
     account_currency: &str,
+    method: CostBasisMethod,
     asset_service: &dyn AssetServiceContract,
     currency_service: &CurrencyService,
     transactions: &[Transaction],
@@ -281,6 +314,7 @@ pub(crate) async fn compute_current_ytd_pct(
         &priced_assets,
         &rate_map,
         account_currency,
+        method,
         today,
     );
     // PRF-034 — year-start baseline is the prior 31 December end value (0 for a
@@ -290,6 +324,7 @@ pub(crate) async fn compute_current_ytd_pct(
         &priced_assets,
         &rate_map,
         account_currency,
+        method,
         year_start_baseline_date,
     );
     let metric = metric_for_span_windowed(
@@ -425,12 +460,14 @@ fn last_day_of_month(year: i32, month: u32) -> NaiveDate {
 }
 
 /// PRF-020/021/022/023/024 — Global Value as of `period_end`: cash at face value
-/// plus the carry-forward market value of each same-currency non-cash holding.
+/// plus the market value of each non-cash holding: its carry-forward price, converted
+/// (FXR-042), or its cost with no recorded price (PRF-022A).
 pub(crate) fn end_value_as_of(
     transactions: &[Transaction],
     priced_assets: &HashMap<String, PricedAsset>,
     rate_map: &RateMap,
     account_currency: &str,
+    method: CostBasisMethod,
     period_end: NaiveDate,
 ) -> i64 {
     // Quantity per asset and cash balance reconstructed from transactions ≤ period_end.
@@ -511,19 +548,23 @@ pub(crate) fn end_value_as_of(
         if priced.class == AssetClass::Cash {
             continue;
         }
-        // PRF-022 — carry-forward: most recent recorded price with date ≤ period_end.
-        let Some(price) = priced.price_as_of(period_end).map(|p| p as i128) else {
-            continue;
-        };
-        if priced.currency == account_currency {
-            // Same-currency holding — no conversion (PRF-020/024 pre-FXR behaviour).
-            total += quantity * price / QUANTITY_UNIT;
-        } else if let Some(rate) = rate_map.get(&(priced.currency.clone(), period_end)) {
-            // FXR-042 — value the foreign holding using the rate as of period_end.
-            let converted_price = at_rate(price, *rate);
-            total += quantity * converted_price / QUANTITY_UNIT;
+        // PRF-022 — carry-forward: most recent recorded price with date ≤ period_end, at
+        // the rate as of period_end for a foreign holding (FXR-042), which contributes 0
+        // without a usable one (FXR-034); PRF-022A — with no recorded price, its cost.
+        let rate = rate_map
+            .get(&(priced.currency.clone(), period_end))
+            .copied();
+        if let Some(unit_value) = unit_value_as_of(
+            priced,
+            transactions,
+            asset_id,
+            account_currency,
+            method,
+            rate,
+            period_end,
+        ) {
+            total += quantity * unit_value / QUANTITY_UNIT;
         }
-        // FXR-034 — a foreign holding with no usable rate as-of period_end contributes 0.
     }
     debug_assert!(
         total <= i64::MAX as i128 && total >= i64::MIN as i128,
@@ -975,17 +1016,18 @@ pub(crate) fn position_held_as_of(
 /// PRF-082 — market value of ONE asset's position as of `period_end`, in
 /// account-currency micros: the quantity reconstructed from the asset's
 /// transaction replay (PRF-021) valued at the carry-forward price (PRF-022) and
-/// the FX rate at `period_end` (FXR-042). Contributes 0 when the position is not
-/// held, when the asset has no usable price or rate as of the date (PRF-022 /
-/// FXR-034), or when the scoped asset is the Cash class — mirroring the
-/// priced-holding path of `end_value_as_of`, which never values the cash line as
-/// a holding.
+/// the FX rate at `period_end` (FXR-042), or at its cost with no recorded price
+/// (PRF-022A). Contributes 0 when the position is not held, when a recorded price has
+/// no usable rate as of the date (FXR-034), or when the scoped asset is the Cash class —
+/// mirroring the priced-holding path of `end_value_as_of`, which never values the cash
+/// line as a holding.
 pub(crate) fn holding_end_value_as_of(
     asset_transactions: &[Transaction],
     asset_id: &str,
     priced_assets: &HashMap<String, PricedAsset>,
     rate_map: &RateMap,
     account_currency: &str,
+    method: CostBasisMethod,
     period_end: NaiveDate,
 ) -> i64 {
     let quantity = Account::quantity_held_as_of(
@@ -1002,18 +1044,21 @@ pub(crate) fn holding_end_value_as_of(
     if priced.class == AssetClass::Cash {
         return 0;
     }
-    let Some(price) = priced.price_as_of(period_end).map(|p| p as i128) else {
-        return 0;
-    };
-    let quantity = quantity as i128;
-    let value = if priced.currency == account_currency {
-        quantity * price / QUANTITY_UNIT
-    } else if let Some(rate) = rate_map.get(&(priced.currency.clone(), period_end)) {
-        let converted_price = at_rate(price, *rate);
-        quantity * converted_price / QUANTITY_UNIT
-    } else {
-        0
-    };
+    let rate = rate_map
+        .get(&(priced.currency.clone(), period_end))
+        .copied();
+    let value = unit_value_as_of(
+        priced,
+        asset_transactions,
+        asset_id,
+        account_currency,
+        method,
+        rate,
+        period_end,
+    )
+    .map_or(0, |unit_value| {
+        quantity as i128 * unit_value / QUANTITY_UNIT
+    });
     debug_assert!(
         value <= i64::MAX as i128 && value >= i64::MIN as i128,
         "holding_end_value_as_of i64 overflow: {value}"
@@ -1357,6 +1402,7 @@ mod tests {
                 &no_assets,
                 &no_rates,
                 "EUR",
+                CostBasisMethod::default(),
                 day("2024-02-28")
             ),
             105_000_000
@@ -1392,7 +1438,15 @@ mod tests {
         let period_end = day("2024-06-30");
         let rates = RateMap::from([(("USD".to_string(), period_end), 900_000)]);
         assert_eq!(
-            holding_end_value_as_of(&transactions, "asset-1", &priced, &rates, "EUR", period_end),
+            holding_end_value_as_of(
+                &transactions,
+                "asset-1",
+                &priced,
+                &rates,
+                "EUR",
+                CostBasisMethod::default(),
+                period_end
+            ),
             27_000_000
         );
         assert_eq!(
@@ -1402,6 +1456,7 @@ mod tests {
                 &priced,
                 &RateMap::new(),
                 "EUR",
+                CostBasisMethod::default(),
                 period_end
             ),
             0,
@@ -1483,6 +1538,140 @@ mod tests {
         }
     }
 
+    // #824 / PRF-022 / PRF-022A / FXR-034 — one unit's value in the account's currency: its
+    // recorded price first, converted at the rate and none without one; with no recorded
+    // price, the holding's average cost on the date, already in the account's currency —
+    // a sale revalues nothing — and none when nothing is held.
+    #[test]
+    fn prf_022a_one_unit_is_worth_its_recorded_price_then_its_average_cost() {
+        let bought = |date: &str, unit_cost: i64| {
+            let mut purchase =
+                transaction_on("asset-1", TransactionType::Purchase, date, 1_000_000);
+            purchase.unit_price = unit_cost;
+            purchase.total_amount = unit_cost;
+            purchase
+        };
+        let mut sold = transaction_on("asset-1", TransactionType::Sell, "2024-05-01", 1_000_000);
+        sold.unit_price = 300_000_000;
+        sold.total_amount = 300_000_000;
+        let transactions = vec![
+            bought("2024-03-01", 100_000_000),
+            bought("2024-04-01", 200_000_000),
+            sold,
+        ];
+        let value = |priced: &PricedAsset, rate, date: &str| {
+            unit_value_as_of(
+                priced,
+                &transactions,
+                "asset-1",
+                "EUR",
+                CostBasisMethod::default(),
+                rate,
+                day(date),
+            )
+        };
+        let unpriced = priced_with(Vec::new());
+        assert_eq!(
+            value(&unpriced, None, "2024-02-28"),
+            None,
+            "nothing held yet"
+        );
+        assert_eq!(value(&unpriced, None, "2024-03-15"), Some(100_000_000));
+        assert_eq!(value(&unpriced, None, "2024-04-15"), Some(150_000_000));
+        assert_eq!(
+            value(&unpriced, None, "2024-06-30"),
+            Some(150_000_000),
+            "a sale at 300 revalues nothing"
+        );
+        let priced = priced_with(vec![price_at("2024-06-01", 200_000_000)]);
+        assert_eq!(
+            value(&priced, Some(900_000), "2024-06-30"),
+            Some(180_000_000)
+        );
+        assert_eq!(value(&priced, None, "2024-06-30"), None, "FXR-034");
+        assert_eq!(value(&priced, None, "2024-04-15"), Some(150_000_000));
+    }
+
+    // #824 / PRF-022B / PRF-082 — the cost of a holding with no recorded price follows the
+    // account's replay: a split leaves it as it was, and a transfer carries the average
+    // cost, so the two accounts together are worth what the one was.
+    #[test]
+    fn prf_022b_a_split_and_a_transfer_leave_an_unpriced_holding_s_value_as_it_was() {
+        let moved = |kind, date: &str, units: i64, total: i64| {
+            let mut transaction = transaction_on("asset-1", kind, date, units);
+            transaction.total_amount = total;
+            transaction.unit_price = total * 1_000_000 / units;
+            transaction
+        };
+        let unpriced = HashMap::from([("asset-1".to_string(), priced_with(Vec::new()))]);
+        let worth = |transactions: &[Transaction], date: &str| {
+            holding_end_value_as_of(
+                transactions,
+                "asset-1",
+                &unpriced,
+                &RateMap::new(),
+                "EUR",
+                CostBasisMethod::default(),
+                day(date),
+            )
+        };
+        let mut sending = vec![
+            moved(
+                TransactionType::Purchase,
+                "2024-03-01",
+                1_000_000,
+                100_000_000,
+            ),
+            moved(
+                TransactionType::Purchase,
+                "2024-04-01",
+                1_000_000,
+                200_000_000,
+            ),
+        ];
+        assert_eq!(worth(&sending, "2024-04-30"), 300_000_000);
+        // The account's value counts the same 300, beside the cash the purchases took.
+        assert_eq!(
+            end_value_as_of(
+                &sending,
+                &unpriced,
+                &RateMap::new(),
+                "EUR",
+                CostBasisMethod::default(),
+                day("2024-04-30"),
+            ),
+            0
+        );
+
+        sending.push(transaction_on(
+            "asset-1",
+            TransactionType::Split,
+            "2024-05-01",
+            2_000_000,
+        ));
+        assert_eq!(
+            worth(&sending, "2024-05-31"),
+            300_000_000,
+            "a 2-for-1 split"
+        );
+
+        // Half of it — 2 of the 4 units, at the average cost of 75 — moves to another account.
+        sending.push(moved(
+            TransactionType::TransferOut,
+            "2024-06-01",
+            2_000_000,
+            150_000_000,
+        ));
+        let receiving = vec![moved(
+            TransactionType::TransferIn,
+            "2024-06-01",
+            2_000_000,
+            150_000_000,
+        )];
+        assert_eq!(worth(&sending, "2024-06-30"), 150_000_000);
+        assert_eq!(worth(&receiving, "2024-06-30"), 150_000_000);
+    }
+
     // WOF-023 (#550) — a write-off is neither an external cash flow nor a position flow:
     // the value it takes out is a loss of the position.
     #[test]
@@ -1534,6 +1723,7 @@ mod tests {
                 &priced,
                 &RateMap::new(),
                 "USD",
+                CostBasisMethod::default(),
                 day(date),
             )
         };
@@ -1765,6 +1955,7 @@ mod tests {
 
         let ytd_pct = compute_current_ytd_pct(
             "EUR",
+            CostBasisMethod::default(),
             &asset_service,
             &currency_service,
             &transactions,

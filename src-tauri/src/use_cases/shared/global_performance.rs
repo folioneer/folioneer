@@ -2,7 +2,7 @@
 //! computation the global performance and the profiles overview (PFL-055) share (B18).
 
 use crate::context::account::{
-    Account, AccountError, AccountServiceContract, Transaction, TransactionType,
+    Account, AccountError, AccountServiceContract, CostBasisMethod, Transaction, TransactionType,
 };
 use crate::context::asset::AssetServiceContract;
 use crate::context::currency::CurrencyService;
@@ -219,6 +219,7 @@ impl PerformanceAggregator {
         }
 
         let mut converted_account = ConvertedAccount {
+            cost_basis_method: account.cost_basis_method,
             currency: account.currency,
             reference_currency: reference.to_string(),
             transactions,
@@ -325,6 +326,9 @@ fn empty_response(reference: &str) -> AccountPerformanceResponse {
 /// pre-converted to the reference currency (GPF-020/030).
 struct ConvertedAccount {
     currency: String,
+    /// The account's cost basis method: what values a holding with no recorded price
+    /// (PRF-022A).
+    cost_basis_method: CostBasisMethod,
     /// The currency the portfolio is reported in (GPF-011).
     reference_currency: String,
     transactions: Vec<Transaction>,
@@ -366,6 +370,7 @@ impl ConvertedAccount {
                 &self.priced_assets,
                 &self.rate_map,
                 &self.currency,
+                self.cost_basis_method,
                 period_end,
             ),
             Some(asset_id) => holding_end_value_as_of(
@@ -374,6 +379,7 @@ impl ConvertedAccount {
                 &self.priced_assets,
                 &self.rate_map,
                 &self.currency,
+                self.cost_basis_method,
                 period_end,
             ),
         };
@@ -850,6 +856,7 @@ mod bridge_reference_tests {
             .map(|date| (date, 500_000))
             .collect();
         ConvertedAccount {
+            cost_basis_method: CostBasisMethod::default(),
             currency: "USD".to_string(),
             reference_currency: "EUR".to_string(),
             transactions,

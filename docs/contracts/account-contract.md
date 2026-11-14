@@ -45,18 +45,18 @@
 > `get_account_details` is implemented in `use_cases/account_details/` — it reads from both the
 > account and asset BCs but mutates neither; owned here as the account aggregate is the primary subject.
 
-| Command               | Args                                                                                                                | Return                   | Errors                                                                                                                                                                                                                                                                                                                                                                           |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `get_account_details` | `account_id: String, as_of_date: Option<String>` — none = live view (today); a date = read-only past reconstruction | `AccountDetailsResponse` | `AccountNotFound { account_id }` (ACD-012), `InvalidDate` _(no rule — an as-of date that is no ISO date)_, `DateInFuture` _(no rule — an as-of date after today)_, `DatabaseError` (ACD-038) _(in the live view a latest price that is missing or cannot be read degrades the figure to None, MKT-031; in the as-of view a failed read of the price history is `DatabaseError`)_ |
+| Command               | Args                                                                                                                | Return                   | Errors                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `get_account_details` | `account_id: String, as_of_date: Option<String>` — none = live view (today); a date = read-only past reconstruction | `AccountDetailsResponse` | `AccountNotFound { account_id }` (ACD-012), `InvalidDate` _(no rule — an as-of date that is no ISO date)_, `DateInFuture` _(no rule — an as-of date after today)_, `DatabaseError` (ACD-038) _(in the live view a latest price that is missing or cannot be read leaves the price None and values the holding at its cost basis, MKT-031, PRF-022A; in the as-of view a failed read of the price history is `DatabaseError`)_ |
 
 ### Account Summaries
 
 > `get_account_summaries` is implemented in `use_cases/account_summary/` — it reads from both the
 > account and asset BCs (price lookups for each account's holdings) but mutates neither.
 
-| Command                 | Args                     | Return             | Errors                                                                                                                                                                                                                                                                                      |
-| ----------------------- | ------------------------ | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `get_account_summaries` | `holder: Option<String>` | `AccountSummaries` | `DatabaseError`; price lookup failures silently contribute 0 to the value (MKT-031); the accounts of the profile in use and their total (PFL-050) _(with a holder, trimmed, only its accounts, the total and `holders` staying every account's, ACC-051A; a blank one reads every account)_ |
+| Command                 | Args                     | Return             | Errors                                                                                                                                                                                                                                                                                                                                  |
+| ----------------------- | ------------------------ | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `get_account_summaries` | `holder: Option<String>` | `AccountSummaries` | `DatabaseError`; a holding whose price lookup fails counts as one with no recorded price, at its cost basis (MKT-031, PRF-022A); the accounts of the profile in use and their total (PFL-050) _(with a holder, trimmed, only its accounts, the total and `holders` staying every account's, ACC-051A; a blank one reads every account)_ |
 
 ### Account Performance
 
@@ -65,9 +65,9 @@
 > history) but mutates neither; owned here as the account aggregate is the primary subject. Period
 > values and metrics are recomputed on read per ADR-013; nothing is persisted.
 
-| Command                   | Args                                                                                                        | Return                       | Errors                                                                                                                                                                |
-| ------------------------- | ----------------------------------------------------------------------------------------------------------- | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `get_account_performance` | `account_id: String, asset_id: Option<String>` — `Some` scopes the series to one asset's position (PRF-080) | `AccountPerformanceResponse` | `AccountNotFound { account_id }` (PRF-016), `DatabaseError` (PRF-027 — a failed read of the price history included); an asset without a price contributes 0 (PRF-022) |
+| Command                   | Args                                                                                                        | Return                       | Errors                                                                                                                                                                                     |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `get_account_performance` | `account_id: String, asset_id: Option<String>` — `Some` scopes the series to one asset's position (PRF-080) | `AccountPerformanceResponse` | `AccountNotFound { account_id }` (PRF-016), `DatabaseError` (PRF-027 — a failed read of the price history included); a holding without a recorded price is worth its cost basis (PRF-022A) |
 
 ### Global Performance
 
@@ -609,8 +609,8 @@ struct HoldingDetail {
     dividends_received: i64,            // micros, account currency; sum of dividend cash for this (account, asset); 0 when none; always computable (DIV-070)
     total_return_pct: Option<i64>,      // micros; (unrealized_pnl + dividends_received) × 100 / cost_basis; None under the same conditions as performance_pct (DIV-071)
     management_fees: i64,               // micros, account currency; cumulative fee value (Σ removed_qty × price_as_of(date)) for this (account, asset); 0 when none (FEE-052)
-    market_value: Option<i64>,          // micros, account currency; the holding's contribution to total_global_value; None when unpriced or no usable rate (ACD-052)
-    current_value: Option<i64>,         // micros, asset currency; current_price × quantity; None when no price (MKT-143)
+    market_value: Option<i64>,          // micros, account currency; the holding's contribution to total_global_value; with no recorded price, its cost basis (PRF-022A); None for a foreign holding with a recorded price and no usable rate (ACD-052B)
+    current_value: Option<i64>,         // micros, asset currency; current_price × quantity; with no recorded price, the holding's cost basis when the asset is in the account's currency (PRF-022A), None otherwise (MKT-143)
     weight_pct: Option<i64>,            // micro-percent; market_value × 100 / total_global_value; None when market_value is None or the Global Value is not positive (ACD-052)
     inconsistency: Option<HoldingInconsistency>, // derived on read; Some when the merged ledger oversells the position or overdraws cash (SYN-040, CFR-042); None otherwise — see sync-contract.md
     current_price_source: Option<AssetPriceSource>, // where current_price comes from (asset contract); None when there is no price (MKT-142)
@@ -661,7 +661,7 @@ struct AccountDetailsResponse {
     total_cost_basis: i64,                     // micros, sum of cost_basis across active non-cash holdings (ACD-031, CSH-093)
     total_realized_pnl: i64,                   // micros, sum of total_realized_pnl across all holdings (ACD-045)
     total_unrealized_pnl: Option<i64>,         // micros; sum across same-currency priced active holdings; None when none qualify (MKT-040)
-    total_global_value: i64,                   // micros, account currency: cash_holding.quantity + Σ_h (h.quantity × latest_price(h)) over non-cash active holdings; unpriced non-cash holdings contribute 0 (CSH-094)
+    total_global_value: i64,                   // micros, account currency: cash_holding.quantity + Σ_h (h.quantity × latest_price(h)) over non-cash active holdings; a non-cash holding with no recorded price contributes its cost basis (PRF-022A, CSH-094)
     total_dividends_received: i64,             // micros, account currency: sum of dividend cash across all the account's dividend transactions; 0 when none (DIV-073)
     total_management_fees: i64,                // micros, account currency: sum of per-holding management_fees across the account; 0 when none (FEE-053)
     total_net_cash_input: i64,                 // micros, account currency: deposits minus withdrawals since inception; negative when more was withdrawn (ACD-053)
@@ -712,7 +712,7 @@ struct PerformanceMetric {
 struct PerformancePeriod {
     year: i32,
     month: Option<u8>,                              // Some(1..=12) for month rows; None for year rows (PRF-011)
-    end_value: i64,                                 // micros, account currency; Global Value at period end (PRF-020)
+    end_value: i64,                                 // micros, account currency; Global Value at period end, a holding with no recorded price at its cost basis (PRF-020, PRF-022A)
     previous_value: i64,                            // Global Value at the previous period end; 0 for the first period (PRF-074)
     cash_flow: i64,                                 // deposits minus withdrawals within the period (PRF-070); asset-scoped rows: purchases minus sales (PRF-084)
     asset_flow: i64,                                // in-kind entries and exits within the period: opening balances and transfers at entry-date market value, typed cost when unpriced (PRF-071, PRF-086); transfers excluded in the all-accounts read (TRF-028)
@@ -954,6 +954,7 @@ struct AccountJournal {
 - 2026-11-01 — #577 (SPL-010, DIV-023): `Transaction` gains `split_factor` and `dividend_amount`, each moved out of `quantity`, which is 0 on a split and a dividend. No command changed.
 - 2026-10-25 — #502 (IMP-051): `Transaction` gains `added_deposit`, absent from a change written before data format 11 and then `false`. No command changed.
 - 2026-11-14 — #774 (DIV-011, DIV-040, DIV-045): a dividend needs its asset held on its date or before it; `correct_transaction`, `cancel_transaction`, `correct_transfer` and `cancel_transfer` gain `DividendBeforeHolding`.
+- 2026-11-14 — #824 (PRF-022A): `HoldingDetail.market_value` and `.current_value` carry, for a holding with no recorded price, its cost basis; `current_price` stays none. No type or command changed.
 - 2026-11-14 — #825 (MKT-231): free shares within 5 days of a reported split's date also end an unrecorded split; the comments of `HoldingDetail.unrecorded_splits` and `UnrecordedSplit` say so. No type or command changed.
 - 2026-10-24 — #510 (TRF): `record_transfer` (`TransferDTO`, `TransferError`), `correct_transfer` (`CorrectTransferDTO`) and `cancel_transfer`; `TransactionType` gains `TransferOut` and `TransferIn`, `Transaction` gains `transfer_id`; `AccountError` gains `TransferToSameAccount`, `TransferReceivedAboveSent`, `TransferRateMissing { from_currency, to_currency }`, `TransferRateNotOne`, `PartOfTransfer` and `TransferNotFound`. `correct_transaction` and `correct_write_off` refuse a part of a transfer; `cancel_transaction` removes the whole transfer. Data format version 9 (SYN-038).
 
