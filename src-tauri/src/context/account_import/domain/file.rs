@@ -106,26 +106,30 @@ pub fn read_file(
         return Err(AccountImportError::FileTooLarge);
     }
     let (text, encoding) = decode(bytes, choices.encoding)?;
-    let raw: Vec<&str> = text
-        .split('\n')
-        .map(|line| line.strip_suffix('\r').unwrap_or(line))
-        .collect();
-    let Some((header_line, body)) = raw
-        .split_first()
-        .filter(|(header, _)| !header.trim().is_empty())
-    else {
+    if text
+        .lines()
+        .next()
+        .is_none_or(|first| first.trim().is_empty())
+    {
         return Err(AccountImportError::FileEmpty);
+    }
+    // IMP-012 / IMP-012B — a row ends where its separator's quoting says, so the rows are
+    // read under each candidate separator until one separates them.
+    let (separator, rows) = match choices.separator {
+        Some(separator) => (separator, rows_of(&text, separator)),
+        None => [Separator::Semicolon, Separator::Tab, Separator::Comma]
+            .into_iter()
+            .map(|separator| (separator, rows_of(&text, separator)))
+            .find(|(separator, rows)| separates(*separator, rows))
+            .ok_or(AccountImportError::SeparatorNotFound)?,
     };
-    let separator = match choices.separator {
-        Some(separator) => separator,
-        None => detect_separator(header_line, body).ok_or(AccountImportError::SeparatorNotFound)?,
-    };
+    let header_line = rows.first().map_or("", |(_, row)| *row);
     let header = split_header(header_line, separator);
-    let lines: Vec<FileLine> = body
+    let lines: Vec<FileLine> = rows
         .iter()
-        .enumerate()
-        .map(|(index, line)| FileLine {
-            number: index + 2,
+        .skip(1)
+        .map(|(number, line)| FileLine {
+            number: *number,
             fields: split_line(line, separator),
         })
         .filter(|line| line.fields.iter().any(|field| !field.is_empty()))
@@ -177,6 +181,65 @@ pub fn read_file(
         operation_labels,
     };
     Ok((file, read))
+}
+
+/// IMP-012B / IMP-012C — the rows of `text` under `separator`, each with the number of the line it
+/// starts on: a line break inside a quoted field is part of the field, not the end of its
+/// row. A quote opens a quoted field only as a field's first character, as `split_line`
+/// reads it. A quote that never closes leaves every line a row.
+fn rows_of(text: &str, separator: Separator) -> Vec<(usize, &str)> {
+    let separator = separator.character();
+    let by_line = || {
+        text.split('\n')
+            .enumerate()
+            .map(|(index, line)| (index + 1, line.strip_suffix('\r').unwrap_or(line)))
+            .collect::<Vec<_>>()
+    };
+    let mut rows = Vec::new();
+    let (mut start, mut started_on, mut line) = (0, 1, 1);
+    let (mut quoted, mut field_started) = (false, false);
+    let mut characters = text.char_indices().peekable();
+    while let Some((position, character)) = characters.next() {
+        match character {
+            '"' if quoted && characters.peek().is_some_and(|(_, next)| *next == '"') => {
+                characters.next();
+            }
+            // As `split_line` reads it: a quote adds nothing to its field, so a field that
+            // held only a closed quoted part may open another.
+            '"' if quoted => {
+                quoted = false;
+                continue;
+            }
+            '"' if !field_started => {
+                quoted = true;
+                continue;
+            }
+            '\n' if !quoted => {
+                let row = &text[start..position];
+                rows.push((started_on, row.strip_suffix('\r').unwrap_or(row)));
+                start = position + 1;
+                line += 1;
+                started_on = line;
+                field_started = false;
+                continue;
+            }
+            '\n' => line += 1,
+            _ if character == separator && !quoted => {
+                field_started = false;
+                continue;
+            }
+            _ => {}
+        }
+        if !character.is_whitespace() {
+            field_started = true;
+        }
+    }
+    if quoted {
+        return by_line();
+    }
+    let last = &text[start..];
+    rows.push((started_on, last.strip_suffix('\r').unwrap_or(last)));
+    rows
 }
 
 /// IMP-022A — the labels of the column at `position`, in the order the file first holds them.
@@ -239,31 +302,27 @@ fn windows_1252(byte: u8) -> char {
     }
 }
 
-/// IMP-012 — the first of `;`, tab and `,` that splits the header into more than one field
-/// and every line of the first 20 that are not blank into at least as many.
-fn detect_separator(header: &str, lines: &[&str]) -> Option<Separator> {
-    [Separator::Semicolon, Separator::Tab, Separator::Comma]
-        .into_iter()
-        .find(|separator| {
-            let columns = split_header(header, *separator).len();
-            columns > 1
-                && lines
-                    .iter()
-                    .map(|line| split_line(line, *separator))
-                    .filter(|fields| fields.iter().any(|field| !field.is_empty()))
-                    .take(DETECTION_LINES)
-                    .all(|fields| fields.len() >= columns)
-        })
+/// IMP-012 — whether `separator` splits the header, the first of `rows`, into more than
+/// one field and every row of the first 20 after it that are not blank into at least as
+/// many.
+fn separates(separator: Separator, rows: &[(usize, &str)]) -> bool {
+    let Some(((_, header), body)) = rows.split_first() else {
+        return false;
+    };
+    let columns = split_header(header, separator).len();
+    columns > 1
+        && body
+            .iter()
+            .map(|(_, row)| split_line(row, separator))
+            .filter(|fields| fields.iter().any(|field| !field.is_empty()))
+            .take(DETECTION_LINES)
+            .all(|fields| fields.len() >= columns)
 }
 
 /// IMP-012A — the fields of `line`: a quoted field holds the separator as text and `""`
 /// for `"`; each is trimmed.
 pub fn split_line(line: &str, separator: Separator) -> Vec<String> {
-    let separator = match separator {
-        Separator::Semicolon => ';',
-        Separator::Comma => ',',
-        Separator::Tab => '\t',
-    };
+    let separator = separator.character();
     let mut fields = Vec::new();
     let mut field = String::new();
     let mut quoted = false;
@@ -462,6 +521,43 @@ mod tests {
         let (file, _) = read("A,B,C\n1,2,\n").expect("read");
         assert_eq!(file.lines[0].fields, ["1", "2", ""]);
         assert_eq!(split_line("a;;b", Separator::Semicolon), ["a", "", "b"]);
+    }
+
+    // #782 / IMP-012B / IMP-012C — a line break inside a quoted field is part of the field: the row
+    // is one line, numbered where it starts, and the rows after it keep their numbers. A
+    // quote that never closes leaves the file read line by line.
+    #[test]
+    fn imp_012a_a_quoted_field_keeps_its_line_break() {
+        let (file, found) =
+            read("A,B,C\r\n1,\"first\r\nsecond, \"\"so\"\"\",x\r\n2,plain,y\r\n").expect("read");
+        assert_eq!(found.rows, 2);
+        assert_eq!(file.lines[0].fields, ["1", "first\r\nsecond, \"so\"", "x"]);
+        assert_eq!(file.lines[0].number, 2);
+        assert_eq!(file.lines[1].fields, ["2", "plain", "y"]);
+        assert_eq!(file.lines[1].number, 4);
+        // Under another separator, and with a quote that is no field's first character.
+        let (file, _) = read("A;B\n1;\"a\nb\"\n2;5\" wide\n3;c\n").expect("read");
+        assert_eq!(file.lines[0].fields, ["1", "a\nb"]);
+        assert_eq!(file.lines[1].fields, ["2", "5\" wide"]);
+        assert_eq!(file.lines[2].number, 5);
+        // An opening quote with no closing one: each line stays a row.
+        let (file, found) = read("A;B\n1;\"open\n2;b\n").expect("read");
+        assert_eq!(found.rows, 2);
+        assert_eq!(
+            file.lines[0].fields,
+            ["1", "open"],
+            "the field runs to the line's end"
+        );
+        assert_eq!(file.lines[1].fields, ["2", "b"]);
+        // Under `;`, a quote after a comma is no field's first character: each line a row.
+        let (file, found) = read("A;B\n1;x,\"y\n2;z,\"w\n3;v\n").expect("read");
+        assert_eq!(found.rows, 3);
+        assert_eq!(file.lines[0].fields, ["1", "x,\"y"]);
+        assert_eq!(file.lines[2].number, 4);
+        // An empty quoted part, then another: the rows and the fields agree on what opens.
+        let (file, _) = read("A;B\n1;\"\" \"x\ny\"\n2;z\n").expect("read");
+        assert_eq!(file.lines[0].fields, ["1", "x\ny"]);
+        assert_eq!(file.lines[1].fields, ["2", "z"]);
     }
 
     // IMP-013 — the comma when a field is a figure written with one, thousands dotted or

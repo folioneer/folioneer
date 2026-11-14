@@ -159,7 +159,7 @@ async fn source() -> (Portfolio, String, String, String) {
         &pea,
         "2024-01-02".into(),
         micro(10_000),
-        Some("first, \"main\"".into()),
+        Some("first, \"main\"\nsecond line".into()),
     )
     .await
     .expect("deposit");
@@ -271,8 +271,9 @@ async fn exp_050_an_account_comes_back_through_the_import() {
     ] {
         assert!(folder.join(file).is_file(), "{file}");
     }
-    // EXP-030 — the note keeps its comma and its quotes, quoted as the standard writes it.
-    assert!(read(&folder.join("transactions.csv")).contains("\"first, \"\"main\"\"\""));
+    // EXP-030 — the note keeps its comma, its quotes and its line break, quoted as the
+    // standard writes it; the import reads its row whole (IMP-012B, #782).
+    assert!(read(&folder.join("transactions.csv")).contains("\"first, \"\"main\"\"\nsecond line\""));
 
     let restored = portfolio().await;
     asset(&restored, "Acme World", "ACM", "FR0000000010").await;

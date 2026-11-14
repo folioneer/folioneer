@@ -22,6 +22,17 @@ pub enum Separator {
     Tab,
 }
 
+impl Separator {
+    /// The character it is in a file.
+    pub fn character(self) -> char {
+        match self {
+            Separator::Semicolon => ';',
+            Separator::Comma => ',',
+            Separator::Tab => '\t',
+        }
+    }
+}
+
 /// The mark before a figure's decimals (IMP-013).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 pub enum DecimalMark {
