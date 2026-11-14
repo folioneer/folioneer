@@ -54,7 +54,7 @@ pub fn definitions() -> Vec<ToolDefinition> {
             name: "list_holdings",
             title: "List an account's holdings",
             only_reads: true,
-            description: "The holdings of one account, with their quantities, costs, latest prices and gains, and the account's totals — total_capital_brought_in is what the owner brought in, cash and opening balances at cost; price_outdated says a holding's latest price is too old to trust for its kind (5 business days, 10 for a fund, never for a custom asset), and outdated_price_count how many are; unrecorded_splits lists the splits the price provider reports that this account held through without recording one on that date, each with its date and its factor as new for old — record it with record_split, nothing is recorded automatically; as they stood on a past date when `as_of` is given.",
+            description: "The holdings of one account, with their quantities, costs, latest prices and gains, and the account's totals — total_capital_brought_in is what the owner brought in, cash and opening balances at cost; price_outdated says a holding's latest price is too old to trust for its kind (5 business days, 10 for a fund, never for a custom asset), and outdated_price_count how many are; unrecorded_splits lists the splits the price provider reports that this account held through without recording a split or free shares of the asset within 5 days of its date, each with its date and its factor as new for old — record it with record_split, or with record_free_shares when it is a bonus issue; nothing is recorded automatically; as they stood on a past date when `as_of` is given.",
             input_schema: json!({
                 "type": "object",
                 "properties": {
