@@ -52,6 +52,7 @@ const ACCOUNT_COLUMNS: &[&str] = &[
     "currency",
     "country",
     "wrapper",
+    "holder",
     "management_fees_enabled",
     "cost_basis_method",
 ];
@@ -453,6 +454,7 @@ fn account_row(account: &Account) -> Vec<Cell> {
         text(&account.currency),
         optional_text(account.country.as_deref()),
         optional_text(account.wrapper.as_deref()),
+        optional_text(account.holder.as_deref()),
         Cell::Flag(account.management_fees_enabled),
         text(account.cost_basis_method.as_str()),
     ]
