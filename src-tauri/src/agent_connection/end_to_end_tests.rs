@@ -1057,10 +1057,10 @@ async fn agt_050_a_session_corrects_and_cancels_what_it_recorded() {
 }
 
 // AGT-060 / DIV-011 — a dividend counts what the account held on its date: one paid while
-// the position was open is recorded though it is sold since; one dated before the purchase
-// or after the sale is refused.
+// the position was open, or after it was sold, is recorded; one dated before the purchase is
+// refused.
 #[tokio::test]
-async fn agt_060_a_dividend_counts_what_was_held_on_its_date() {
+async fn agt_060_a_dividend_counts_what_was_held_on_its_date_or_before() {
     let data_dir = tempfile::tempdir().expect("tempdir");
     let bench = workbench(data_dir.path()).await;
     let granted = session(&bench.connections).await;
@@ -1068,6 +1068,7 @@ async fn agt_060_a_dividend_counts_what_was_held_on_its_date() {
         let (tools, granted) = (&bench.tools, &granted);
         async move { tools.call(granted, tool, &arguments).await }
     };
+    let mut ids = Vec::new();
     for (tool, arguments) in [
         (
             "record_deposit",
@@ -1082,7 +1083,13 @@ async fn agt_060_a_dividend_counts_what_was_held_on_its_date() {
             json!({ "account": "PEA", "asset": "CW8", "quantity": 2, "price": 110, "date": "2019-09-01" }),
         ),
     ] {
-        call(tool, arguments).await.expect(tool);
+        let recorded = call(tool, arguments).await.expect(tool);
+        ids.push(
+            recorded["transaction"]["id"]
+                .as_str()
+                .expect("id")
+                .to_string(),
+        );
     }
 
     let paid = call(
@@ -1092,15 +1099,33 @@ async fn agt_060_a_dividend_counts_what_was_held_on_its_date() {
     .await
     .expect("held on its date");
     assert_eq!(paid["transaction"]["transaction_type"], "Dividend");
-    for date in ["2019-02-15", "2019-10-01"] {
-        let refused = call(
-            "record_dividend",
-            json!({ "account": "PEA", "asset": "CW8", "amount": 4, "date": date }),
-        )
+    call(
+        "record_dividend",
+        json!({ "account": "PEA", "asset": "CW8", "amount": 4, "date": "2019-10-01" }),
+    )
+    .await
+    .expect("paid after the sale");
+    let refused = call(
+        "record_dividend",
+        json!({ "account": "PEA", "asset": "CW8", "amount": 4, "date": "2019-02-15" }),
+    )
+    .await
+    .expect_err("before the asset was first held");
+    assert_eq!(refused.code, "AssetNotHeld");
+
+    // DIV-040 / DIV-045 (#774) — correcting the dividend to a date before the asset was
+    // first held, or cancelling the purchase that first brought it in, is refused.
+    let moved = call(
+        "correct_recording",
+        json!({ "transaction": paid["transaction"]["id"], "date": "2019-02-15" }),
+    )
+    .await
+    .expect_err("a dividend before the first holding");
+    assert_eq!(moved.code, "DividendBeforeHolding");
+    let cancelled = call("cancel_recording", json!({ "transaction": ids[1] }))
         .await
-        .expect_err("not held on its date");
-        assert_eq!(refused.code, "AssetNotHeld", "{date}");
-    }
+        .expect_err("the purchase that first brought the asset in");
+    assert_eq!(cancelled.code, "DividendBeforeHolding");
 }
 
 // AGT-060 / AGT-050 — a session records a deposit, a withdrawal and a dividend through the

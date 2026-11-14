@@ -1164,7 +1164,7 @@ impl HoldingTransactionUseCase {
     }
 
     /// DIV-011 — the account exists, the paying asset exists, is not the cash line and was
-    /// held on the dividend's date. The account is returned for its currency.
+    /// held on the dividend's date or before it. The account is returned for its currency.
     async fn ensure_payable(
         &self,
         account_id: &str,
@@ -1202,8 +1202,8 @@ impl HoldingTransactionUseCase {
     }
 
     /// DIV-011 / FSD-011 — what a dividend and free shares both check: the account exists,
-    /// the asset exists, is not the cash line and is held — on `held_on` when given (a
-    /// dividend's date), today otherwise. The account is returned.
+    /// the asset exists, is not the cash line and is held — on `held_on` or before it when
+    /// given (a dividend's date), today otherwise. The account is returned.
     async fn ensure_held_asset(
         &self,
         account_id: &str,
@@ -1243,9 +1243,10 @@ impl HoldingTransactionUseCase {
         Ok(account)
     }
 
-    /// DIV-011 — whether the account held the asset on `date`: a quantity above zero once
-    /// every transaction of the pair dated on or before it is counted (TDI-010). A date
-    /// that does not read is left to the recorder, which refuses it as such (TRX-020).
+    /// DIV-011 — whether the account held the asset on `date` or before it: a dividend is
+    /// paid after the date that gave the right to it, so a position sold since still
+    /// receives it. A date that does not read is left to the recorder, which refuses it as
+    /// such (TRX-020).
     async fn held_on(
         &self,
         account_id: &str,
@@ -1254,12 +1255,11 @@ impl HoldingTransactionUseCase {
     ) -> Result<bool, AccountError> {
         match self
             .account_service
-            .holding_snapshot_as_of(account_id, asset_id, date)
+            .held_on_or_before(account_id, asset_id, date)
             .await
         {
-            Ok(snapshot) => Ok(snapshot.quantity > 0),
             Err(AccountError::InvalidDate) => Ok(true),
-            Err(error) => Err(error),
+            held => held,
         }
     }
 
@@ -1982,11 +1982,11 @@ mod tests {
         );
     }
 
-    // DIV-011 / TRX-012 — a dividend counts what the account held on its date: paid while
-    // the position was open it is recorded though the position is closed since; dated
-    // before the purchase, while the asset is held today, it is refused.
+    // DIV-011 / TRX-012 — a dividend counts what the account held on its date or before it:
+    // paid while the position was open it is recorded though the position is closed since;
+    // dated before the purchase, while the asset is held today, it is refused.
     #[tokio::test]
-    async fn record_dividend_counts_what_was_held_on_its_date() {
+    async fn record_dividend_counts_what_was_held_on_its_date_or_before() {
         let pool = setup_pool().await;
         let (account_svc, asset_svc) = make_services(&pool);
         let closed = asset_svc.create_asset(base_asset_dto()).await.unwrap();
@@ -2046,6 +2046,17 @@ mod tests {
         };
 
         dividend(&closed.id).await.expect("held on its date");
+        // #774 — paid after the whole position was sold: the right came while it was held.
+        uc.record_dividend(
+            &account.id,
+            closed.id.clone(),
+            "2024-05-15".to_string(),
+            micro(2),
+            micro(1),
+            None,
+        )
+        .await
+        .expect("held before its date");
         let err = dividend(&held.id).await.unwrap_err();
         assert!(
             matches!(err, DividendError::UseCase(DividendTask::AssetNotHeld)),
@@ -2053,10 +2064,11 @@ mod tests {
         );
     }
 
-    // DIV-011 — a dividend falls in a holding period: a position sold, then bought back,
-    // takes a dividend dated in either period and refuses one dated in the gap between.
+    // DIV-011 (#774) — a position sold, then bought back, takes a dividend dated in either
+    // period and in the gap between, paid after the sale; one dated before the first
+    // purchase is refused.
     #[tokio::test]
-    async fn record_dividend_refuses_the_gap_between_two_holding_periods() {
+    async fn record_dividend_refuses_only_a_date_before_the_first_holding() {
         let pool = setup_pool().await;
         let (account_svc, asset_svc) = make_services(&pool);
         let asset = asset_svc.create_asset(base_asset_dto()).await.unwrap();
@@ -2107,16 +2119,14 @@ mod tests {
                 None,
             )
         };
-        for date in ["2024-03-01", "2024-09-01"] {
+        for date in ["2024-03-01", "2024-06-15", "2024-09-01"] {
             dividend(date).await.expect(date);
         }
-        for date in ["2024-01-15", "2024-06-15"] {
-            let err = dividend(date).await.unwrap_err();
-            assert!(
-                matches!(err, DividendError::UseCase(DividendTask::AssetNotHeld)),
-                "{date}: {err:?}"
-            );
-        }
+        let err = dividend("2024-01-15").await.unwrap_err();
+        assert!(
+            matches!(err, DividendError::UseCase(DividendTask::AssetNotHeld)),
+            "before the first purchase: {err:?}"
+        );
     }
 
     // DIV-011 — DividendOnCashAsset: the paying asset is a Cash Asset.

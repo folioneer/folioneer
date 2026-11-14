@@ -142,7 +142,7 @@ A small `FormModal` — the free-shares modal:
 
 - **Stock splits / reverse splits** — ratio-based quantity changes (×2, ÷10) affecting the whole position; share most of this feature's mechanics but need ratio semantics and historical-price presentation decisions.
 - **User-declared attribution value** — an optional per-share reference value (e.g. the fiscal acquisition value of an _attribution gratuite_) that would increase the cost basis instead of diluting it. v1 is strictly zero-cost (user-confirmed).
-- **Distributions on closed positions** — recording a distribution declared while held but settled after the position was fully sold (v1 requires an active holding, `quantity > 0` — FSD-011; a dividend, by contrast, is judged on its date, DIV-011).
+- **Distributions on closed positions** — recording a distribution declared while held but settled after the position was fully sold (v1 requires an active holding, `quantity > 0` — FSD-011; a dividend, by contrast, is judged on its date or before it, DIV-011).
 - **Per-holding-row action** — a contextual "Record free shares" action directly on a holding row (asset pre-selected). v1 initiates from the header "Record" menu with an in-modal asset picker (FSD-010).
 - **Merger / acquisition asset substitution** — roadmap Phase 4 item; unrelated mechanics (asset swap), out of scope.
 

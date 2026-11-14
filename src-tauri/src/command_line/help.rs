@@ -461,7 +461,7 @@ Exit codes: 0 recorded, 1 refused, 2 wrong usage."
         );
     }
 
-    // CLI-027 / CLI-028 — a deposit, a withdrawal and a dividend have their pages: an
+    // CLI-027 / `command-line.md § holding dividend` — a deposit, a withdrawal and a dividend have their pages: an
     // amount, no quantity.
     #[test]
     fn cli_027_cash_and_a_dividend_have_their_own_pages() {

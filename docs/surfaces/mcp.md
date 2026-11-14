@@ -29,3 +29,18 @@ AGT-068. Input: `name` and `currency`; `bank`, `country` and `wrapper`, each opt
 `InvalidArguments`: a bank, a country or a wrapper that is not text, and every bound AGT-068
 sets on the text. Answer: `{ "status": "created", "account": … }`, the account as
 `list_accounts` gives it.
+
+## record_deposit, record_withdrawal
+
+AGT-060. Input: `account`, its name, and `amount`, in the account's currency; `date` and
+`note`, each optional; no asset. The refusals are the recording's, among them
+`AmountNotPositive`, and `InsufficientCash` for a withdrawal (CSH-031, CSH-080). Answer: as a recording's (AGT-044), its asset `null`.
+
+## record_dividend
+
+AGT-060. Input: `account` and `asset`, named as AGT-044 says, and `amount`, the total net
+amount received in the asset's currency; `rate`, the exchange rate to the account's
+currency, `date` and `note`, each optional. The refusals are the recording's, among them
+`AssetNotHeld` (DIV-011). Answer: as a
+recording's (AGT-044). `correct_recording` and `cancel_recording` answer
+`DividendBeforeHolding` for the refusals of DIV-040 and DIV-045.

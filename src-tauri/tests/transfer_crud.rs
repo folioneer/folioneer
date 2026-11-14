@@ -1193,3 +1193,62 @@ async fn trf_062_the_journal_names_the_other_account() {
         .await
         .contains(&(TransactionType::TransferIn, None)));
 }
+
+// DIV-045 (#774) — a transfer in that first brought an asset in is not moved after a dividend
+// of that asset, nor cancelled while one is dated after it.
+#[tokio::test]
+async fn div_045_a_transfer_never_leaves_a_dividend_before_any_holding() {
+    let ctx = build_ctx().await;
+    let (from, to, asset) = seed(&ctx, "EUR").await;
+    let parts = ctx
+        .transfer
+        .record_transfer(&from, &to, asset.clone(), figures(micro(4), micro(4), None))
+        .await
+        .unwrap();
+    let transfer_id = parts[0].transfer_id.clone().unwrap();
+    ctx.recording
+        .record_dividend(
+            &to,
+            asset.clone(),
+            "2024-04-01".to_string(),
+            micro(2),
+            micro(1),
+            None,
+        )
+        .await
+        .expect("held since the transfer");
+
+    let later = TransferFigures {
+        date: "2024-05-01".to_string(),
+        ..figures(micro(4), micro(4), None)
+    };
+    let moved = ctx
+        .transfer
+        .correct_transfer(&transfer_id, later)
+        .await
+        .unwrap_err();
+    assert!(
+        matches!(
+            moved,
+            TransferError::Account(AccountError::DividendBeforeHolding)
+        ),
+        "{moved:?}"
+    );
+    let cancelled = ctx
+        .transfer
+        .cancel_transfer(&transfer_id)
+        .await
+        .unwrap_err();
+    assert!(
+        matches!(
+            cancelled,
+            TransferError::Account(AccountError::DividendBeforeHolding)
+        ),
+        "{cancelled:?}"
+    );
+    assert_eq!(
+        holding(&ctx, &to, &asset).await.unwrap().quantity,
+        folioneer_lib::shared::domain::quantity::from_surface(micro(4)),
+        "nothing persists"
+    );
+}

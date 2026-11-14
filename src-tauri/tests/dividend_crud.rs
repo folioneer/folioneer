@@ -1025,3 +1025,188 @@ async fn total_dividends_received_sums_all_account_dividends() {
         "total_dividends_received must sum all dividend transactions (DIV-073)"
     );
 }
+
+// -------------------------------------------------------------------------
+// #774 — DIV-011 / DIV-040: held on the dividend's date or before it
+// -------------------------------------------------------------------------
+
+/// One unit of `asset` bought or sold on `date` at 100.
+async fn trade(ctx: &Ctx, account_id: &str, asset_id: &str, date: &str, buy: bool) -> String {
+    let quantity = folioneer_lib::shared::domain::quantity::from_surface(micro(1));
+    let (id, date) = (asset_id.to_string(), date.to_string());
+    let recorded = if buy {
+        ctx.use_case
+            .buy_holding(
+                account_id,
+                id,
+                date,
+                quantity,
+                micro(100),
+                micro(1),
+                0,
+                None,
+                None,
+            )
+            .await
+    } else {
+        ctx.use_case
+            .sell_holding(
+                account_id,
+                id,
+                date,
+                quantity,
+                micro(100),
+                micro(1),
+                0,
+                None,
+                None,
+            )
+            .await
+    };
+    recorded.expect("trade").id
+}
+
+/// A dividend's or a trade's date moved to `date`, its figures kept.
+async fn move_to(
+    ctx: &Ctx,
+    account_id: &str,
+    transaction_id: &str,
+    date: &str,
+    dividend: bool,
+) -> Result<(), folioneer_lib::context::account::AccountError> {
+    let (quantity, unit_price) = if dividend {
+        (micro(2), 0)
+    } else {
+        (
+            folioneer_lib::shared::domain::quantity::from_surface(micro(1)),
+            micro(100),
+        )
+    };
+    ctx.use_case
+        .correct_transaction(
+            account_id,
+            transaction_id,
+            date.to_string(),
+            quantity,
+            unit_price,
+            micro(1),
+            0,
+            None,
+            None,
+        )
+        .await
+        .map(|_| ())
+}
+
+/// DIV-011 / DIV-040 (#774) — a dividend paid after the whole position was sold is
+/// recorded, and corrected to any date from the first holding on; correcting it to a date
+/// before the asset was first held is refused.
+#[tokio::test]
+async fn div_040_a_dividend_follows_the_first_holding_not_the_position() {
+    use folioneer_lib::context::account::AccountError;
+    let ctx = build_ctx().await;
+    let asset = ctx
+        .asset_service
+        .create_asset(stocks_asset_dto("Paid", "PAID", "EUR"))
+        .await
+        .unwrap();
+    let account = ctx
+        .account_service
+        .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
+        .await
+        .unwrap();
+    ctx.use_case
+        .record_deposit(&account.id, "2024-01-01".to_string(), micro(1_000), None)
+        .await
+        .unwrap();
+    trade(&ctx, &account.id, &asset.id, "2024-02-01", true).await;
+    trade(&ctx, &account.id, &asset.id, "2024-05-01", false).await;
+
+    let dividend = ctx
+        .use_case
+        .record_dividend(
+            &account.id,
+            asset.id.clone(),
+            "2024-05-15".to_string(),
+            micro(2),
+            micro(1),
+            None,
+        )
+        .await
+        .expect("paid after the sale");
+    move_to(&ctx, &account.id, &dividend.id, "2024-06-01", true)
+        .await
+        .expect("still after the first holding");
+    let refused = move_to(&ctx, &account.id, &dividend.id, "2024-01-15", true)
+        .await
+        .unwrap_err();
+    assert!(
+        matches!(refused, AccountError::DividendBeforeHolding),
+        "{refused:?}"
+    );
+}
+
+/// DIV-040 (#774) — a change to another transaction that would leave a dividend dated
+/// before the asset was first held is refused: the purchase moved after it, or cancelled.
+/// A sale moved before the dividend is accepted.
+#[tokio::test]
+async fn div_040_another_transaction_s_change_never_leaves_a_dividend_before_any_holding() {
+    use folioneer_lib::context::account::AccountError;
+    let ctx = build_ctx().await;
+    let asset = ctx
+        .asset_service
+        .create_asset(stocks_asset_dto("Paid", "PAID", "EUR"))
+        .await
+        .unwrap();
+    let account = ctx
+        .account_service
+        .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
+        .await
+        .unwrap();
+    ctx.use_case
+        .record_deposit(&account.id, "2024-01-01".to_string(), micro(1_000), None)
+        .await
+        .unwrap();
+    let purchase = trade(&ctx, &account.id, &asset.id, "2024-02-01", true).await;
+    let sale = trade(&ctx, &account.id, &asset.id, "2024-05-01", false).await;
+    ctx.use_case
+        .record_dividend(
+            &account.id,
+            asset.id.clone(),
+            "2024-04-01".to_string(),
+            micro(2),
+            micro(1),
+            None,
+        )
+        .await
+        .expect("held on its date");
+
+    move_to(&ctx, &account.id, &sale, "2024-03-01", false)
+        .await
+        .expect("a sale moved before the dividend is accepted");
+    move_to(&ctx, &account.id, &sale, "2024-05-01", false)
+        .await
+        .expect("back");
+
+    let moved = move_to(&ctx, &account.id, &purchase, "2024-04-15", false)
+        .await
+        .unwrap_err();
+    assert!(
+        matches!(moved, AccountError::DividendBeforeHolding),
+        "{moved:?}"
+    );
+
+    ctx.use_case
+        .cancel_transaction(&account.id, &sale)
+        .await
+        .expect("the sale goes");
+    let cancelled = ctx
+        .use_case
+        .cancel_transaction(&account.id, &purchase)
+        .await
+        .unwrap_err();
+    assert!(
+        matches!(cancelled, AccountError::DividendBeforeHolding),
+        "{cancelled:?}"
+    );
+}

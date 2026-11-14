@@ -426,20 +426,21 @@ mod tests {
         assert_eq!(value["price"]["asset_id"], cw8.id);
     }
 
-    // CLI-028 / DIV-011 — a dividend counts what the account held on its date: paid while
-    // the position was open, it is recorded though the position is closed since; dated
-    // before the purchase or after the sale, it is refused.
+    // `command-line.md § holding dividend` / DIV-011 — a dividend counts what the account held on its date or before
+    // it: paid while the position was open, or after it was sold, it is recorded; dated
+    // before the purchase, it is refused.
     #[tokio::test]
-    async fn cli_028_a_dividend_counts_what_was_held_on_its_date() {
+    async fn cli_028_a_dividend_counts_what_was_held_on_its_date_or_before() {
         let dir = portfolio("dividend-closed").await;
         for line in [
             "holding buy --account PEA --asset CW8 --quantity 2 --price 100 --date 2026-02-01",
             "holding sell --account PEA --asset CW8 --quantity 2 --price 110 --date 2026-03-01",
             "holding dividend --account PEA --asset CW8 --amount 5 --date 2026-02-15",
+            "holding dividend --account PEA --asset CW8 --amount 5 --date 2026-03-15",
         ] {
             assert_eq!(run_line(&dir, line).await.exit_code, RECORDED, "{line}");
         }
-        for date in ["2026-01-15", "2026-03-15"] {
+        for date in ["2026-01-15"] {
             let refused = run_line(
                 &dir,
                 &format!(
@@ -472,7 +473,7 @@ mod tests {
         );
     }
 
-    // CLI-027 / CLI-028 — a deposit, a withdrawal and a dividend are recorded through the
+    // CLI-027 / `command-line.md § holding dividend` — a deposit, a withdrawal and a dividend are recorded through the
     // window's rules: a withdrawal above the cash held and a dividend of an asset not held
     // are refused with the window's codes, and nothing is written.
     #[tokio::test]

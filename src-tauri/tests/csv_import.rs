@@ -855,7 +855,7 @@ async fn imp_035a_the_order_of_a_days_rows() {
          2024-02-02,Sell,FR0000000002,BTP,Beta Power,1,100.00,100.00,0,EUR\n\
          2024-02-04,Dividend,FR0000000010,,,,,1.00,,EUR\n\
          2024-02-05,Buy,FR0000000002,BTP,Beta Power,1,100.00,100.00,0,EUR\n\
-         2024-02-05,Dividend,FR0000000002,,,,,1.00,,EUR\n"
+         2024-02-03,Dividend,FR0000000010,,,,,1.00,,EUR\n"
     );
     let file = picked(&ctx, &rows, false).await;
     let previewed = preview(&ctx, &account_id, &file, &english_mapper()).await;
@@ -874,6 +874,10 @@ async fn imp_035a_the_order_of_a_days_rows() {
         "the day's first purchase, funded by the earlier deposit"
     );
     assert!(
+        matches!(status(&previewed, 3), RowStatus::Ready { .. }),
+        "DIV-011: a dividend paid after the whole position was sold the day before"
+    );
+    assert!(
         matches!(
             status(&previewed, 9),
             RowStatus::Rejected {
@@ -881,7 +885,7 @@ async fn imp_035a_the_order_of_a_days_rows() {
                 ..
             }
         ),
-        "IMP-035A: the dividend comes before the day's first purchase"
+        "IMP-035A: the dividend comes before the day's first purchase of its asset"
     );
 }
 

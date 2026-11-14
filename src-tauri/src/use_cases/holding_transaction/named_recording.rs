@@ -1642,7 +1642,7 @@ impl HoldingTransactionUseCase {
             .map_err(|error| refusal_from_account(&error))
     }
 
-    /// CLI-028 — a dividend: the account and the paying asset found by what was typed, the
+    /// `command-line.md § holding dividend` — a dividend: the account and the paying asset found by what was typed, the
     /// dividend recorded through the rules of the window.
     async fn record_dividend_named(
         &self,
@@ -2104,6 +2104,9 @@ pub fn refusal_from_account(error: &AccountError) -> Refusal {
         AccountError::CascadingOversell => {
             "this would leave a later transaction without enough units".to_string()
         }
+        AccountError::DividendBeforeHolding => {
+            "this would date a dividend before the asset was first held".to_string()
+        }
         AccountError::WriteOffWithoutReason => {
             "this write-off has no reason: correct it with one".to_string()
         }
@@ -2236,6 +2239,11 @@ mod tests {
                 AccountError::CascadingOversell,
                 "CascadingOversell",
                 "this would leave a later transaction without enough units",
+            ),
+            (
+                AccountError::DividendBeforeHolding,
+                "DividendBeforeHolding",
+                "this would date a dividend before the asset was first held",
             ),
             (
                 AccountError::WriteOffWithoutReason,
