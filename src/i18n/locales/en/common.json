@@ -1122,6 +1122,7 @@
     "type_dividend": "Dividend",
     "type_deposit": "Deposit",
     "type_withdrawal": "Withdrawal",
+    "type_deposit_or_withdrawal": "Deposit or withdrawal, by the amount's sign",
     "type_trade_tax": "Trade tax",
     "type_not_imported": "Not imported",
     "provider_label": "Provider",

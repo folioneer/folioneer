@@ -113,7 +113,7 @@ enum Separator { Semicolon, Comma, Tab }                    // IMP-012
 enum DecimalMark { Dot, Comma }                             // IMP-013
 enum DateFormat { DayMonthYear, MonthDayYear, YearMonthDay } // IMP-014
 enum Encoding { Utf8, Windows1252 }                         // IMP-011
-enum OperationType { Purchase, Sale, Dividend, Deposit, Withdrawal, TradeTax, NotImported } // IMP-022
+enum OperationType { Purchase, Sale, Dividend, Deposit, Withdrawal, DepositOrWithdrawal, TradeTax, NotImported } // IMP-022, IMP-031A
 
 // IMP-018 — what the user picked; each `None` is detected. `date_column`: the header the date
 // format is detected on (IMP-014), once mapped.
@@ -236,6 +236,7 @@ enum RowFigures {
 ## Changelog
 
 - 2026-11-08 — #766 (PFL-051A): `read_import_file`, `confirm_import` and `preview_import` refuse an account outside the profile in use with `AccountOutsideProfileInUse { account_id }`.
+- 2026-11-14 — #548 (IMP-031A): `OperationType` gains `DepositOrWithdrawal`, a deposit or a withdrawal by its amount's sign; `RowFigures` is unchanged, the row read as either.
 - 2026-10-25 — Added by `csv-import` (#501): `list_column_mappings`, `save_column_mapping`, `delete_column_mapping`, the mapping types, event `ColumnMappingUpdated`.
 - 2026-10-25 — Amended by `csv-import` (#501): the reading errors of `ImportError` (IMP-010 to IMP-021), ahead of the preview command.
 - 2026-10-25 — Amended by `csv-import` (#501): `read_import_file`, `preview_import`, their types and errors (IMP-010 to IMP-038).

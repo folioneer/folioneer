@@ -75,6 +75,9 @@ pub enum OperationType {
     Deposit,
     /// A withdrawal.
     Withdrawal,
+    /// A deposit or a withdrawal by the sign of its amount: positive a deposit, negative a
+    /// withdrawal (IMP-031A).
+    DepositOrWithdrawal,
     /// A trade tax, added to its purchase's fees (IMP-034).
     TradeTax,
     /// A corporate action this version leaves to record by hand.

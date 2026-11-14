@@ -337,6 +337,20 @@ fn read_line(
         OperationType::Dividend => RowFigures::Dividend { amount: amount()? },
         OperationType::Deposit => RowFigures::Deposit { amount: amount()? },
         OperationType::Withdrawal => RowFigures::Withdrawal { amount: amount()? },
+        // IMP-031A — the sign of the amount read gives the direction.
+        OperationType::DepositOrWithdrawal => {
+            let amount = amount()?;
+            let read_from = if net.is_some() {
+                located.net_amount
+            } else {
+                located.gross_amount
+            };
+            if read_from.is_some_and(|position| field(position).starts_with('-')) {
+                RowFigures::Withdrawal { amount }
+            } else {
+                RowFigures::Deposit { amount }
+            }
+        }
         OperationType::TradeTax => RowFigures::TradeTax {
             amount: amount()?,
             quantity,
@@ -357,7 +371,9 @@ fn read_line(
         .format("%Y-%m-%d")
         .to_string();
     let asset = match operation_type {
-        OperationType::Deposit | OperationType::Withdrawal => AssetRead::default(),
+        OperationType::Deposit | OperationType::Withdrawal | OperationType::DepositOrWithdrawal => {
+            AssetRead::default()
+        }
         _ => asset_read(),
     };
     Ok(RowRead::Operation(OperationRead {
@@ -505,6 +521,7 @@ mod tests {
             ("Retrait", OperationType::Withdrawal),
             ("TAXE TRANSAC FINAN", OperationType::TradeTax),
             ("OST détachement", OperationType::NotImported),
+            ("Mouvement espèces", OperationType::DepositOrWithdrawal),
             // A mapper's file may give an empty label a type; no row takes it (IMP-022).
             ("", OperationType::Deposit),
         ]
@@ -726,6 +743,54 @@ mod tests {
         assert_eq!(operation(&read[0]).date, "2024-01-03");
         assert_eq!(operation(&read[0]).asset.name.as_deref(), Some("ACME"));
         assert_eq!(operation(&read[0]).currency.as_deref(), Some("EUR"));
+    }
+
+    // #548 / IMP-031A — a deposit or a withdrawal by its sign: a positive amount, or one with
+    // no sign, is a deposit, a negative one a withdrawal, of the amount without its sign; the
+    // net amount's sign when the net amount is read, the gross amount's otherwise.
+    #[test]
+    fn imp_031a_a_deposit_or_a_withdrawal_by_its_sign() {
+        let read = rows(concat!(
+            ";Mouvement espèces;07/01/2024;;;;;500;;\n",
+            ";Mouvement espèces;08/01/2024;;;;;-120.5;;\n",
+            ";Mouvement espèces;09/01/2024;;;+30;;;;\n",
+            ";Mouvement espèces;10/01/2024;;;-40;;;;\n",
+            ";Mouvement espèces;11/01/2024;;;;;;;\n",
+            ";Mouvement espèces;12/01/2024;;;50;;-50;;\n",
+        ));
+        let deposit = operation(&read[0]);
+        assert_eq!(
+            deposit.figures,
+            RowFigures::Deposit {
+                amount: 500_000_000
+            }
+        );
+        assert_eq!(deposit.asset, AssetRead::default());
+        assert_eq!(
+            operation(&read[1]).figures,
+            RowFigures::Withdrawal {
+                amount: 120_500_000
+            }
+        );
+        assert_eq!(
+            operation(&read[2]).figures,
+            RowFigures::Deposit { amount: 30_000_000 }
+        );
+        assert_eq!(
+            operation(&read[3]).figures,
+            RowFigures::Withdrawal { amount: 40_000_000 }
+        );
+        assert_eq!(
+            read[4],
+            RowRead::Rejected(RowRejection::FigureMissing {
+                field: "net_amount".into()
+            })
+        );
+        // The net amount is the one read: its sign decides, not the gross amount's.
+        assert_eq!(
+            operation(&read[5]).figures,
+            RowFigures::Withdrawal { amount: 50_000_000 }
+        );
     }
 
     // IMP-034 — a trade tax joins the first purchase of its asset, date and quantity not yet

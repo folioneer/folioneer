@@ -1122,6 +1122,7 @@
     "type_dividend": "Dividende",
     "type_deposit": "Dépôt",
     "type_withdrawal": "Retrait",
+    "type_deposit_or_withdrawal": "Dépôt ou retrait, selon le signe du montant",
     "type_trade_tax": "Taxe sur la transaction",
     "type_not_imported": "Non importé",
     "provider_label": "Fournisseur",
