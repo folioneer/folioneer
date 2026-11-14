@@ -14,12 +14,12 @@ This spec covers the CRUD lifecycle of accounts. The Account Details view (drill
 
 A financial account owned by the user.
 
-| Field     | Business meaning                                                                                                                         |
-| --------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `name`    | User-defined display name (e.g. "PEA Boursorama", "Livret A"). Unique among the accounts of its profile (case-insensitive, ACC-003).     |
-| `country` | The account's own country (two upper-case letters), when one is set; absent otherwise (ACC-041).                                         |
-| `wrapper` | The identifier of the tax wrapper the account sits in, normally one of the lists of ACC-040; absent when none is set (ACC-043, ACC-044). |
-| `holder`  | Whose name the account is in, free text; absent when none is set (ACC-050). Read by no figure (ACC-052).                                 |
+| Field     | Business meaning                                                                                                                                      |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`    | User-defined display name (e.g. "PEA Boursorama", "Livret A"). Unique among the accounts of its profile (the case ignored for every letter, ACC-003). |
+| `country` | The account's own country (two upper-case letters), when one is set; absent otherwise (ACC-041).                                                      |
+| `wrapper` | The identifier of the tax wrapper the account sits in, normally one of the lists of ACC-040; absent when none is set (ACC-043, ACC-044).              |
+| `holder`  | Whose name the account is in, free text; absent when none is set (ACC-050). Read by no figure (ACC-052).                                              |
 
 ### PortfolioTotal
 

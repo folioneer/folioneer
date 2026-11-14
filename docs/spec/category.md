@@ -8,10 +8,10 @@ A category (`AssetCategory`) is a free-form grouping defined by the user to orga
 
 ## Category field definitions
 
-| Field  | Meaning                                                                                                                          |
-| ------ | -------------------------------------------------------------------------------------------------------------------------------- |
-| `id`   | Unique identifier generated at creation (UUID). The system category has the fixed id `default-uncategorized`.                    |
-| `name` | User-defined human-readable name (e.g. "US Stocks", "European Real Estate"). Unique across active categories (case-insensitive). |
+| Field  | Meaning                                                                                                                                                 |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`   | Unique identifier generated at creation (UUID). The system category has the fixed id `default-uncategorized`.                                           |
+| `name` | User-defined human-readable name (e.g. "US Stocks", "European Real Estate"). Unique across the categories, the case ignored for every letter (CAT-001). |
 
 ---
 
