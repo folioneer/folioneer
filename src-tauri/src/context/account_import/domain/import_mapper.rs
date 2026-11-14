@@ -287,6 +287,12 @@ impl ImportMapper {
         })
     }
 
+    /// IMP-020F — this mapper as a built-in preset, read-only.
+    pub fn as_built_in(mut self) -> Self {
+        self.built_in = true;
+        self
+    }
+
     /// IMP-020 — the mapper under the file name it takes among `held`, when it has none yet.
     pub fn named_among(mut self, held: &[String]) -> Self {
         if self.id.is_empty() {

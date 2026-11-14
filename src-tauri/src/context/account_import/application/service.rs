@@ -38,10 +38,7 @@ impl AccountImportService {
         self.built_in = files
             .into_iter()
             .filter_map(|(stem, bytes)| match read_mapper(&built_in_id(&stem), &bytes) {
-                Ok(mapper) => Some(ImportMapper {
-                    built_in: true,
-                    ..mapper
-                }),
+                Ok(mapper) => Some(mapper.as_built_in()),
                 Err(e) => {
                     tracing::error!(target: BACKEND, preset = %stem, err = %e, "built-in preset left out");
                     None

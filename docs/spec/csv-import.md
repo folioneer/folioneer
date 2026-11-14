@@ -96,7 +96,7 @@ One row of the file that is not blank — one line, or several when a quoted fie
 
 **IMP-020E — A saved mapper is reused (backend)**: A saved mapper picked for the next file reads it with its own separator, decimal mark, date format and encoding, none detected. The preview runs with the mapper in use, saved or not. Picking a mapper that is no longer held or no longer reads (IMP-020A) is rejected with a specific error.
 
-**IMP-020F — Built-in presets (backend)**: A built-in preset is a saved mapper that ships with the application, read-only: every rule of a saved mapper holds for it but where IMP-020G and IMP-040A say otherwise. Its identity is its own, which no file of the folder can take, and an update of the application that corrects it keeps it.
+**IMP-020F — Built-in presets (backend)**: A built-in preset is a saved mapper that ships with the application, read-only: every rule of a saved mapper holds for it but where IMP-020G and IMP-040A say otherwise. Its identity is its own, which no file of the folder can take, and an update of the application that corrects the preset keeps that identity. A preset that does not read as a mapper is left out of the list and logged, as a folder's file is (IMP-020A).
 
 **IMP-020G — Saving a built-in preset saves a copy (backend)**: Saving a built-in preset, as it is or changed, writes a mapper of its own, which needs a provider of its own (IMP-024); the preset stays as it was.
 
@@ -126,9 +126,9 @@ One row of the file that is not blank — one line, or several when a quoted fie
 
 **IMP-033 — An unknown asset is matched once (backend)**: The user matches an unknown asset's name, ISIN or reference to an asset of the portfolio; the match is part of the mapper in use, kept when it is saved, so the next file of that provider matches it. A match is compared as the field it was read from is (IMP-032). Every row of that name, ISIN or reference then takes that asset, and the preview judges them again. A match to an asset unknown to the portfolio is rejected with a specific error when it is made. Saving a mapper keeps its matches as they are. The user may create the asset from the row instead (IMP-052).
 
-**IMP-033B — A match made on a built-in preset (backend)**: An asset matched while a built-in preset is in use holds for that account import, and is remembered once the user saves a copy (IMP-020G; owner, 2026-10-31).
-
 **IMP-033A — A match whose asset is not held is passed over (backend)**: A saved match whose asset the portfolio does not hold, as in a mapper written elsewhere, is passed over: the next matches of IMP-032 apply, and the row is unknown if none does. Of two matches for one text, the first whose asset is held applies.
+
+**IMP-033B — A match made on a built-in preset (backend)**: An asset matched while a built-in preset is in use holds for that account import, and is remembered once the user saves a copy (IMP-020G; owner, 2026-10-31).
 
 **IMP-034 — A trade tax joins its purchase (backend)**: A trade-tax row is added to the fees of the purchase in the file with the same asset — the same ISIN, reference and name as read —, on the same date, of the same quantity when the tax row has one; its amount is its net amount, or its gross amount. The tax row keeps its own line in the preview, its status naming the purchase's line, and is counted and recorded with that purchase. When several purchases fit, the first in the file's order not yet holding one takes it: a purchase takes one trade tax at most, and a second tax row of the same asset, date and quantity takes the next such purchase. A trade-tax row with no such purchase is rejected — "no purchase of this asset, date and quantity in the file".
 

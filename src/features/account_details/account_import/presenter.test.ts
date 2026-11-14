@@ -4,6 +4,7 @@ import {
   accountImportErrorToI18n,
   blankDraft,
   columnAsInFile,
+  draftOf,
   fileNameOf,
   folderOf,
   mapperFileRefusalToI18n,
@@ -113,5 +114,39 @@ describe("OPERATION_TYPE_LABELS", () => {
     expect(OPERATION_TYPE_LABELS.DepositOrWithdrawal).toBe(
       "account_import.type_deposit_or_withdrawal",
     );
+  });
+});
+
+// #548 / IMP-020F — a mapper's draft holds what its file holds: neither its identity nor the
+// built-in mark, which the core refuses in a draft.
+describe("draftOf", () => {
+  it("leaves out the identity and the built-in mark", () => {
+    const draft = draftOf({
+      id: "built-in:interactive-brokers-trades",
+      built_in: true,
+      info: { provider: "Interactive Brokers — Trades" },
+      separator: "Comma",
+      decimal_mark: "Dot",
+      date_format: "YearMonthDay",
+      encoding: "Utf8",
+      columns: {
+        date: "TradeDate",
+        operation: "Buy/Sell",
+        isin: "ISIN",
+        reference: null,
+        name: null,
+        quantity: null,
+        unit_price: null,
+        gross_amount: null,
+        fees: null,
+        net_amount: null,
+        currency: null,
+      },
+      operation_types: [],
+      asset_matches: [],
+    });
+    expect(Object.keys(draft)).not.toContain("built_in");
+    expect(Object.keys(draft)).not.toContain("id");
+    expect(draft.info.provider).toBe("Interactive Brokers — Trades");
   });
 });
