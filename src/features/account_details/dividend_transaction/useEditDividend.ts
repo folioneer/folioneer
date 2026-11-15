@@ -11,8 +11,8 @@ import {
 import { useSnackbar } from "@/ui/components/snackbar/snackbarStore";
 import type { I18nMessage } from "@/ui/format/i18n";
 import { accountDetailsGateway } from "../gateway";
-import { dividendErrorToI18n } from "../shared/presenter";
-import { useDraftProblemDisplay } from "../shared/useDraftProblemDisplay";
+import { dividendDraftMessage, dividendErrorToI18n } from "../shared/presenter";
+import { type DraftFieldOverrides, useDraftProblemDisplay } from "../shared/useDraftProblemDisplay";
 import { useTransactionDraftCheck } from "../shared/useTransactionDraftCheck";
 
 /** The recorded dividend being corrected (DIV-040): its account and paying asset are fixed. */
@@ -41,6 +41,12 @@ interface EditDividendFormData {
   exchangeRate: string;
   note: string;
 }
+
+/**
+ * DIV-022 — a dividend has no unit price nor total to type: an amount that converts to
+ * nothing is the amount's to fix.
+ */
+const DIVIDEND_FIELDS: DraftFieldOverrides = { TotalAmountNotPositive: "quantity" };
 
 /**
  * DIV-040 — state of the dividend correction dialog. The core checks what is typed as
@@ -89,7 +95,12 @@ export function useEditDividend({ dividend, onSubmitSuccess }: UseEditDividendPr
     ],
   );
   const check = useTransactionDraftCheck(draft);
-  const problemDisplay = useDraftProblemDisplay(check.problem, check.problemMessage);
+  const problemDisplay = useDraftProblemDisplay(
+    check.problem,
+    dividendDraftMessage(check.problem, check.problemMessage),
+    "price",
+    DIVIDEND_FIELDS,
+  );
   const touch = problemDisplay.touch;
 
   const handleChange = useCallback(

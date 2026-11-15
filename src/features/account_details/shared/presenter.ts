@@ -157,6 +157,17 @@ export function dividendErrorToI18n(err: DividendError): I18nMessage {
 }
 
 /**
+ * DIV-021 — the message of a dividend draft's problem: a dividend's quantity is its amount,
+ * so a quantity past the limit is said as the amount past a trillion.
+ */
+export function dividendDraftMessage(
+  problem: TransactionDraftError | null,
+  message: I18nMessage | null,
+): I18nMessage | null {
+  return problem?.code === "QuantityOutOfRange" ? { key: "error.AmountOutOfRange" } : message;
+}
+
+/**
  * F27 — Maps the free-shares error surfaces to an i18n key (FSD-021/011/040).
  * Covers both the create path (`FreeSharesError`) and the edit path
  * (`AccountError`, via `correct_transaction`). Every reachable code resolves to

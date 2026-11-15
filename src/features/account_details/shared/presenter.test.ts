@@ -8,6 +8,7 @@ import type {
 import { microToFormatted } from "@/lib/microUnits";
 import {
   assetPriceMutationErrorToI18n,
+  dividendDraftMessage,
   dividendErrorToI18n,
   formatFxStaleness,
   formatSource,
@@ -665,6 +666,22 @@ describe("priceRefreshBlockedErrorToI18n", () => {
 // TotalAmountNotPositive, QuantityOutOfRange, AmountOutOfRange (AccountError). Unknown codes
 // fall to error.Unknown.
 // ---------------------------------------------------------------------------
+
+// DIV-021 (#465) — a dividend's quantity is its amount: a quantity past the limit is said as
+// the amount past a trillion; every other problem keeps its message.
+describe("dividendDraftMessage", () => {
+  it("says a quantity past the limit as the amount past a trillion", () => {
+    expect(
+      dividendDraftMessage({ code: "QuantityOutOfRange" }, { key: "error.QuantityOutOfRange" }),
+    ).toEqual({ key: "error.AmountOutOfRange" });
+  });
+
+  it("keeps every other problem's message", () => {
+    const message = { key: "error.TotalAmountNotPositive" };
+    expect(dividendDraftMessage({ code: "TotalAmountNotPositive" }, message)).toBe(message);
+    expect(dividendDraftMessage(null, null)).toBeNull();
+  });
+});
 
 describe("dividendErrorToI18n", () => {
   it("AccountNotFound (carries account_id payload) maps to error.AccountNotFound", () => {
