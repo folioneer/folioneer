@@ -1,4 +1,4 @@
-use super::cost_basis::{CostBasis, LotTake, MICRO};
+use super::cost_basis::{CarriedLot, CostBasis, LotTake, MICRO};
 use super::country::CostBasisMethod;
 use super::fee_schedule::{FeeCatchUpPosition, FeeSchedule};
 use super::holding::{Holding, HoldingAsOfReconstruction, HoldingSnapshot, StockSplitPosition};
@@ -60,6 +60,12 @@ pub enum AccountChange {
 /// (micro-units) into the receiving account's, rounded down.
 pub fn converted_cost(cost: i64, exchange_rate: i64) -> i64 {
     (cost as i128 * exchange_rate as i128 / 1_000_000) as i64
+}
+
+/// CBM-024 (b) — the lots a transfer out carries, as its transfer in brings them: each cost
+/// converted at `exchange_rate`, the lots adding up to the converted cost `received`.
+pub fn received_lots(lots: &[CarriedLot], exchange_rate: i64, received: i64) -> Vec<CarriedLot> {
+    CarriedLot::converted(lots, |cost| converted_cost(cost, exchange_rate), received)
 }
 
 /// Whether a holding replay enforces the ledger invariants (oversell, insufficient cash,
@@ -162,6 +168,9 @@ pub struct RemovalLot {
 }
 
 /// What `Account::replay_pair` gives for one (account, asset) pair.
+/// CBM-024 — the lots each transfer out carries, by transaction id.
+type CarriedByTransfer = std::collections::HashMap<String, Vec<CarriedLot>>;
+
 struct ReplayedPair {
     quantity: i128,
     average_price: i64,
@@ -174,6 +183,9 @@ struct ReplayedPair {
     /// EXP-026 — what each removal took, lot by lot, by transaction id; none under the
     /// weighted average.
     takes: std::collections::HashMap<String, Vec<LotTake>>,
+    /// CBM-024 — the lots each transfer out carries, by transaction id; none under the
+    /// weighted average.
+    carried: CarriedByTransfer,
 }
 
 /// Represents a financial account — the Aggregate Root of the Account bounded context.
@@ -1384,13 +1396,14 @@ impl Account {
             .iter()
             .filter(|t| t.asset_id == asset_id)
             .collect();
-        let (holding, pnl_map) = match self.recalculate_holding(asset_id, &pair_txs) {
-            Ok(result) => result,
-            Err(e) => {
-                self.transactions = before;
-                return Err(e);
-            }
-        };
+        let (holding, pnl_map, mut carried) =
+            match self.replay_holding_with_lots(asset_id, &pair_txs, Invariants::Enforced) {
+                Ok(result) => result,
+                Err(e) => {
+                    self.transactions = before;
+                    return Err(e);
+                }
+            };
         let mut placed = Vec::new();
         for tx in self
             .transactions
@@ -1402,6 +1415,7 @@ impl Account {
                     let cost = pnl_map.get(&tx.id).copied().unwrap_or(0);
                     tx.total_amount = cost;
                     tx.unit_price = Transaction::unit_cost(cost, tx.quantity);
+                    tx.carried_lots = carried.remove(&tx.id).unwrap_or_default();
                 }
                 TransactionType::WriteOff => tx.realized_pnl = pnl_map.get(&tx.id).copied(),
                 _ => {}
@@ -1563,10 +1577,11 @@ impl Account {
         }
     }
 
-    /// TRF-025 — gives every transfer out of this account the cost the replay now moves:
-    /// a write that changed the average price before one re-costs it. Returns the
-    /// transfers whose cost moved, with that cost, for their transfers in to follow.
-    pub fn restate_transfers_out(&mut self) -> Vec<(String, i64)> {
+    /// TRF-025 / CBM-024 (e) — gives every transfer out of this account the cost and the lots
+    /// the replay now moves: a write that changed the average price, or the lots taken, before
+    /// one re-costs it. Returns the transfers that moved, with their cost and lots, for their
+    /// transfers in to follow.
+    pub fn restate_transfers_out(&mut self) -> Vec<(String, i64, Vec<CarriedLot>)> {
         let assets: std::collections::BTreeSet<String> = self
             .transactions
             .iter()
@@ -1580,21 +1595,23 @@ impl Account {
                 .iter()
                 .filter(|t| t.asset_id == asset_id)
                 .collect();
-            let Ok((_, pnl_map)) = self.replay_holding(&asset_id, &pair_txs, Invariants::Tolerated)
+            let Ok(mut replayed) = Self::replay_pair(&pair_txs, self.cost_basis_method, false)
             else {
                 continue;
             };
             for tx in self.transactions.iter_mut().filter(|t| {
                 t.asset_id == asset_id && t.transaction_type == TransactionType::TransferOut
             }) {
-                let cost = pnl_map.get(&tx.id).copied().unwrap_or(0);
-                if tx.total_amount != cost {
+                let cost = replayed.pnl_map.get(&tx.id).copied().unwrap_or(0);
+                let lots = replayed.carried.remove(&tx.id).unwrap_or_default();
+                if tx.total_amount != cost || tx.carried_lots != lots {
                     tx.total_amount = cost;
                     tx.unit_price = Transaction::unit_cost(cost, tx.quantity);
+                    tx.carried_lots = lots.clone();
                     self.pending_changes
                         .push(AccountChange::TransactionUpdated(tx.clone()));
                     if let Some(transfer_id) = &tx.transfer_id {
-                        moved.push((transfer_id.clone(), cost));
+                        moved.push((transfer_id.clone(), cost, lots));
                     }
                 }
             }
@@ -1602,10 +1619,16 @@ impl Account {
         moved
     }
 
-    /// TRF-025 — gives the transfer in of `transfer_id` the cost its transfer out now moves,
-    /// converted at its recorded rate (TRF-022), and replays the receiving holding. A cost
-    /// that does not move it leaves the account as it was; `false` when it has none here.
-    pub fn recost_transfer_in(&mut self, transfer_id: &str, sending_cost: i64) -> Result<bool> {
+    /// TRF-025 / CBM-024 — gives the transfer in of `transfer_id` the cost and the lots its
+    /// transfer out now moves, converted at its recorded rate (TRF-022), and replays the
+    /// receiving holding. What does not move them leaves the account as it was; `false` when
+    /// it has none here.
+    pub fn recost_transfer_in(
+        &mut self,
+        transfer_id: &str,
+        sending_cost: i64,
+        sending_lots: &[CarriedLot],
+    ) -> Result<bool> {
         let Some(tx) = self.transactions.iter_mut().find(|t| {
             t.transfer_id.as_deref() == Some(transfer_id)
                 && t.transaction_type == TransactionType::TransferIn
@@ -1613,11 +1636,13 @@ impl Account {
             return Ok(false);
         };
         let cost = converted_cost(sending_cost, tx.exchange_rate);
-        if tx.total_amount == cost {
+        let lots = received_lots(sending_lots, tx.exchange_rate, cost);
+        if tx.total_amount == cost && tx.carried_lots == lots {
             return Ok(true);
         }
         tx.total_amount = cost;
         tx.unit_price = Transaction::unit_cost(cost, tx.quantity);
+        tx.carried_lots = lots;
         let asset_id = tx.asset_id.clone();
         self.pending_changes
             .push(AccountChange::TransactionUpdated(tx.clone()));
@@ -2015,6 +2040,21 @@ impl Account {
         transactions: &[&Transaction],
         invariants: Invariants,
     ) -> Result<(Holding, std::collections::HashMap<String, i64>)> {
+        self.replay_holding_with_lots(asset_id, transactions, invariants)
+            .map(|(holding, pnl_map, _)| (holding, pnl_map))
+    }
+
+    /// `replay_holding`, with the lots each transfer out carries (CBM-024).
+    fn replay_holding_with_lots(
+        &self,
+        asset_id: &str,
+        transactions: &[&Transaction],
+        invariants: Invariants,
+    ) -> Result<(
+        Holding,
+        std::collections::HashMap<String, i64>,
+        CarriedByTransfer,
+    )> {
         let enforced = invariants == Invariants::Enforced;
         let replayed = Self::replay_pair(transactions, self.cost_basis_method, enforced)?;
         let total_quantity = replayed.quantity;
@@ -2022,6 +2062,7 @@ impl Account {
         let total_realized_pnl = replayed.total_realized_pnl;
         let last_sold_date = replayed.last_sold_date;
         let pnl_map = replayed.pnl_map;
+        let carried = replayed.carried;
 
         // TRX-024C — a holding past what storage holds is refused; a merged ledger stands at it.
         let quantity = match i64::try_from(total_quantity) {
@@ -2065,7 +2106,7 @@ impl Account {
             ),
         };
 
-        Ok((holding, pnl_map))
+        Ok((holding, pnl_map, carried))
     }
 
     /// One (account, asset) pair replayed in chronological order (SEL-024: date, then the
@@ -2091,16 +2132,23 @@ impl Account {
         let mut pnl_map = std::collections::HashMap::new();
         // EXP-026 — what each removal took, lot by lot, under FIFO.
         let mut takes = std::collections::HashMap::new();
+        let mut carried = std::collections::HashMap::new();
         let mut total_realized_pnl: i64 = 0;
         let mut last_sold_date: Option<String> = None;
         let beyond =
             |basis: &CostBasis, t: &Transaction| enforced && t.quantity as i128 > basis.quantity();
         for t in &txs_by_date {
             match t.transaction_type {
-                // TRX-030/048, TRF-020, CBM-020/024 — units in at their cost.
-                TransactionType::Purchase
-                | TransactionType::OpeningBalance
-                | TransactionType::TransferIn => basis.acquire(&t.date, t.quantity, t.total_amount),
+                // TRX-030/048, TRF-020, CBM-020 — units in at their cost.
+                TransactionType::Purchase | TransactionType::OpeningBalance => {
+                    basis.acquire(&t.date, t.quantity, t.total_amount)
+                }
+                // CBM-024 — a transfer in brings the lots it carries, each at its date; one
+                // that carries none, one lot dated the transfer.
+                TransactionType::TransferIn if t.carries_its_lots() => {
+                    basis.acquire_carried(&t.carried_lots)
+                }
+                TransactionType::TransferIn => basis.acquire(&t.date, t.quantity, t.total_amount),
                 // TRF-020/023/024 — a transfer out leaves at its cost (CBM-022), the cost it
                 // moves kept in the map under its id; it realizes nothing and, leaving nothing
                 // held, closes the position as a sale does.
@@ -2111,6 +2159,10 @@ impl Account {
                     let taken = basis.take(t.quantity);
                     if !basis.last_takes().is_empty() {
                         takes.insert(t.id.clone(), basis.last_takes().to_vec());
+                        carried.insert(
+                            t.id.clone(),
+                            CarriedLot::taken(basis.last_takes(), taken.cost),
+                        );
                     }
                     last_vwap = taken.average_before;
                     pnl_map.insert(t.id.clone(), taken.cost);
@@ -2172,6 +2224,7 @@ impl Account {
             pnl_map,
             basis,
             takes,
+            carried,
         })
     }
 
@@ -8621,5 +8674,132 @@ mod write_off_tests {
                 requested: 1_100_000_000
             }
         ));
+    }
+}
+
+#[cfg(test)]
+mod carried_lots_tests {
+    use super::*;
+    use crate::shared::domain::quantity::from_surface;
+
+    fn units(n: i64) -> i64 {
+        from_surface(n * 1_000_000)
+    }
+
+    fn row(id: &str, kind: TransactionType, date: &str, quantity: i64, total: i64) -> Transaction {
+        Transaction::restore(
+            id.into(),
+            "acc".into(),
+            "asset".into(),
+            kind,
+            date.into(),
+            quantity,
+            0,
+            1_000_000,
+            0,
+            total,
+            None,
+            None,
+            format!("{date}T00:00:00Z"),
+        )
+    }
+
+    fn lot(date: &str, quantity: i64, cost: i64) -> CarriedLot {
+        CarriedLot {
+            acquired_on: date.into(),
+            quantity,
+            cost,
+            free: false,
+        }
+    }
+
+    // EXP-026A / CBM-024 — a sale after a transfer in takes the lots it carried, each named
+    // by the date the sending account acquired it on; one carrying none is one lot dated
+    // the transfer, as is one whose lots do not add up to it.
+    #[test]
+    fn exp_026a_a_lot_a_transfer_in_brought_keeps_its_date() {
+        let carried = vec![
+            lot("2024-02-01", units(10), 1_000),
+            lot("2024-03-01", units(5), 1_000),
+        ];
+        let dates = |transfer_in: Transaction| {
+            let sale = row(
+                "sale",
+                TransactionType::Sell,
+                "2024-05-01",
+                units(12),
+                3_000,
+            );
+            Account::removal_lots_in(&[transfer_in, sale], CostBasisMethod::Fifo)
+                .into_iter()
+                .map(|l| (l.acquired_on, l.quantity, l.cost))
+                .collect::<Vec<_>>()
+        };
+        let transfer_in = || {
+            row(
+                "in",
+                TransactionType::TransferIn,
+                "2024-04-01",
+                units(15),
+                2_000,
+            )
+        };
+        assert_eq!(
+            dates(transfer_in().with_carried_lots(carried.clone())),
+            [
+                ("2024-02-01".to_string(), units(10), 1_000),
+                ("2024-03-01".to_string(), units(2), 400),
+            ]
+        );
+        assert_eq!(
+            dates(transfer_in()),
+            [("2024-04-01".to_string(), units(12), 1_600)]
+        );
+        let short = vec![lot("2024-02-01", units(10), 1_000)];
+        assert_eq!(
+            dates(transfer_in().with_carried_lots(short)),
+            [("2024-04-01".to_string(), units(12), 1_600)]
+        );
+    }
+
+    // CBM-024 (f) / SYN-038 — a transaction change written before data format 19 has no
+    // lots: it reads as carrying none.
+    #[test]
+    fn cbm_024_a_change_of_an_earlier_format_carries_no_lot() {
+        let mut written = serde_json::to_value(
+            row(
+                "in",
+                TransactionType::TransferIn,
+                "2024-04-01",
+                units(1),
+                100,
+            )
+            .with_carried_lots(vec![lot("2024-02-01", units(1), 100)]),
+        )
+        .expect("written");
+        written
+            .as_object_mut()
+            .expect("an object")
+            .remove("carried_lots");
+        let read: Transaction = serde_json::from_value(written).expect("read");
+        assert!(read.carried_lots.is_empty());
+        assert!(!read.carries_its_lots());
+    }
+
+    // CBM-024 (b) — converted lots add up to the converted cost, what the roundings leave
+    // over going to the most recent lot.
+    #[test]
+    fn cbm_024_converted_lots_add_up_to_the_cost_received() {
+        let lots = vec![
+            lot("2024-01-01", 1, 1),
+            lot("2024-02-01", 1, 1),
+            lot("2024-03-01", 1, 1),
+        ];
+        let received = converted_cost(3, 1_500_000);
+        let costs: Vec<i64> = received_lots(&lots, 1_500_000, received)
+            .iter()
+            .map(|l| l.cost)
+            .collect();
+        assert_eq!((received, costs), (4, vec![1, 1, 2]));
     }
 }

@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id, account_id, asset_id, transaction_type, date, quantity, unit_price, exchange_rate, fees, total_amount, note, realized_pnl, created_at, write_off_reason, transfer_id, added_deposit AS \"added_deposit: bool\", split_factor, dividend_amount\n               FROM transactions\n               WHERE account_id = ? AND asset_id = ?\n               ORDER BY date ASC, created_at ASC, id ASC",
+  "query": "SELECT id, account_id, asset_id, transaction_type, date, quantity, unit_price,\n                  exchange_rate, fees, total_amount, note, realized_pnl, created_at, write_off_reason, transfer_id,\n                  added_deposit AS \"added_deposit: bool\", split_factor, dividend_amount, carried_lots\n           FROM transactions WHERE account_id = ?\n           ORDER BY date ASC, created_at ASC, id ASC",
   "describe": {
     "columns": [
       {
@@ -92,10 +92,15 @@
         "name": "dividend_amount",
         "ordinal": 17,
         "type_info": "Integer"
+      },
+      {
+        "name": "carried_lots",
+        "ordinal": 18,
+        "type_info": "Text"
       }
     ],
     "parameters": {
-      "Right": 2
+      "Right": 1
     },
     "nullable": [
       false,
@@ -115,8 +120,9 @@
       true,
       false,
       true,
+      true,
       true
     ]
   },
-  "hash": "027feac3dc560b48c2cc6148240a69320fb9d72cfd0ef320885151025d7750d7"
+  "hash": "46d13041dea79ebc5e2a43728f7a15c9af544c59f5aed52a8f9f9925eea0b2f0"
 }

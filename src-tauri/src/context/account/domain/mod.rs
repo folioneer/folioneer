@@ -13,6 +13,7 @@ mod wrapper;
 
 pub use account::AccountChange;
 pub use account::*;
+pub use cost_basis::CarriedLot;
 pub use country::{rules_of, CostBasisMethod, CountryRules, COUNTRY_RULES};
 pub use fee_schedule::*;
 pub use holding::*;

@@ -2,7 +2,7 @@
 
 ## Context
 
-Each account has a cost basis method: the weighted average (TRX-030), the rule in France and Italy, or first in, first out, the rule in Germany, Spain and Poland, so a user sees the realized gains their broker and tax office see (#395). The method is preselected from the account's country (ADR-025) and changeable, a change recomputing the account's history. Under FIFO a holding is a queue of lots, and what leaves it takes the oldest first. A transfer in is one lot (CBM-024); carrying the sender's lots across is #788.
+Each account has a cost basis method: the weighted average (TRX-030), the rule in France and Italy, or first in, first out, the rule in Germany, Spain and Poland, so a user sees the realized gains their broker and tax office see (#395). The method is preselected from the account's country (ADR-025) and changeable, a change recomputing the account's history. Under FIFO a holding is a queue of lots, and what leaves it takes the oldest first. A transfer carries the lots it moves to the receiving account, each with its acquisition date and cost (CBM-024).
 
 ---
 
@@ -16,15 +16,15 @@ Each account has a cost basis method: the weighted average (TRX-030), the rule i
 
 ### Lot
 
-Under FIFO, the units one transaction brought into a holding, with their acquisition date and cost. A lot belongs to its holding and is derived from the account's transactions on every replay: none is stored, and a holding's lots are read as CBM-034 says.
+Under FIFO, the units one transaction brought into a holding, or that a transfer in carried from another account (CBM-024), with their acquisition date and cost. A lot belongs to its holding and is derived from the account's transactions on every replay: none is stored but the lots a transfer's sides carry, and a holding's lots are read as CBM-034 says.
 
-| Field         | Business meaning                                                                       |
-| ------------- | -------------------------------------------------------------------------------------- |
-| `acquired_on` | The date of the transaction that brought the units in.                                 |
-| `quantity`    | The units it brought in, rescaled by the splits since.                                 |
-| `cost`        | What those units cost when they came in, in the account's currency, fees included.     |
-| `remaining`   | The units it still holds: none once taken whole, fewer after a fee (CBM-022, CBM-023). |
-| `free`        | Whether it came from free shares or interest, whatever its cost (CBM-020).             |
+| Field         | Business meaning                                                                                                                                                                                                                                                                |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `acquired_on` | The date of the transaction that brought the units in; for a lot a transfer in carried, the date the sending account acquired it on; for the one lot of a transfer in from an account under the weighted average or carrying none, the transfer's date (CBM-024 (a), (c), (f)). |
+| `quantity`    | The units it brought in, rescaled by the splits since.                                                                                                                                                                                                                          |
+| `cost`        | What those units cost when they came in, in the account's currency, fees included.                                                                                                                                                                                              |
+| `remaining`   | The units it still holds: none once taken whole, fewer after a fee (CBM-022, CBM-023).                                                                                                                                                                                          |
+| `free`        | Whether it came from free shares or interest, whatever its cost (CBM-020).                                                                                                                                                                                                      |
 
 ---
 
@@ -50,7 +50,7 @@ Under FIFO, the units one transaction brought into a holding, with their acquisi
 
 ### Creation (020–029)
 
-**CBM-020 — What brings a lot in (backend)**: Under FIFO, each purchase and opening balance brings one lot in, dated the transaction's date, at its `total_amount`; free shares (FSD-022) and interest on an asset line (INT-024) bring one lot in at no cost; a transfer in brings one lot as CBM-024 says.
+**CBM-020 — What brings a lot in (backend)**: Under FIFO, each purchase and opening balance brings one lot in, dated the transaction's date, at its `total_amount`; free shares (FSD-022) and interest on an asset line (INT-024) bring one lot in at no cost; a transfer in brings the lots CBM-024 says.
 
 **CBM-021 — The order of the lots (backend)**: Lots are ordered by acquisition date, then in the order the replay meets them (TRX-036).
 
@@ -58,7 +58,7 @@ Under FIFO, the units one transaction brought into a holding, with their acquisi
 
 **CBM-023 — A fee in units shrinks every lot (backend)**: Under FIFO, a management fee taken in units (FEE-023) takes from every lot the same share of its units, each lot keeping its cost; nothing is realized and the holding's cost is unchanged, as under the weighted average (owner, 2026-11-07, on #514). Each lot's units kept are rounded down, and the units that rounding leaves over go to the most recent lot, so the lots add up to the quantity FEE-028 computes.
 
-**CBM-024 — A transfer in is one lot (backend)**: Under FIFO, a transfer in brings one lot dated the transfer's date, at the cost it moved (TRF-020, TRF-025).
+**CBM-024 — A transfer carries its lots (backend)**: Under FIFO in the receiving account: (a) a transfer in brings the lots its transfer out took from the sending account (CBM-022), oldest first, each with the date it was acquired on, the units taken from it, their cost and whether it came from free shares or interest (CBM-020); (b) each lot's cost is the cost it left with, rounded down, converted at the transfer's rate (TRF-022), rounded down, what those roundings leave over going to the most recent lot, so the lots add up to the cost each side moved; (c) a transfer in from an account under the weighted average brings one lot dated the transfer's date, at the cost moved; (d) the lots take their place among the receiving holding's by their dates (CBM-021) from the transfer's date on: what left the receiving holding before the transfer is unchanged; (e) the lots follow the transfer out's as its cost does (TRF-025): a write in the sending account that changes the lots a transfer out takes rewrites the lots of both sides; (f) a transfer in that carries no lot — recorded before its sides carried lots, or arriving from a computer whose data format carries none — or whose lots do not add up to its quantity and cost, brings one lot dated the transfer's date, at its cost, until the next recording, correction or removal in its sending account re-costs it.
 
 **CBM-025 — A split rescales every lot (backend)**: A split (SPL-020) rescales every lot's quantity by its factor, each keeping its cost. Each lot's rescaled units are rounded down, and the units that rounding leaves over go to the most recent lot, so the lots add up to the quantity SPL-020 computes.
 
@@ -78,7 +78,7 @@ Under FIFO, the units one transaction brought into a holding, with their acquisi
 
 **CBM-032 — Figures as of a date (backend)**: Every figure reconstructed as of a date — a holding's average price and realized P&L as of a day (TDI-010), in the account's details as of a past date and in an AI agent's preview (AGT-072) — follows the account's method.
 
-**CBM-033 — The method is synced (backend)**: The method is part of the account, carried to every device of the sync with it (SYN-038). The device that changes it publishes what the change recomputed, its transfers in elsewhere included (TRF-025). A device that receives the change replays the account's holdings under the new method and takes the recomputed transactions as they were published. A sale or a write-off recorded under the old method on another device and crossing the change is replayed under the new one wherever it lands; a transfer out crossing it keeps the cost it was published with, as any transfer out a device receives (TRF-025), until a change of that transfer re-costs it. An account change that outranks the change of method (CFR-020) carries the method it holds, and every device replays under the method that wins, so every device ends with the same figures (CFR-013).
+**CBM-033 — The method is synced (backend)**: (a) The method is part of the account, carried to every device of the sync with it (SYN-038). (b) The device that changes it publishes what the change recomputed, its transfers in elsewhere included (TRF-025). (c) A device that receives the change replays the account's holdings under the new method and takes the recomputed transactions as they were published. (d) A sale or a write-off recorded under the old method on another device and crossing the change is replayed under the new one wherever it lands. (e) A transfer out crossing it keeps the cost and the lots it was published with, as any transfer out a device receives (TRF-025, CBM-024), until a change of that transfer re-costs it. (f) An account change that outranks the change of method (CFR-020) carries the method it holds, and every device replays under the method that wins, so every device ends with the same figures (CFR-013).
 
 **CBM-034 — A holding's lots are read (backend)**: Under FIFO, a holding's lots are read, oldest first, those taken whole included: each with the date it was acquired on, the units it brought in (rescaled by the splits since, each rescale rounded down), what they cost when they came in, the units it still holds (none once taken whole, fewer after a fee, CBM-023) and whether it came from free shares or interest, whatever its cost (CBM-020). The account's method is read with them. An unknown account is rejected with a specific error.
 
@@ -94,4 +94,6 @@ Under FIFO, the units one transaction brought into a holding, with their acquisi
 - [x] Other methods? — Weighted average and FIFO only (owner, 2026-10-17, #395).
 - [x] The United Kingdom and the United States? — Their own methods (share pooling and 30-day matching; lot identification) are left until planned; until then they take the weighted average (owner, 2026-11-07, on #764).
 - [x] A fee in units under FIFO? — Every lot shrinks, keeping its cost (owner, 2026-11-07, on #514).
-- [x] A transfer between two accounts? — It carries its lots (owner, 2026-11-07, on #514): #788; until it ships a transfer in is one lot (CBM-024).
+- [x] A transfer between two accounts? — It carries its lots, one lot at average cost from a weighted-average sending account (owner, 2026-11-07, on #514; #788, CBM-024).
+- [x] A transfer recorded before its sides carried lots? — It stays one lot dated the transfer until the next recording, correction or removal in its sending account re-costs it, as a transfer crossing a change does (TRF-025, CBM-024 (f)); no recomputation at launch (agent's choice, 2026-11-15, #788).
+- [x] The date of the lot a weighted-average sending account gives? — The transfer's date: the average pools the purchases, so no one date is theirs (owner, 2026-11-15, #788).

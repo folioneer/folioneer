@@ -3,6 +3,7 @@
 
 use super::country::CostBasisMethod;
 use crate::shared::domain::quantity::QUANTITY_UNIT;
+use serde::{Deserialize, Serialize};
 
 /// A split's factor is in millionths.
 pub(crate) const MICRO: i128 = 1_000_000;
@@ -45,6 +46,63 @@ pub(crate) struct LotTake {
     pub(crate) cost: i128,
     /// Whether the lot came from free shares or interest (CBM-020).
     pub(crate) free: bool,
+}
+
+/// CBM-024 — a lot a transfer moved, as each side carries it: the date the sending account
+/// acquired it on, the units taken from it, their cost in the side's account currency and
+/// whether it came at no cost.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CarriedLot {
+    /// The date the sending account acquired it on.
+    pub acquired_on: String,
+    /// The units moved, in quantity units.
+    pub quantity: i64,
+    /// Their cost, in money micro-units of the side's account currency.
+    pub cost: i64,
+    /// Whether it came from free shares or interest (CBM-020).
+    pub free: bool,
+}
+
+impl CarriedLot {
+    /// CBM-024 (a)(b) — the lots a transfer out took, adding up to the cost `total` it moved:
+    /// each cost rounded down, what the roundings leave over going to the most recent lot.
+    pub(crate) fn taken(takes: &[LotTake], total: i64) -> Vec<CarriedLot> {
+        let lots = takes
+            .iter()
+            .map(|take| CarriedLot {
+                acquired_on: take.acquired_on.clone(),
+                quantity: take.quantity.clamp(0, i64::MAX as i128) as i64,
+                cost: (take.cost / QUANTITY_UNIT) as i64,
+                free: take.free,
+            })
+            .collect();
+        Self::adding_up(lots, total)
+    }
+
+    /// CBM-024 (b) — `lots` with each cost converted by `convert`, adding up to `total`, what
+    /// the roundings leave over going to the most recent lot.
+    pub(crate) fn converted(
+        lots: &[CarriedLot],
+        convert: impl Fn(i64) -> i64,
+        total: i64,
+    ) -> Vec<CarriedLot> {
+        let lots = lots
+            .iter()
+            .map(|lot| CarriedLot {
+                cost: convert(lot.cost),
+                ..lot.clone()
+            })
+            .collect();
+        Self::adding_up(lots, total)
+    }
+
+    fn adding_up(mut lots: Vec<CarriedLot>, total: i64) -> Vec<CarriedLot> {
+        let sum: i128 = lots.iter().map(|lot| lot.cost as i128).sum();
+        if let Some(last) = lots.last_mut() {
+            last.cost = (last.cost as i128 + total as i128 - sum) as i64;
+        }
+        lots
+    }
 }
 
 /// What a removal took: the average price just before it, and the cost of what left.
@@ -100,6 +158,13 @@ impl CostBasis {
     /// free shares and interest), after every lot acquired on or before that date.
     pub(crate) fn acquire(&mut self, acquired_on: &str, quantity: i64, total_amount: i64) {
         self.acquire_lot(acquired_on, quantity, total_amount, false);
+    }
+
+    /// CBM-024 (a)(d) — the lots a transfer in brings, each placed by its acquisition date.
+    pub(crate) fn acquire_carried(&mut self, lots: &[CarriedLot]) {
+        for lot in lots {
+            self.acquire_lot(&lot.acquired_on, lot.quantity, lot.cost, lot.free);
+        }
     }
 
     /// CBM-020 — free shares or interest: units in at no cost, a lot named as such.
@@ -427,6 +492,23 @@ mod tests {
         let mut average = two_lots(WeightedAverage);
         average.take(units(15));
         assert!(average.last_takes().is_empty());
+    }
+
+    // CBM-024 (a)(b) — the lots a transfer out took add up to the cost it moved, what the
+    // roundings leave over going to the most recent lot.
+    #[test]
+    fn carried_lots_add_up_to_the_cost_moved() {
+        let half = QUANTITY_UNIT / 2;
+        let take = |date: &str| LotTake {
+            acquired_on: date.into(),
+            quantity: 1,
+            cost: 10 * QUANTITY_UNIT + half,
+            free: false,
+        };
+        let lots = CarriedLot::taken(&[take("2024-01-01"), take("2024-02-01")], 21);
+        let costs: Vec<i64> = lots.iter().map(|l| l.cost).collect();
+        assert_eq!(costs, [10, 11]);
+        assert!(CarriedLot::taken(&[], 21).is_empty());
     }
 
     // CBM-026 — the quantity is the same under either method.

@@ -5,8 +5,8 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use crate::context::account::domain::{
-    AgentRecording, SessionRecording, Transaction, TransactionRepository, TransactionType,
-    WriteOffReason,
+    AgentRecording, CarriedLot, SessionRecording, Transaction, TransactionRepository,
+    TransactionType, WriteOffReason,
 };
 use crate::shared::domain::{
     ChangeDraft, LogicalTimestamp, Operation, Origin, RecordIdentity, RecordKind,
@@ -33,6 +33,28 @@ struct TransactionRow {
     added_deposit: bool,
     split_factor: Option<i64>,
     dividend_amount: Option<i64>,
+    /// CBM-024 — the lots a transfer's side carries, as JSON; none when it carries none.
+    carried_lots: Option<String>,
+}
+
+/// CBM-024 — the lots a stored side carries: none when the column is empty.
+pub(super) fn carried_lots_of(raw: Option<&str>) -> Result<Vec<CarriedLot>> {
+    raw.map(|text| {
+        serde_json::from_str(text)
+            .map_err(|e| anyhow::anyhow!("unreadable carried_lots in DB: {e}"))
+    })
+    .transpose()
+    .map(Option::unwrap_or_default)
+}
+
+/// CBM-024 — the lots a side carries, as stored: none when it carries none.
+pub(super) fn carried_lots_text(lots: &[CarriedLot]) -> Result<Option<String>> {
+    if lots.is_empty() {
+        return Ok(None);
+    }
+    serde_json::to_string(lots)
+        .map(Some)
+        .map_err(|e| anyhow::anyhow!("carried_lots not written: {e}"))
 }
 
 impl TryFrom<TransactionRow> for Transaction {
@@ -68,7 +90,8 @@ impl TryFrom<TransactionRow> for Transaction {
         .with_write_off_reason(write_off_reason)
         .with_transfer_id(row.transfer_id)
         .with_added_deposit(row.added_deposit)
-        .with_own_figures(row.split_factor, row.dividend_amount))
+        .with_own_figures(row.split_factor, row.dividend_amount)
+        .with_carried_lots(carried_lots_of(row.carried_lots.as_deref())?))
     }
 }
 
@@ -125,7 +148,7 @@ impl TransactionRepository for SqliteTransactionRepository {
     async fn get_by_id(&self, id: &str) -> Result<Option<Transaction>> {
         let row = sqlx::query_as!(
             TransactionRow,
-            r#"SELECT id, account_id, asset_id, transaction_type, date, quantity, unit_price, exchange_rate, fees, total_amount, note, realized_pnl, created_at, write_off_reason, transfer_id, added_deposit AS "added_deposit: bool", split_factor, dividend_amount FROM transactions WHERE id = ?"#,
+            r#"SELECT id, account_id, asset_id, transaction_type, date, quantity, unit_price, exchange_rate, fees, total_amount, note, realized_pnl, created_at, write_off_reason, transfer_id, added_deposit AS "added_deposit: bool", split_factor, dividend_amount, carried_lots FROM transactions WHERE id = ?"#,
             id
         )
         .fetch_optional(&self.pool)
@@ -142,7 +165,7 @@ impl TransactionRepository for SqliteTransactionRepository {
     ) -> Result<Vec<Transaction>> {
         let rows = sqlx::query_as!(
             TransactionRow,
-            r#"SELECT id, account_id, asset_id, transaction_type, date, quantity, unit_price, exchange_rate, fees, total_amount, note, realized_pnl, created_at, write_off_reason, transfer_id, added_deposit AS "added_deposit: bool", split_factor, dividend_amount
+            r#"SELECT id, account_id, asset_id, transaction_type, date, quantity, unit_price, exchange_rate, fees, total_amount, note, realized_pnl, created_at, write_off_reason, transfer_id, added_deposit AS "added_deposit: bool", split_factor, dividend_amount, carried_lots
                FROM transactions
                WHERE account_id = ? AND asset_id = ?
                ORDER BY date ASC, created_at ASC, id ASC"#,
@@ -166,7 +189,7 @@ impl TransactionRepository for SqliteTransactionRepository {
     async fn get_all_for_account(&self, account_id: &str) -> Result<Vec<Transaction>> {
         let rows = sqlx::query_as!(
             TransactionRow,
-            r#"SELECT id, account_id, asset_id, transaction_type, date, quantity, unit_price, exchange_rate, fees, total_amount, note, realized_pnl, created_at, write_off_reason, transfer_id, added_deposit AS "added_deposit: bool", split_factor, dividend_amount
+            r#"SELECT id, account_id, asset_id, transaction_type, date, quantity, unit_price, exchange_rate, fees, total_amount, note, realized_pnl, created_at, write_off_reason, transfer_id, added_deposit AS "added_deposit: bool", split_factor, dividend_amount, carried_lots
                FROM transactions
                WHERE account_id = ?
                ORDER BY date ASC, created_at ASC, id ASC"#,

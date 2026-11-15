@@ -2039,18 +2039,21 @@ fn stage_on(
     let placed_out = sending
         .place_transfer_parts(transfer_id, &asset_id, sent_parts)
         .map_err(to_holding_tx_error)?;
-    let cost = placed_out
+    let (cost, lots) = placed_out
         .iter()
         .find(|t| t.transaction_type == TransactionType::TransferOut)
-        .map(|t| t.total_amount)
-        .unwrap_or(0);
+        .map(|t| (t.total_amount, t.carried_lots.clone()))
+        .unwrap_or_default();
+    // CBM-024 — the transfer in brings the lots the transfer out took, converted.
+    let received = super::domain::converted_cost(cost, exchange_rate);
     let incoming = side(
         TransactionType::TransferIn,
         to_account_id,
         &date,
-        super::domain::converted_cost(cost, exchange_rate),
+        received,
         exchange_rate,
-    )?;
+    )?
+    .with_carried_lots(super::domain::received_lots(&lots, exchange_rate, received));
     let placed_in = receiving
         .place_transfer_parts(transfer_id, &asset_id, vec![incoming])
         .map_err(to_holding_tx_error)?;
@@ -4434,8 +4437,10 @@ async fn follow_transfers(
     accounts: &mut [&mut Account],
 ) -> Result<Vec<Account>, AccountError> {
     let mut followers: Vec<Account> = Vec::new();
-    // Each pass re-costs what the last one moved; a cost moves at most once per transfer
-    // and pass, so the passes end — bounded all the same against a corrupt ledger.
+    // Each pass re-costs what the last one moved; a transfer's cost and lots move at most
+    // once per pass (CBM-024), so the passes end — bounded all the same against a corrupt
+    // ledger, which is logged.
+    let mut settled = false;
     for _ in 0..64 {
         let mut moved = Vec::new();
         for account in accounts.iter_mut() {
@@ -4445,9 +4450,10 @@ async fn follow_transfers(
             moved.extend(account.restate_transfers_out());
         }
         if moved.is_empty() {
+            settled = true;
             break;
         }
-        for (transfer_id, cost) in moved {
+        for (transfer_id, cost, lots) in moved {
             let holders = repo.transfer_accounts(&transfer_id).await.map_err(|e| {
                 tracing::error!(target: BACKEND, transfer_id = %transfer_id, err = ?e, "follow_transfers: repository failure");
                 AccountError::DatabaseError
@@ -4455,16 +4461,16 @@ async fn follow_transfers(
             for holder in holders {
                 if let Some(account) = accounts.iter_mut().find(|a| a.id == holder) {
                     account
-                        .recost_transfer_in(&transfer_id, cost)
+                        .recost_transfer_in(&transfer_id, cost, &lots)
                         .map_err(to_holding_tx_error)?;
                 } else if let Some(account) = followers.iter_mut().find(|a| a.id == holder) {
                     account
-                        .recost_transfer_in(&transfer_id, cost)
+                        .recost_transfer_in(&transfer_id, cost, &lots)
                         .map_err(to_holding_tx_error)?;
                 } else {
                     let mut account = load_account(repo, &holder).await?;
                     if account
-                        .recost_transfer_in(&transfer_id, cost)
+                        .recost_transfer_in(&transfer_id, cost, &lots)
                         .map_err(to_holding_tx_error)?
                     {
                         followers.push(account);
@@ -4472,6 +4478,9 @@ async fn follow_transfers(
                 }
             }
         }
+    }
+    if !settled {
+        tracing::error!(target: BACKEND, "follow_transfers: the transfers still moved after 64 passes");
     }
     Ok(followers)
 }

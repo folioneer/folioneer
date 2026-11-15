@@ -73,9 +73,10 @@ none (CBM). Code: `CostBasisMethod` — `WeightedAverage`, `Fifo` (owner, 2026-1
 ### Lot
 
 Under FIFO, the units one transaction brought in (a purchase, an opening balance, free
-shares, interest, a transfer in), with their acquisition date and cost; a sale, a
-write-off or a transfer out takes the oldest lots first (CBM-020, CBM-022) (owner,
-2026-11-07).
+shares, interest), or that a transfer in carried from another account, with their cost and
+their acquisition date — for a carried lot, the date the sending account acquired it on; a
+sale, a write-off or a transfer out takes the oldest lots first (CBM-020, CBM-022, CBM-024)
+(owner, 2026-11-07).
 
 > Status: confirmed
 

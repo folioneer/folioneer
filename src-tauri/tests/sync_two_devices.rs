@@ -2054,6 +2054,20 @@ async fn written_form_of_every_record_kind() -> serde_json::Value {
         )
         .await
         .unwrap();
+    // CBM-024 — a second account under FIFO, for a transfer carrying its lots; created
+    // before the holder is set, so the account's last written form has one.
+    let second = ctx
+        .account_service
+        .create_classified(
+            "Second".into(),
+            "Bank".into(),
+            "EUR".into(),
+            false,
+            Some("DE".into()),
+            Some("de_depot".into()),
+        )
+        .await
+        .unwrap();
     // ACC-050 — a holder, so its form is pinned.
     let account = ctx
         .account_service
@@ -2067,6 +2081,20 @@ async fn written_form_of_every_record_kind() -> serde_json::Value {
             "2026-01-05".into(),
             folioneer_lib::shared::domain::quantity::from_surface(10_000_000),
             1_500_000_000,
+        )
+        .await
+        .unwrap();
+    // CBM-024 — a transfer whose sides carry their lots, the transfer in written last.
+    ctx.account_service
+        .record_transfer(
+            &account.id,
+            &second.id,
+            asset.id.clone(),
+            "2026-01-10".into(),
+            folioneer_lib::shared::domain::quantity::from_surface(4_000_000),
+            folioneer_lib::shared::domain::quantity::from_surface(4_000_000),
+            1_000_000,
+            Some("Moved".into()),
         )
         .await
         .unwrap();
