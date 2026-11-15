@@ -16,6 +16,7 @@ pub mod connections;
 mod definitions;
 pub mod gate;
 mod mcp;
+mod rules;
 pub mod server;
 pub mod tools;
 mod wire;

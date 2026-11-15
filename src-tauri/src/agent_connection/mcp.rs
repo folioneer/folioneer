@@ -10,8 +10,9 @@ use super::wire::shown_name;
 /// The protocol version answered when the client asks for none.
 const PROTOCOL_VERSION: &str = "2025-06-18";
 
-/// AGT-010, AGT-014 — the one convention on figures, said once.
-const FIGURES: &str = "Every figure you read and every figure you write is exact decimal text with a dot, up to six decimals and up to eight for a quantity of an asset: \"12.5\" is twelve and a half, and a percentage \"1.5\" is 1.5 %. Send a figure back as you read it. Only what counts things and the ratio of a split are whole numbers.";
+/// AGT-010, AGT-014, AGT-077 — the one convention on figures, said once, and where the
+/// rules behind them are read.
+const FIGURES: &str = "Every figure you read and every figure you write is exact decimal text with a dot, up to six decimals and up to eight for a quantity of an asset: \"12.5\" is twelve and a half, and a percentage \"1.5\" is 1.5 %. Send a figure back as you read it. Only what counts things and the ratio of a split are whole numbers. The rules behind a holding's figures — the cost basis method, realized results, fees, rates, rounding, income and value — are given by describe_rules; the application computes no tax.";
 const METHOD_NOT_FOUND: i64 = -32601;
 const INVALID_PARAMS: i64 = -32602;
 const INVALID_REQUEST: i64 = -32600;

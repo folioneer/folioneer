@@ -281,6 +281,8 @@ impl AgentTools {
             }
             "list_transactions" => self.list_transactions(granted, arguments).await,
             "list_lots" => self.list_lots(arguments).await,
+            // AGT-077 — the rules behind the figures; nothing is read from the portfolio.
+            "describe_rules" => Ok(super::rules::described()),
             "get_price" => self.get_price(arguments).await,
             "list_prices" => self.list_prices(arguments).await,
             "list_holdings" => {
