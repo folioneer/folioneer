@@ -3106,6 +3106,12 @@ pub trait AccountServiceContract: Send + Sync {
         account_id: &str,
         filter: &JournalFilter,
     ) -> StdResult<AccountJournal, AccountError>;
+    /// CBM-034 — the lots of the account's holding of an asset, with the account's method.
+    async fn holding_lots(
+        &self,
+        account_id: &str,
+        asset_id: &str,
+    ) -> StdResult<HoldingLots, AccountError>;
     /// Retrieves a transaction by ID.
     async fn get_transaction_by_id(&self, id: &str)
         -> StdResult<Option<Transaction>, AccountError>;
@@ -3607,6 +3613,14 @@ impl AccountServiceContract for AccountService {
         filter: &JournalFilter,
     ) -> StdResult<AccountJournal, AccountError> {
         AccountService::get_account_journal(self, account_id, filter).await
+    }
+
+    async fn holding_lots(
+        &self,
+        account_id: &str,
+        asset_id: &str,
+    ) -> StdResult<HoldingLots, AccountError> {
+        AccountService::holding_lots(self, account_id, asset_id).await
     }
 
     async fn get_transaction_by_id(

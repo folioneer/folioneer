@@ -2,13 +2,16 @@
 //! named (AGT-070): the rows a filter keeps of the account journal the window reads
 //! (TXL-060), oldest first and one page at a time, each with the reference of its asset and
 //! the mark of the agent session that recorded it. The price of the asset named at a date
-//! (AGT-071), and its prices over a period, one page at a time (AGT-075).
+//! (AGT-071), and its prices over a period, one page at a time (AGT-075). The lots of the
+//! holding named (AGT-076).
 
 use std::collections::HashMap;
 
 use chrono::NaiveDate;
 
-use crate::context::account::{AgentRecording, JournalFilter, TransactionType, TransactionView};
+use crate::context::account::{
+    AgentRecording, HoldingLots, JournalFilter, TransactionType, TransactionView,
+};
 use crate::context::asset::{Asset, AssetPrice};
 use crate::core::BACKEND;
 
@@ -106,7 +109,44 @@ pub struct ListedPrices {
     pub prices: Vec<AssetPrice>,
 }
 
+/// AGT-076 — the lots of the holding named, with the names it was asked by.
+#[derive(Debug, Clone)]
+pub struct NamedLots {
+    /// The account's name as stored.
+    pub account_name: String,
+    /// The asset's reference.
+    pub asset_reference: String,
+    /// The account's method and the holding's lots (CBM-034).
+    pub lots: HoldingLots,
+}
+
 impl HoldingTransactionUseCase {
+    /// AGT-076 — the lots of the account named's holding of the asset named (CBM-034),
+    /// refused as a listing refuses a name it cannot read (AGT-070).
+    pub async fn lots_named(&self, account: &str, asset: &str) -> Result<NamedLots, Refusal> {
+        let account = self
+            .find_account_by_name(account)
+            .await
+            .map_err(|error| refusal_from_lookup(&error))?;
+        let asset = self
+            .find_asset_by_name(asset)
+            .await
+            .map_err(|error| refusal_from_lookup(&error))?;
+        let lots = self
+            .account_service
+            .holding_lots(&account.id, &asset.id)
+            .await
+            .map_err(|error| {
+                tracing::error!(target: BACKEND, err = ?error, "lots_named: the lots could not be read");
+                unreadable()
+            })?;
+        Ok(NamedLots {
+            account_name: account.name,
+            asset_reference: asset.reference,
+            lots,
+        })
+    }
+
     /// AGT-070 — the transactions of the account named that the filter keeps, oldest first:
     /// the page asked for, with how many there are in all.
     pub async fn list_named(

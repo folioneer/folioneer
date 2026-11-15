@@ -8,7 +8,7 @@ use serde_json::Value;
 
 use crate::context::account::{
     spawn_within_profile, within_profile, AccountError, AccountServiceContract, AgentRecording,
-    Transaction, TransactionType, TransactionView, WriteOffReason,
+    CostBasisMethod, Transaction, TransactionType, TransactionView, WriteOffReason,
 };
 use crate::context::asset::{
     Asset, AssetClass, AssetCreationDefaults, AssetError, AssetKind, AssetServiceContract,
@@ -61,6 +61,8 @@ struct AccountRow {
     wrapper: Option<String>,
     /// AGT-102 — whose name it is in, or none (ACC-050).
     holder: Option<String>,
+    /// AGT-040 — its cost basis method (CBM-010).
+    cost_basis_method: CostBasisMethod,
 }
 
 /// An asset as a tool names it.
@@ -259,6 +261,7 @@ impl AgentTools {
                         currency: account.currency,
                         wrapper: account.wrapper,
                         holder: account.holder,
+                        cost_basis_method: account.cost_basis_method,
                     })
                     .collect();
                 as_json(&rows)
@@ -277,6 +280,7 @@ impl AgentTools {
                 as_json(&rows)
             }
             "list_transactions" => self.list_transactions(granted, arguments).await,
+            "list_lots" => self.list_lots(arguments).await,
             "get_price" => self.get_price(arguments).await,
             "list_prices" => self.list_prices(arguments).await,
             "list_holdings" => {
@@ -384,6 +388,25 @@ impl AgentTools {
             "price": recorded.price,
             "asset": recorded.asset_reference,
             "currency": recorded.currency,
+        }))
+    }
+
+    /// AGT-076 — the lots of the account named's holding of the asset named.
+    async fn list_lots(&self, arguments: &Value) -> Result<Value, Refusal> {
+        let read = self
+            .recorder
+            .lots_named(text(arguments, "account")?, text(arguments, "asset")?)
+            .await
+            .map_err(|refusal| Refusal {
+                code: refusal.code,
+                message: refusal.message,
+            })?;
+        Ok(serde_json::json!({
+            "status": "listed",
+            "account": read.account_name,
+            "asset": read.asset_reference,
+            "cost_basis_method": read.lots.method,
+            "lots": as_json(&read.lots.lots)?,
         }))
     }
 
@@ -661,6 +684,7 @@ impl AgentTools {
                 currency: created.currency,
                 wrapper: created.wrapper,
                 holder: created.holder,
+                cost_basis_method: created.cost_basis_method,
             },
         }))
     }
