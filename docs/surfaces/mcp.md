@@ -21,6 +21,15 @@ asset, or several. `DatabaseError`: a read that fails. Answer: `{ "status": "lis
 reference, the method, and the lots as CBM-034 reads them, each with the fields of the Lot
 entity (`docs/spec/cost-basis.md`): `acquired_on`, `quantity`, `cost`, `remaining`, `free`.
 
+## describe_rules
+
+AGT-077. Input: none. Answer: `{ "status": "described", "scope", "rules" }` — `scope` says
+what the rules are and that no tax is computed; each rule is `{ "rules", "topic",
+"statement", "example" }`: the spec rules it states, a few words, the statement, and an
+example — `account_country`, `account_currency`, `asset_currency` (the accounts Example and Other are of that country and currency), `management_fees_enabled` when the example needs the account's management fees on, the `calls` in order (each `{ "tool",
+"arguments" }`) and `answers`: `{ "at", "value" }`, the figure the last call answers at that
+JSON pointer.
+
 ## add_asset
 
 AGT-064. Input: `name`, `reference` and `currency`; `kind` or `class`, at least one, read

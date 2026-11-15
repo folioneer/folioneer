@@ -150,7 +150,7 @@ folioneer holding buy --help  # one command's options and defaults
 
 ## AI Agents (Model Context Protocol)
 
-An AI agent — Claude Code, Claude Desktop — can read the portfolio, an account's transactions and an asset's price at a date included, add an asset it does not have yet and record opening balances, purchases, sales, dividends, deposits, withdrawals, splits, free shares and prices through the application while it is open, on Linux and on Windows. Nothing answers when Folioneer is closed.
+An AI agent — Claude Code, Claude Desktop — can read the portfolio, an account's transactions, a holding's lots, an asset's price at a date, and the rules behind a holding's figures, add an asset it does not have yet and record opening balances, purchases, sales, dividends, deposits, withdrawals, splits, free shares and prices through the application while it is open, on Linux and on Windows. Nothing answers when Folioneer is closed.
 
 1. In Folioneer, **Settings → Allow AI agents to connect** (off by default).
 2. Tell the AI agent how to start the bridge, which is the installed program with `--mcp`:

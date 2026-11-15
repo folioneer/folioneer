@@ -3069,6 +3069,90 @@ async fn agt_069_an_account_whose_mark_cannot_be_written_is_not_created() {
     assert_eq!(bench.connections.sessions().remove(0).accounts_added, 0);
 }
 
+// AGT-077 — the rules an agent is told are the rules applied: every spec rule a statement
+// cites exists, and every statement's example, recorded through the tools on a fresh
+// portfolio, answers the figure it states. A statement that drifts from the engine fails here.
+#[tokio::test]
+async fn agt_077_the_rules_stated_are_the_ones_applied() {
+    let specs: String =
+        std::fs::read_dir(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../docs/spec"))
+            .expect("the specs")
+            .map(|entry| {
+                std::fs::read_to_string(entry.expect("a spec").path()).expect("a spec read")
+            })
+            .collect();
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let granted = session(&bench.connections).await;
+    let described = bench
+        .tools
+        .call(&granted, "describe_rules", &json!({}))
+        .await
+        .expect("described");
+    assert_eq!(described["status"], "described");
+    let rules = described["rules"].as_array().expect("rules");
+    for rule in rules {
+        for id in rule["rules"].as_array().expect("cited rules") {
+            let id = id.as_str().expect("a rule id");
+            assert!(specs.contains(&format!("**{id} ")), "{id} is no spec rule");
+        }
+        let example = rule
+            .get("example")
+            .unwrap_or_else(|| panic!("{} has no example", rule["topic"]));
+        let dir = tempfile::tempdir().expect("tempdir");
+        let bench = workbench(dir.path()).await;
+        let granted = session(&bench.connections).await;
+        let call = |tool: &str, arguments: Value| {
+            let (tools, granted) = (&bench.tools, &granted);
+            let tool = tool.to_string();
+            async move { tools.call(granted, &tool, &arguments).await }
+        };
+        for name in ["Example", "Other"] {
+            call(
+                "add_account",
+                json!({ "name": name, "currency": example["account_currency"], "country": example["account_country"] }),
+            )
+            .await
+            .expect("the example's accounts");
+        }
+        call(
+            "add_asset",
+            json!({ "name": "ACME", "reference": "ACME", "currency": example["asset_currency"], "kind": "Custom" }),
+        )
+        .await
+        .expect("the example's asset");
+        call(
+            "record_deposit",
+            json!({ "account": "Example", "amount": "100000", "date": "2024-01-02" }),
+        )
+        .await
+        .expect("cash to buy with");
+        // What the owner turns on in the window, no tool of an agent's.
+        if example["management_fees_enabled"] == true {
+            sqlx::query("UPDATE accounts SET management_fees_enabled = 1")
+                .execute(&bench.pool)
+                .await
+                .expect("management fees on");
+        }
+        let mut last = Value::Null;
+        for step in example["calls"].as_array().expect("calls") {
+            last = call(
+                step["tool"].as_str().expect("a tool"),
+                step["arguments"].clone(),
+            )
+            .await
+            .unwrap_or_else(|refusal| panic!("{}: {refusal:?}", rule["topic"]));
+        }
+        let at = example["answers"]["at"].as_str().expect("a pointer");
+        assert_eq!(
+            last.pointer(at),
+            Some(&example["answers"]["value"]),
+            "{}",
+            rule["topic"]
+        );
+    }
+}
+
 // AGT-076 / AGT-040 — a session reads an account's cost basis method and a holding's lots,
 // oldest first, a lot taken whole included; an account under the weighted average has none,
 // and an account or an asset it cannot name is refused. It is a read.

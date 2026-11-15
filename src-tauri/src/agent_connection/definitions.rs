@@ -81,6 +81,17 @@ pub fn definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
+            name: "describe_rules",
+            title: "Describe the rules applied",
+            only_reads: true,
+            description: "The rules the application applies to a holding's cost, its realized result, its income and its value — each account's cost basis method and what a sale takes, fees, exchange rates, rounding, write-offs, free shares, dividends, interest, transfers and valuation — each naming its spec rules, with a worked example. Read it before computing anything from these figures, a tax among them: the application computes no tax and states no country's tax treatment.",
+            input_schema: json!({
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+            }),
+        },
+        ToolDefinition {
             name: "list_transactions",
             title: "List an account's transactions",
             only_reads: true,
