@@ -42,7 +42,7 @@ What the exchange stores and gives, whatever convention computes from them (#845
 
 ### Eligibility and Initiation (010–019)
 
-**SHX-010 — What an exchange takes (backend)**: An exchange names an account, an asset given up and an asset received — two different assets, neither a Cash Asset, neither archived (SEL-037) —, a quantity given and a quantity received, both strictly positive and within TRX-020's bounds, a date within the TRX bounds (TRX-020), and optionally the cash paid, strictly positive, in the given asset's currency, with the rate to the account's (DIV-022: one between the same currencies, any other rate refused), and a note. An unknown account or asset, and each argument missing or out of bounds, is rejected with a specific error.
+**SHX-010 — What an exchange takes (backend)**: An exchange names an account, an asset given up and an asset received — two different assets, neither a Cash Asset, neither archived (SEL-037) —, a quantity given and a quantity received, both strictly positive and within TRX-020's bounds, a date within the TRX bounds (TRX-020), and optionally the cash paid, strictly positive, in the given asset's currency, with the rate to the account's (one between the same currencies, any other rate refused, as TRF-022), and a note. An unknown account or asset, and each argument missing or out of bounds, is rejected with a specific error.
 
 **SHX-011 — The value of the shares received (backend)**: An exchange carries the value of one share received on its date, strictly positive and within TRX-020's bounds, in the received asset's currency, with the rate to the account's — the one given, or else the stored rate of the date (FXR-035), one between the same currencies. When no value is given it is the received asset's price recorded on the exchange's date, if any (owner, 2026-11-15). An exchange with a cash part and no value, given or recorded, or no rate for it, is rejected with a specific error. Without a cash part a missing value stays none; the value computes no cost and no realized result then (SHX-024), and values the parts' flows (SHX-027).
 
@@ -56,7 +56,7 @@ What the exchange stores and gives, whatever convention computes from them (#845
 
 **SHX-022 — The received side (backend)**: The received side adds the quantity received to the received holding at the cost given up minus the cash part's share of it (SHX-021) — zero when the shares given up cost nothing. It moves no cash and realizes nothing. From its date the received asset is held (DIV-011).
 
-**SHX-023 — The lots under FIFO (backend)**: Under FIFO, the received holding gets the lots the given side took (CBM-022), each keeping the date it was acquired on and whether it came at no cost (CBM-020) (owner, 2026-11-15): each lot's units are `floor(its units × quantity received ÷ quantity given)` and its cost `floor(its cost × cost received ÷ cost given up)` — 0 when the cost given up is 0 —, what the roundings leave over going to the most recent lot, so the lots add up to the received side's quantity and cost. They take their place among the received holding's lots by their dates (CBM-021), from the exchange's date on: what left the received holding before the exchange is unchanged (as CBM-024 (d)).
+**SHX-023 — The lots under FIFO (backend)**: Under FIFO, the received holding gets the lots the given side took (CBM-022), each keeping the date it was acquired on and whether it came at no cost (CBM-020) (owner, 2026-11-15): each lot's units are `floor(its units × quantity received ÷ quantity given)` and its cost `floor(its cost × cost received ÷ cost given up)` — the cost received being the received side's (SHX-022) — 0 when the cost given up is 0 —, what the roundings leave over going to the most recent lot, so the lots add up to the received side's quantity and cost. They take their place among the received holding's lots by their dates (CBM-021), from the exchange's date on: what left the received holding before the exchange is unchanged (as CBM-024 (d)).
 
 **SHX-024 — Without a cash part (backend)**: An exchange without cash paid has no third part: the shares received keep the whole cost given up, and nothing is realized.
 
@@ -72,34 +72,36 @@ What the exchange stores and gives, whatever convention computes from them (#845
 
 ### Updates and Status Changes (030–039)
 
-**SHX-030 — Corrected as one (backend)**: An exchange's date, quantities, cash paid and its rate, value and its rate, and note are corrected as one operation, checked again as SHX-010 to SHX-012 say on the history without it, with the same errors; a date moved with no value given reads the price of the new date again (SHX-011). A correction keeps each part's identity, adds the cash part a correction gives and removes the one it takes away. It is refused when it would leave a later transaction of the received asset above what is held at its date (TRF-030), a dividend of the received asset before any holding (DIV-045), or a later withdrawal or purchase short of cash (CSH-080). An unknown exchange is rejected with a specific error.
+**SHX-030 — Corrected as one (backend)**: An exchange's date, quantities, cash paid and its rate, value and its rate, and note are corrected as one operation, checked again as SHX-010 to SHX-012 say on the history without it, with the same errors; a date moved with no value given reads the price of the new date again (SHX-011). A correction keeps each part's identity, adds the cash part a correction gives and removes the one it takes away. It is refused when it would leave a later transaction of the received asset above what is held at its date (SEL-032, TRF-030), a dividend of the received asset before any holding (DIV-045), or a later withdrawal or purchase short of cash (CSH-080). An unknown exchange is rejected with a specific error.
 
 **SHX-031 — Not corrected by its parts (backend)**: A part of an exchange is not corrected through the transactions' modification (TRX-031): it is rejected with a specific error naming the exchange as what to correct (TRF-031).
 
 ### Deletion (040–049)
 
-**SHX-040 — Cancelled as one (backend)**: Cancelling any part cancels the exchange, every part; it is refused when it would leave a later transaction of the received asset above what is held at its date (TRF-012), a dividend of the received asset before any holding (DIV-045), or a later withdrawal or purchase short of cash (CSH-080). An unknown exchange is rejected with a specific error.
+**SHX-040 — Cancelled as one (backend)**: Cancelling any part cancels the exchange, every part; it is refused when it would leave a later transaction of the received asset above what is held at its date (SEL-032, TRF-040), a dividend of the received asset before any holding (DIV-045), or a later withdrawal or purchase short of cash (CSH-080). An unknown exchange is rejected with a specific error.
 
 ### Extensions (050–059)
 
 **SHX-050 — Read as one, and its raw values (backend)**: An exchange is read as one from its identity: its account, its two assets, its quantities, the cost given up, the cash paid with its rate, the value of the shares received with its rate, and its date and note (as TRF-060). Each row of an account journal that is a part of an exchange carries the asset on its other side (as TRF-062). Wherever a transaction is read — the account journal, an AI agent's reads, the data export — an exchange's parts give its raw values (#845).
 
-**SHX-051 — Synced as its parts (backend)**: An exchange is synced as its parts, the new types, `value_received` and `share_exchange_id` in a new data format version (SYN-038). Two computers correcting one exchange at once are resolved as a transfer's parts are (CFR-012, TRF-032).
+**SHX-051 — Synced as its parts (backend)**: An exchange is synced as its parts, the new types, `value_received` and `share_exchange_id` in the data format version that ships them, which SYN-038 names when the core ships (#847). Two computers correcting one exchange at once are resolved as a transfer's parts are (CFR-012, TRF-032).
 
 ---
 
 ## Cross-amendments
 
+The rules below are amended by the core's pull request (#847), each in its own spec, when the behaviour ships; until then they describe the application as it is.
+
 - **TRX-020, TRX-021** — the cash part has no quantity; the received side's cost can be zero; the sides' unit price is a cost per unit in the account's currency and the cash part's the cash paid in the given asset's currency (SHX-010, SHX-021, SHX-022).
 - **TRX-031** — a part of an exchange is corrected as the exchange (SHX-031).
-- **CBM-020, CBM-021, CBM-022, CBM-030** — the given side takes lots as a transfer out does; the received side brings the lots SHX-023 says; a change of method re-costs an exchange (SHX-025).
+- **CBM-020, CBM-021, CBM-022 (a), CBM-030** — the given side takes lots as a transfer out does; the received side brings the lots SHX-023 says; a change of method re-costs an exchange (SHX-025).
 - **SEL-012, SEL-032, WOF-012, FEE-027, FSD-041** — a removal that would leave a later given side short is refused (SHX-012).
 - **SEL-024, ACD-043** — a holding's realized result counts its exchanges' cash parts; a given side that leaves nothing held closes the position (SHX-020, SHX-021).
 - **DIV-011, DIV-045** — the received side is a way an asset comes to be held (SHX-022).
 - **TXL-060, CSH-050, CSH-080** — the cash part credits cash (SHX-021).
 - **PRF-030, PRF-070, PRF-071, PRF-083, PRF-084, ACD-056, GPF-030, GPF-040** — an exchange is no flow of the account or the portfolio; its parts are flows of their positions (SHX-026 to SHX-028).
-- **EXP-020, EXP-026, EXP-031, EXP-032** — the export holds the parts, their raw values and the given side's lots (SHX-050).
-- **SYN-038** — a new data format version carries the exchange (SHX-051).
+- **EXP-020, EXP-026, EXP-031, EXP-032** — the export's types and columns gain the parts and their raw values, and its lots the given side's (SHX-050).
+- **SYN-038** — the version that ships the exchange's types, `value_received` and `share_exchange_id` (SHX-051).
 - **AGT-077** — the rules an AI agent is told gain the share exchange's convention, once the core ships (#847).
 
 ---
