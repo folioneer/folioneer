@@ -151,8 +151,6 @@ The tax wrapper an account sits in — a PEA, an assurance vie, a Depot — is a
 
 **ACC-046 — The Wrapper column (frontend)**: The account table shows each account's wrapper in a Wrapper column after Bank (ACC-008): its label in the window's language, the identifier for one the lists do not know, "—" without one or until the lists are read.
 
-**ACC-047 — Grouping by wrapper (frontend)**: Once the lists are read and accounts are listed — not while the accounts load, fail to load or none exists; a search matching nothing keeps it — a "Group by" choice above the account table offers Nothing or Wrapper; it is kept while the page stays open, not between visits. Grouped, the accounts sit under one heading per wrapper — its label in the window's language, or the identifier of one the lists do not know — in a fixed order: the generic wrappers, then France's, then Germany's, each list in the order ACC-040 names its wrappers; the wrappers they do not know after them in the order the accounts meet them, the accounts without one last under "No wrapper". A heading is not an account row: it cannot be focused, clicked or collapsed. Sorting (ACC-009) orders the accounts within each heading, the headings keeping their order; a search (ACC-011) hides a heading left with no account; the total row stays below every heading (ACC-031). Grouping changes only how this table shows the accounts.
-
 ### Holder (050–059)
 
 Within a profile, an account names whose name it is in; nothing is computed from it (owner, 2026-11-07, #769).
@@ -186,8 +184,6 @@ Within a profile, an account names whose name it is in; nothing is computed from
           │
           ├─ [Column header] → Toggle asc/desc sort + visual indicator (ACC-009)
           │
-          ├─ [Group by] → Nothing or Wrapper (ACC-047)
-          │
           ├─ [FAB] → Create modal (Name, Bank, Country, Wrapper)
           │            → Inline error if name empty or duplicate (ACC-014)
           │            → Account created → modal closed → table refreshed
@@ -212,7 +208,7 @@ Within a profile, an account names whose name it is in; nothing is computed from
 
 ### Main component
 
-Full-width table, default sort by Name ascending. Floating action button (bottom-right). Each row is fully clickable (navigates to Account Details, ACC-010) with a `ChevronRight` hover affordance. Edit and Delete buttons per row (stop propagation). A Wrapper column after Bank (ACC-046), and above the table a "Group by" choice, Nothing or Wrapper (ACC-047). The table closes with a portfolio total row in the cross-account reference currency (ACC-030).
+Full-width table, default sort by Name ascending. Floating action button (bottom-right). Each row is fully clickable (navigates to Account Details, ACC-010) with a `ChevronRight` hover affordance. Edit and Delete buttons per row (stop propagation). A Wrapper column after Bank (ACC-046). The table closes with a portfolio total row in the cross-account reference currency (ACC-030).
 
 ### States
 
@@ -221,8 +217,7 @@ Full-width table, default sort by Name ascending. Floating action button (bottom
 - **Load error**: error message + Retry button (ACC-013)
 - **No search results**: message distinct from empty state (ACC-011)
 - **Filtering**: the portfolio total row is hidden while a search filter is active (ACC-032)
-- **Grouped by wrapper**: one heading per wrapper, the accounts without one under "No wrapper" (ACC-047)
-- **Wrapper lists not read**: the form shows no Country or Wrapper, the column shows "—" and there is no "Group by" (ACC-045 to ACC-048)
+- **Wrapper lists not read**: the form shows no Country or Wrapper, the column shows "—" (ACC-045, ACC-046, ACC-048)
 - **Total incomplete**: "partial" beside the total's label when an unconvertible account hides a figure (ACC-028, ACC-030)
 - **Inline error**: message displayed inside the active modal or dialog (ACC-014)
 - **Delete empty account confirmation**: standard confirmation dialog (ACC-018)

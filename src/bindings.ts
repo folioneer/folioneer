@@ -2128,8 +2128,8 @@ name: string;
  */
 currency: string; 
 /**
- * ACC-046 — the identifier of the account's tax wrapper (ACC-043), for the list's column
- * and grouping; none when unset.
+ * ACC-046 — the identifier of the account's tax wrapper (ACC-043), for the list's column;
+ * none when unset.
  */
 wrapper: string | null; 
 /**

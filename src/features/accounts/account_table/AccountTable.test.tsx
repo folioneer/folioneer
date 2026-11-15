@@ -461,8 +461,8 @@ describe("AccountTable — portfolio total row (ACC-027–032)", () => {
   });
 });
 
-// ACC-046/047 — the accounts list by wrapper.
-describe("AccountTable — wrapper (ACC-046, ACC-047)", () => {
+// ACC-046 — the accounts list by wrapper.
+describe("AccountTable — wrapper (ACC-046)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockIsLoading.mockReturnValue(false);
@@ -481,14 +481,12 @@ describe("AccountTable — wrapper (ACC-046, ACC-047)", () => {
     expect(screen.getByTestId("account-wrapper-a")).toHaveTextContent("—");
   });
 
-  it("groups the accounts by wrapper on demand, the ones without last", () => {
+  // #566 — the table offers no "Group by" choice: the Wrapper column shows each wrapper.
+  it("offers no Group by choice and groups no rows", () => {
     render(<AccountTable searchTerm="" onAccountClick={vi.fn()} />);
+    expect(document.getElementById("account-group-by")).toBeNull();
     expect(document.querySelectorAll("[id^='account-wrapper-group-']")).toHaveLength(0);
-    fireEvent.change(screen.getByTestId("account-group-by"), { target: { value: "wrapper" } });
-    const headings = [...document.querySelectorAll("[id^='account-wrapper-group-']")].map(
-      (row) => row.textContent,
-    );
-    expect(headings).toEqual(["Brokerage", "PEA", "account.group_no_wrapper"]);
+    expect(screen.getByTestId("account-wrapper-b")).toHaveTextContent("PEA");
   });
 
   // ACC-051 (#769) — a holder chip shows one holder's accounts; "All" shows them all.

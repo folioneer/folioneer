@@ -674,7 +674,7 @@ struct AccountSummary {
     id: String,
     name: String,
     currency: String,                          // ISO 4217 currency code; same as Account.currency
-    wrapper: Option<String>,                   // identifier of the account's tax wrapper, for the list's column and grouping (ACC-046, ACC-047)
+    wrapper: Option<String>,                   // identifier of the account's tax wrapper, for the list's column (ACC-046)
     holder: Option<String>,                    // whose name the account is in; None when unset (ACC-050, ACC-051)
     total_global_value: i64,                   // micros, account currency: same algorithm as AccountDetailsResponse.total_global_value (CSH-094)
     total_unrealized_pnl: Option<i64>,         // micros, account currency: account-wide unrealized P&L, same algorithm as AccountDetailsResponse.total_unrealized_pnl (MKT-040 / ACC-023); None when no holding qualifies

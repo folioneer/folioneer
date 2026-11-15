@@ -11,7 +11,6 @@ import {
   formatPriceMovementDate,
   formatPriceMovementPct,
   formatPriceMovementValue,
-  groupByWrapper,
   wrapperLabel,
   wrapperOptions,
 } from "./presenter";
@@ -318,22 +317,5 @@ describe("countryOptions (ACC-045)", () => {
     expect(options.map((o) => o.value)).toEqual(["", "DE"]);
     expect(options[0]?.country).toBe("France");
     expect(options[1]?.label).toBe("Germany");
-  });
-});
-
-describe("groupByWrapper (ACC-047)", () => {
-  it("groups the rows in the lists' order, the accounts without one last", () => {
-    const rows = [
-      { name: "A", wrapper: "brokerage" },
-      { name: "B", wrapper: null },
-      { name: "C", wrapper: "fr_pea" },
-      { name: "D", wrapper: "brokerage" },
-    ];
-    const groups = groupByWrapper(rows, lists, (id) => wrapperLabel(lists, id, "en"));
-    expect(groups.map((g) => [g.wrapper, g.label, g.rows.map((r) => r.name)])).toEqual([
-      ["brokerage", "Brokerage", ["A", "D"]],
-      ["fr_pea", "PEA", ["C"]],
-      [null, null, ["B"]],
-    ]);
   });
 });

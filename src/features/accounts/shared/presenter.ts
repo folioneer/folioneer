@@ -196,35 +196,6 @@ export function countryOptions(
   });
 }
 
-/**
- * ACC-047 — rows grouped by wrapper in the lists' order (the core's), wrappers the lists do
- * not know after them in the order the rows meet them, the rows without a wrapper last
- * (wrapper and label null); rows keep their order within a group. A group's heading is its
- * wrapper's label, or the identifier of one the lists do not know.
- */
-export function groupByWrapper<T extends { wrapper: string | null }>(
-  rows: T[],
-  lists: WrapperLists | null,
-  labelOf: (wrapperId: string | null) => string | null,
-): { wrapper: string | null; label: string | null; rows: T[] }[] {
-  const buckets = new Map<string | null, T[]>();
-  for (const wrapper of lists?.wrappers ?? []) buckets.set(wrapper.id, []);
-  const unknown = new Map<string | null, T[]>();
-  for (const row of rows) {
-    const bucket = buckets.get(row.wrapper) ?? unknown.get(row.wrapper) ?? [];
-    if (!buckets.has(row.wrapper)) unknown.set(row.wrapper, bucket);
-    bucket.push(row);
-  }
-  const groups: { wrapper: string | null; label: string | null; rows: T[] }[] = [];
-  const withoutWrapper = unknown.get(null);
-  unknown.delete(null);
-  for (const [wrapper, groupRows] of [...buckets, ...unknown]) {
-    if (groupRows.length > 0) groups.push({ wrapper, label: labelOf(wrapper), rows: groupRows });
-  }
-  if (withoutWrapper) groups.push({ wrapper: null, label: null, rows: withoutWrapper });
-  return groups;
-}
-
 /** #515 (the validated mock), CBM-014 — under the method, the country it was preselected from. */
 export function impliedCostBasisHint(implied: ImpliedCostBasis, language: string): I18nMessage {
   const country = countryName(implied.country, language);
