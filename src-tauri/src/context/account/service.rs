@@ -7491,12 +7491,12 @@ mod tests {
         );
     }
 
-    // DIV-021 — a dividend whose amount, converted, floors to nothing is refused.
+    // DIV-022 — a dividend whose amount, converted, floors to nothing is refused.
     #[tokio::test]
-    async fn div_021_a_dividend_that_converts_to_nothing_is_refused() {
+    async fn div_022_a_dividend_that_converts_to_nothing_is_refused() {
         let pool = make_pool().await;
         let (svc, asset_id) = setup(&pool).await;
-        let account = account_holding(&pool, &svc, &asset_id, "DIV-021", micro(100)).await;
+        let account = account_holding(&pool, &svc, &asset_id, "DIV-022", micro(100)).await;
 
         let err = svc
             .record_dividend(
