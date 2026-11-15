@@ -253,6 +253,7 @@ Pick a file → the mapper → Preview.
 ## Open Questions
 
 - [x] Which presets ship first? — Interactive Brokers' Trades and Cash Transactions sections, each exported alone from a Flex Query, one data file each so adding a preset changes no code (owner, 2026-10-26 and 2026-11-14, #548).
+- [x] Which Scalable Capital labels does its preset type? — Buy and Sell only, as the one published sample shows them; DEGIRO and Trade Republic wait for a real export each (#837, #838) (owner, 2026-11-14, #549).
 - [x] What does the Interactive Brokers Cash preset do with a withholding tax and a payment in lieu of dividends? — A withholding tax is not imported, so a dividend comes in gross until #629 settles the tax withheld at source (agent's standing choice, 2026-11-14, on #548); a payment in lieu of dividends is a dividend, as the broker pays it in its place (agent's choice, 2026-11-14).
 - [x] Where does an asset come from when the file has no ISIN? — Its exact name, case and accents ignored; one matching none or two is an unknown asset, matched once and remembered by the mapper (owner, 2026-10-25).
 - [x] When is the mapper chosen remembered? — At the confirmation, not at the choice, so a file only previewed changes nothing (IMP-017) (agent's reading of the owner's 2026-10-31 decision).

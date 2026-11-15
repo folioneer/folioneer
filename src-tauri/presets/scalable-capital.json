@@ -1,0 +1,33 @@
+{
+  "info": {
+    "provider": "Scalable Capital"
+  },
+  "separator": "Semicolon",
+  "decimal_mark": "Comma",
+  "date_format": "YearMonthDay",
+  "encoding": "Utf8",
+  "columns": {
+    "date": "date",
+    "operation": "type",
+    "isin": "isin",
+    "reference": null,
+    "name": "description",
+    "quantity": "shares",
+    "unit_price": "price",
+    "gross_amount": null,
+    "fees": "fee",
+    "net_amount": "amount",
+    "currency": "currency"
+  },
+  "operation_types": [
+    {
+      "label": "Buy",
+      "transaction_type": "Purchase"
+    },
+    {
+      "label": "Sell",
+      "transaction_type": "Sale"
+    }
+  ],
+  "asset_matches": []
+}
