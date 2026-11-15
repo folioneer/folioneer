@@ -250,10 +250,105 @@ async fn cbm_020_free_shares_and_a_split_keep_their_lots() {
     assert_eq!(sale.realized_pnl, Some(micro(2_000)));
 }
 
-// CBM-024 / CBM-022 — a transfer out of a FIFO account moves the cost of the oldest lots,
-// and the transfer in brings it as one lot.
+/// Records a transfer of `quantity` units of `asset` on `date`, at `rate` when given.
+async fn transfer(
+    ctx: &Ctx,
+    from: &str,
+    to: &str,
+    asset: &str,
+    date: &str,
+    quantity: i64,
+    rate: Option<i64>,
+) {
+    ctx.transfer
+        .record_transfer(
+            from,
+            to,
+            asset.into(),
+            TransferFigures {
+                date: date.into(),
+                quantity_sent: units(quantity),
+                quantity_received: units(quantity),
+                exchange_rate: rate,
+                note: None,
+            },
+        )
+        .await
+        .expect("transfer");
+}
+
+/// The lots of `account`'s holding of `asset`: the date, the units brought, their cost, the
+/// units left and whether they came at no cost (CBM-034).
+async fn lots(ctx: &Ctx, account: &str, asset: &str) -> Vec<(String, String, i64, String, bool)> {
+    ctx.accounts
+        .holding_lots(account, asset)
+        .await
+        .expect("lots")
+        .lots
+        .into_iter()
+        .map(|l| (l.acquired_on, l.quantity, l.cost, l.remaining, l.free))
+        .collect()
+}
+
+fn lot(
+    date: &str,
+    quantity: &str,
+    cost: i64,
+    left: &str,
+    free: bool,
+) -> (String, String, i64, String, bool) {
+    (date.into(), quantity.into(), cost, left.into(), free)
+}
+
+// CBM-024 (a)(d) / TRF-020 — a transfer out of a FIFO account moves the cost of the oldest
+// lots, and the transfer in brings those lots, free shares named, each at the date it was
+// acquired on and placed among the receiving account's own: a later sale takes the oldest,
+// a sale before the transfer is unchanged.
 #[tokio::test]
-async fn cbm_024_a_transfer_moves_the_cost_of_the_oldest_lots() {
+async fn cbm_024_a_transfer_carries_its_lots() {
+    let ctx = ctx().await;
+    let acme = asset(&ctx).await;
+    let from = account(&ctx, "Depot", Some("DE"), None).await;
+    let to = account(&ctx, "Depot 2", Some("DE"), None).await;
+    two_lots(&ctx, &from, &acme).await;
+    ctx.recording
+        .record_free_shares(&from, acme.clone(), "2024-03-15".into(), units(2), None)
+        .await
+        .expect("free shares");
+    buy(&ctx, &to, &acme, "2024-02-15", 5, 300).await;
+    let before = sell(&ctx, &to, &acme, "2024-03-20", 2, 400).await;
+    assert_eq!(before.realized_pnl, Some(micro(800 - 600)));
+    transfer(&ctx, &from, &to, &acme, "2024-04-01", 22, None).await;
+    let unchanged = transactions(&ctx, &to)
+        .await
+        .into_iter()
+        .find(|t| t.id == before.id)
+        .expect("sale");
+    assert_eq!(unchanged.realized_pnl, Some(micro(800 - 600)));
+    let transfer_in = transactions(&ctx, &to)
+        .await
+        .into_iter()
+        .find(|t| t.transaction_type == TransactionType::TransferIn)
+        .expect("transfer in");
+    assert_eq!(transfer_in.total_amount, micro(3_000));
+    assert_eq!(
+        lots(&ctx, &to, &acme).await,
+        [
+            lot("2024-02-01", "10", micro(1_000), "10", false),
+            lot("2024-02-15", "5", micro(1_500), "3", false),
+            lot("2024-03-01", "10", micro(2_000), "10", false),
+            lot("2024-03-15", "2", 0, "2", true),
+        ]
+    );
+    // The 12 sold take the 10 carried from 2024-02-01, then 2 of the account's own.
+    let sale = sell(&ctx, &to, &acme, "2024-05-01", 12, 200).await;
+    assert_eq!(sale.realized_pnl, Some(micro(2_400 - 1_000 - 600)));
+}
+
+// CBM-024 (a) / TRF-021 — a fee in kind takes the oldest lots first, the transfer out the
+// next: the transfer in carries what the transfer out took.
+#[tokio::test]
+async fn cbm_024_a_fee_in_kind_leaves_before_the_lots_carried() {
     let ctx = ctx().await;
     let acme = asset(&ctx).await;
     let from = account(&ctx, "Depot", Some("DE"), None).await;
@@ -266,20 +361,118 @@ async fn cbm_024_a_transfer_moves_the_cost_of_the_oldest_lots() {
             acme.clone(),
             TransferFigures {
                 date: "2024-04-01".into(),
-                quantity_sent: units(15),
-                quantity_received: units(15),
+                quantity_sent: units(11),
+                quantity_received: units(10),
                 exchange_rate: None,
                 note: None,
             },
         )
         .await
         .expect("transfer");
-    let transfer_in = transactions(&ctx, &to)
+    assert_eq!(
+        lots(&ctx, &to, &acme).await,
+        [
+            lot("2024-02-01", "9", micro(900), "9", false),
+            lot("2024-03-01", "1", micro(200), "1", false),
+        ]
+    );
+}
+
+// CBM-024 (b)(c) — between currencies each lot's cost is converted at the transfer's rate;
+// from an account under the weighted average the transfer in is one lot dated the transfer.
+#[tokio::test]
+async fn cbm_024_converted_lots_and_one_lot_from_the_weighted_average() {
+    let ctx = ctx().await;
+    let acme = asset(&ctx).await;
+    let fifo = account(&ctx, "Depot", Some("DE"), None).await;
+    let average = account(&ctx, "Compte", Some("FR"), None).await;
+    let dollars = ctx
+        .accounts
+        .create_classified(
+            "Depot US".into(),
+            String::new(),
+            "USD".into(),
+            false,
+            Some("DE".into()),
+            None,
+        )
         .await
-        .into_iter()
-        .find(|t| t.transaction_type == TransactionType::TransferIn)
-        .expect("transfer in");
-    assert_eq!(transfer_in.total_amount, micro(2_000));
+        .expect("account")
+        .id;
+    let to = account(&ctx, "Depot 2", Some("DE"), None).await;
+    two_lots(&ctx, &fifo, &acme).await;
+    two_lots(&ctx, &average, &acme).await;
+    transfer(
+        &ctx,
+        &fifo,
+        &dollars,
+        &acme,
+        "2024-04-01",
+        15,
+        Some(1_500_000),
+    )
+    .await;
+    assert_eq!(
+        lots(&ctx, &dollars, &acme).await,
+        [
+            lot("2024-02-01", "10", micro(1_500), "10", false),
+            lot("2024-03-01", "5", micro(1_500), "5", false),
+        ]
+    );
+    transfer(&ctx, &average, &to, &acme, "2024-04-01", 15, None).await;
+    assert_eq!(
+        lots(&ctx, &to, &acme).await,
+        [lot("2024-04-01", "15", micro(2_250), "15", false)]
+    );
+}
+
+// CBM-024 (e) / TRF-025 — a backdated purchase in the sending account changes the lots a
+// transfer out takes: the transfer in's lots follow, though the cost moved stays the same.
+#[tokio::test]
+async fn cbm_024_the_carried_lots_follow_the_sending_account() {
+    let ctx = ctx().await;
+    let acme = asset(&ctx).await;
+    let from = account(&ctx, "Depot", Some("DE"), None).await;
+    let to = account(&ctx, "Depot 2", Some("DE"), None).await;
+    buy(&ctx, &from, &acme, "2024-02-01", 10, 100).await;
+    transfer(&ctx, &from, &to, &acme, "2024-04-01", 5, None).await;
+    assert_eq!(
+        lots(&ctx, &to, &acme).await,
+        [lot("2024-02-01", "5", micro(500), "5", false)]
+    );
+    buy(&ctx, &from, &acme, "2024-01-15", 10, 100).await;
+    assert_eq!(
+        lots(&ctx, &to, &acme).await,
+        [lot("2024-01-15", "5", micro(500), "5", false)]
+    );
+}
+
+// CBM-024 — a transfer recorded before its sides carried lots brings one lot dated the
+// transfer, until the next write in its sending account re-costs it.
+#[tokio::test]
+async fn cbm_024_a_transfer_without_lots_carries_them_from_the_next_write() {
+    let ctx = ctx().await;
+    let acme = asset(&ctx).await;
+    let from = account(&ctx, "Depot", Some("DE"), None).await;
+    let to = account(&ctx, "Depot 2", Some("DE"), None).await;
+    two_lots(&ctx, &from, &acme).await;
+    transfer(&ctx, &from, &to, &acme, "2024-04-01", 15, None).await;
+    sqlx::query("UPDATE transactions SET carried_lots = NULL")
+        .execute(&ctx.pool)
+        .await
+        .expect("lots removed");
+    assert_eq!(
+        lots(&ctx, &to, &acme).await,
+        [lot("2024-04-01", "15", micro(2_000), "15", false)]
+    );
+    buy(&ctx, &from, &acme, "2024-05-01", 1, 100).await;
+    assert_eq!(
+        lots(&ctx, &to, &acme).await,
+        [
+            lot("2024-02-01", "10", micro(1_000), "10", false),
+            lot("2024-03-01", "5", micro(1_000), "5", false),
+        ]
+    );
 }
 
 // CBM-030 — changing the method recomputes the account's sales and holdings, and re-costs
@@ -332,6 +525,23 @@ async fn cbm_030_a_change_of_method_recomputes_the_history() {
     // FIFO: the 5 sold cost 5 × 100, then the transfer moves 5 × 100 + 10 × 200.
     assert_eq!(resold.realized_pnl, Some(micro(500)));
     assert_eq!(cost_in(transactions(&ctx, &to).await), Some(micro(2_500)));
+    // CBM-024 (e) — the transfer in now carries the lots the transfer out takes.
+    let carried: Vec<(String, i64, i64)> = transactions(&ctx, &to)
+        .await
+        .into_iter()
+        .find(|t| t.transaction_type == TransactionType::TransferIn)
+        .expect("transfer in")
+        .carried_lots
+        .into_iter()
+        .map(|l| (l.acquired_on, l.quantity, l.cost))
+        .collect();
+    assert_eq!(
+        carried,
+        [
+            ("2024-02-01".to_string(), units(5), micro(500)),
+            ("2024-03-01".to_string(), units(10), micro(2_000)),
+        ]
+    );
 
     let again = ctx
         .accounts

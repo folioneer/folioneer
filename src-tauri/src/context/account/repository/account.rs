@@ -4,7 +4,7 @@ use sqlx::{Pool, Sqlite, SqliteConnection};
 use std::str::FromStr;
 use std::sync::Arc;
 
-use super::transaction::insert_agent_recording;
+use super::transaction::{carried_lots_of, carried_lots_text, insert_agent_recording};
 use crate::context::account::domain::{
     Account, AccountChange, AccountRepository, AgentRecording, CostBasisMethod, FeeCatchUpPosition,
     FeeFrequency, FeeSchedule, Holding, HoldingNote, ThresholdDirection, Transaction,
@@ -99,6 +99,8 @@ struct TransactionRow {
     added_deposit: bool,
     split_factor: Option<i64>,
     dividend_amount: Option<i64>,
+    /// CBM-024 — the lots a transfer's side carries, as JSON; none when it carries none.
+    carried_lots: Option<String>,
 }
 
 impl TryFrom<TransactionRow> for Transaction {
@@ -134,7 +136,8 @@ impl TryFrom<TransactionRow> for Transaction {
         .with_write_off_reason(write_off_reason)
         .with_transfer_id(row.transfer_id)
         .with_added_deposit(row.added_deposit)
-        .with_own_figures(row.split_factor, row.dividend_amount))
+        .with_own_figures(row.split_factor, row.dividend_amount)
+        .with_carried_lots(carried_lots_of(row.carried_lots.as_deref())?))
     }
 }
 
@@ -339,18 +342,20 @@ impl SqliteAccountRepository {
                 AccountChange::TransactionUpdated(tx) => {
                     let tx_type = tx.transaction_type.to_string();
                     let write_off_reason = tx.write_off_reason.map(|reason| reason.to_string());
+                    let carried_lots = carried_lots_text(&tx.carried_lots)?;
                     // created_at is immutable after creation (SEL-024)
                     sqlx::query!(
                         r#"UPDATE transactions SET account_id = ?, asset_id = ?, transaction_type = ?,
                                date = ?, quantity = ?, unit_price = ?, exchange_rate = ?, fees = ?,
                                total_amount = ?, note = ?, realized_pnl = ?, write_off_reason = ?,
                                transfer_id = ?, added_deposit = ?, split_factor = ?,
-                               dividend_amount = ?
+                               dividend_amount = ?, carried_lots = ?
                            WHERE id = ?"#,
                         tx.account_id, tx.asset_id, tx_type, tx.date, tx.quantity,
                         tx.unit_price, tx.exchange_rate, tx.fees, tx.total_amount,
                         tx.note, tx.realized_pnl, write_off_reason, tx.transfer_id,
-                        tx.added_deposit, tx.split_factor, tx.dividend_amount, tx.id
+                        tx.added_deposit, tx.split_factor, tx.dividend_amount, carried_lots,
+                        tx.id
                     )
                     .execute(&mut *conn)
                     .await
@@ -590,11 +595,13 @@ async fn current_transaction_timestamp(
 async fn insert_transaction(conn: &mut SqliteConnection, tx: &Transaction) -> Result<()> {
     let tx_type = tx.transaction_type.to_string();
     let write_off_reason = tx.write_off_reason.map(|reason| reason.to_string());
+    let carried_lots = carried_lots_text(&tx.carried_lots)?;
     sqlx::query!(
         r#"INSERT INTO transactions (id, account_id, asset_id, transaction_type, date, quantity,
                unit_price, exchange_rate, fees, total_amount, note, realized_pnl, created_at,
-               write_off_reason, transfer_id, added_deposit, split_factor, dividend_amount)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
+               write_off_reason, transfer_id, added_deposit, split_factor, dividend_amount,
+               carried_lots)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
         tx.id,
         tx.account_id,
         tx.asset_id,
@@ -612,7 +619,8 @@ async fn insert_transaction(conn: &mut SqliteConnection, tx: &Transaction) -> Re
         tx.transfer_id,
         tx.added_deposit,
         tx.split_factor,
-        tx.dividend_amount
+        tx.dividend_amount,
+        carried_lots
     )
     .execute(conn)
     .await
@@ -653,7 +661,7 @@ async fn load_aggregate_on(conn: &mut SqliteConnection, id: &str) -> Result<Opti
         TransactionRow,
         r#"SELECT id, account_id, asset_id, transaction_type, date, quantity, unit_price,
                   exchange_rate, fees, total_amount, note, realized_pnl, created_at, write_off_reason, transfer_id,
-                  added_deposit AS "added_deposit: bool", split_factor, dividend_amount
+                  added_deposit AS "added_deposit: bool", split_factor, dividend_amount, carried_lots
            FROM transactions WHERE account_id = ?
            ORDER BY date ASC, created_at ASC, id ASC"#,
         id
@@ -1041,7 +1049,7 @@ impl AccountRepository for SqliteAccountRepository {
                     r#"SELECT id, account_id, asset_id, transaction_type, date, quantity, unit_price,
                               exchange_rate, fees, total_amount, note, realized_pnl, created_at,
                               write_off_reason, transfer_id, added_deposit AS "added_deposit: bool",
-                              split_factor, dividend_amount,
+                              split_factor, dividend_amount, carried_lots,
                               sync_logical_timestamp, sync_origin, sync_device_id
                        FROM transactions WHERE id = ?"#,
                     identity
@@ -1074,6 +1082,7 @@ impl AccountRepository for SqliteAccountRepository {
                         added_deposit: row.added_deposit,
                         split_factor: row.split_factor,
                         dividend_amount: row.dividend_amount,
+                        carried_lots: row.carried_lots,
                     })?;
                     Ok(SyncedRecord {
                         rank,

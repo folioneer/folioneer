@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id, account_id, asset_id, transaction_type, date, quantity, unit_price,\n                  exchange_rate, fees, total_amount, note, realized_pnl, created_at, write_off_reason, transfer_id,\n                  added_deposit AS \"added_deposit: bool\", split_factor, dividend_amount\n           FROM transactions WHERE account_id = ?\n           ORDER BY date ASC, created_at ASC, id ASC",
+  "query": "SELECT id, account_id, asset_id, transaction_type, date, quantity, unit_price,\n                              exchange_rate, fees, total_amount, note, realized_pnl, created_at,\n                              write_off_reason, transfer_id, added_deposit AS \"added_deposit: bool\",\n                              split_factor, dividend_amount, carried_lots,\n                              sync_logical_timestamp, sync_origin, sync_device_id\n                       FROM transactions WHERE id = ?",
   "describe": {
     "columns": [
       {
@@ -92,6 +92,26 @@
         "name": "dividend_amount",
         "ordinal": 17,
         "type_info": "Integer"
+      },
+      {
+        "name": "carried_lots",
+        "ordinal": 18,
+        "type_info": "Text"
+      },
+      {
+        "name": "sync_logical_timestamp",
+        "ordinal": 19,
+        "type_info": "Text"
+      },
+      {
+        "name": "sync_origin",
+        "ordinal": 20,
+        "type_info": "Text"
+      },
+      {
+        "name": "sync_device_id",
+        "ordinal": 21,
+        "type_info": "Text"
       }
     ],
     "parameters": {
@@ -115,8 +135,12 @@
       true,
       false,
       true,
+      true,
+      true,
+      true,
+      true,
       true
     ]
   },
-  "hash": "8858f0260560c254adef2b639ed3be1e22008f128da5cdccb336a0361cfa1992"
+  "hash": "67532030a95f6317031af7a2dc904fd1175c1233bf649f90315ed08aed0bb213"
 }

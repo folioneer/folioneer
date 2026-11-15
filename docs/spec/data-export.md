@@ -66,7 +66,7 @@ The export persists nothing: what it writes is computed from the portfolio when 
 
 **EXP-026 — The lots a sale, write-off or transfer out took (backend)**: For each sale, write-off and transfer out of an account under FIFO, the export holds one row per lot it took (CBM-022): the transaction, its account and asset, the lot's acquisition date, the units taken from it and their cost, both as of that transaction, and whether the lot came from free shares or interest (CBM-020).
 
-**EXP-026A — A lot a transfer in brought (backend)**: A lot a transfer in brought is dated the transfer (CBM-024).
+**EXP-026A — A lot a transfer in brought (backend)**: A lot a transfer in brought keeps the date the sending account acquired it on; from an account under the weighted average, or carrying no lot, it is dated the transfer (CBM-024 (a), (c), (f)).
 
 **EXP-026B — A lot with no units (backend)**: A lot left with no units but a cost (CBM-028) gives a row of no units and that cost.
 

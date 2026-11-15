@@ -1,3 +1,4 @@
+use super::CarriedLot;
 use crate::context::account::error::AccountError;
 use crate::shared::domain::quantity::{
     quantity_text, read_scaled, scaled_text, stored_quantity, FigureTextError, MONEY_DECIMALS,
@@ -153,6 +154,11 @@ pub struct Transaction {
     /// `quantity` (SYN-038).
     #[serde(default)]
     pub dividend_amount: Option<i64>,
+    /// CBM-024 — the lots a transfer's side moved, oldest first: under FIFO in the sending
+    /// account; none on every other transaction, from an account under the weighted average,
+    /// and on a change written before data format 19 (SYN-038).
+    #[serde(default)]
+    pub carried_lots: Vec<CarriedLot>,
 }
 
 /// A transaction as a surface reads it: its fields, with `quantity` as decimal text
@@ -275,6 +281,7 @@ impl Transaction {
             added_deposit: false,
             split_factor: None,
             dividend_amount: None,
+            carried_lots: Vec::new(),
         }
         .with_figure_in_its_field())
     }
@@ -325,6 +332,7 @@ impl Transaction {
             added_deposit: false,
             split_factor: None,
             dividend_amount: None,
+            carried_lots: Vec::new(),
         }
         .with_figure_in_its_field())
     }
@@ -478,6 +486,7 @@ impl Transaction {
             added_deposit: false,
             split_factor: None,
             dividend_amount: None,
+            carried_lots: Vec::new(),
         })
     }
 
@@ -546,6 +555,7 @@ impl Transaction {
             added_deposit: false,
             split_factor: Some(factor),
             dividend_amount: None,
+            carried_lots: Vec::new(),
         })
     }
 
@@ -608,6 +618,7 @@ impl Transaction {
             added_deposit: false,
             split_factor: None,
             dividend_amount: None,
+            carried_lots: Vec::new(),
         })
     }
 
@@ -687,6 +698,7 @@ impl Transaction {
             added_deposit: false,
             split_factor: None,
             dividend_amount: None,
+            carried_lots: Vec::new(),
         })
     }
 
@@ -743,6 +755,7 @@ impl Transaction {
             added_deposit: false,
             split_factor: None,
             dividend_amount: None,
+            carried_lots: Vec::new(),
         })
     }
 
@@ -793,6 +806,7 @@ impl Transaction {
             added_deposit: false,
             split_factor: None,
             dividend_amount: None,
+            carried_lots: Vec::new(),
         })
     }
 
@@ -890,6 +904,30 @@ impl Transaction {
     pub fn with_write_off_reason(mut self, reason: Option<WriteOffReason>) -> Self {
         self.write_off_reason = reason;
         self
+    }
+
+    /// CBM-024 — the side carrying `lots`.
+    pub fn with_carried_lots(mut self, lots: Vec<CarriedLot>) -> Self {
+        self.carried_lots = lots;
+        self
+    }
+
+    /// CBM-024 — whether the lots it carries add up to its quantity and cost: a transfer in
+    /// whose lots do not, or that carries none, brings one lot dated its date.
+    pub(crate) fn carries_its_lots(&self) -> bool {
+        !self.carried_lots.is_empty()
+            && self
+                .carried_lots
+                .iter()
+                .map(|l| l.quantity as i128)
+                .sum::<i128>()
+                == self.quantity as i128
+            && self
+                .carried_lots
+                .iter()
+                .map(|l| l.cost as i128)
+                .sum::<i128>()
+                == self.total_amount as i128
     }
 
     /// The same transaction as a part of the transfer `transfer_id` (TRF entity).
@@ -1004,6 +1042,7 @@ impl Transaction {
             added_deposit: false,
             split_factor: None,
             dividend_amount: None,
+            carried_lots: Vec::new(),
         }
     }
 
