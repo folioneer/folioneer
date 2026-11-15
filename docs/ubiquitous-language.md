@@ -120,6 +120,12 @@ A holding's quantity moved from one account to another of the same portfolio, at
 
 > Status: confirmed
 
+### Return of capital
+
+Part of what was invested in an asset paid back by its issuer: cash comes in, the quantity held does not change and the holding's cost falls by what was paid back, never below 0; what the cost cannot absorb is the return of capital beyond cost, realized (ROC-020 to ROC-022). It is no income. In code: `ReturnOfCapital`. In French: « Remboursement de capital »; in German: « Kapitalrückzahlung » (owner, 2026-10-18, #387).
+
+> Status: confirmed
+
 ### Transfer out
 
 The part of a transfer in the sending account: the quantity received leaving the sending holding at its cost (TRF-020). Code: `TransferOut`. In French: « Transfert sortant » (owner, 2026-10-24).
