@@ -120,6 +120,12 @@ A holding's quantity moved from one account to another of the same portfolio, at
 
 > Status: confirmed
 
+### Share exchange
+
+A merger or an acquisition giving the shares of one asset for another's within one account: the cost of the shares given up moves to the shares received and nothing is realized, but on a cash part paid with it, which takes its share of the cost (SHX-020 to SHX-022). It is stored as its parts — a given side, a received side and, with cash, a cash part — sharing one `share_exchange_id`, and is recorded, corrected and cancelled as one. In code: `ShareExchange` (owner, 2026-11-14, #520).
+
+> Status: confirmed
+
 ### Transfer out
 
 The part of a transfer in the sending account: the quantity received leaving the sending holding at its cost (TRF-020). Code: `TransferOut`. In French: « Transfert sortant » (owner, 2026-10-24).
