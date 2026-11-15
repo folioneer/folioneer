@@ -120,6 +120,12 @@ A holding's quantity moved from one account to another of the same portfolio, at
 
 > Status: confirmed
 
+### Return of capital
+
+Part of what was invested in an asset paid back by its issuer: cash comes in, the quantity held does not change and the holding's cost falls by what was paid back, never below 0; what the cost cannot absorb is the return of capital beyond cost, realized (ROC-020 to ROC-022). It is no income. In code: `ReturnOfCapital`. In French: « Remboursement de capital »; in German: « Kapitalrückzahlung » (owner, 2026-10-18, #387).
+
+> Status: confirmed
+
 ### Share exchange
 
 A merger or an acquisition giving the shares of one asset for another's within one account: the cost of the shares given up moves to the shares received and nothing is realized, but on a cash part paid with it, which takes its share of the cost (SHX-020 to SHX-022). It is stored as its parts — a given side, a received side and, with cash, a cash part — sharing one `share_exchange_id`, and is recorded, corrected and cancelled as one. In code: `ShareExchange` (owner, 2026-11-14, #520).
