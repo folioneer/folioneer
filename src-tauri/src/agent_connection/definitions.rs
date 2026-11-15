@@ -66,6 +66,21 @@ pub fn definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
+            name: "list_lots",
+            title: "List a holding's lots",
+            only_reads: true,
+            description: "The lots of one account's holding of one asset, oldest first, those taken whole included, with the account's cost_basis_method: each lot's acquired_on date, quantity (the units it brought in), cost (what they cost then, in the account's currency), remaining (the units still held) and free (free shares or interest). An account under WeightedAverage keeps no lots. Read it to reconcile against a broker statement's lots.",
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "account": { "type": "string", "description": "The account's name, as list_accounts gives it." },
+                    "asset": { "type": "string", "description": "The asset: its name, reference, ISIN, or reference with its exchange." }
+                },
+                "required": ["account", "asset"],
+                "additionalProperties": false
+            }),
+        },
+        ToolDefinition {
             name: "list_transactions",
             title: "List an account's transactions",
             only_reads: true,

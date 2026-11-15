@@ -31,8 +31,8 @@ pub use error::{
 };
 pub use figures_as_text::{figures_as_text, WHOLE_NUMBERS};
 pub use named_listing::{
-    ListedPrices, ListedTransaction, ListedTransactions, PriceRead, RecordedBy, TransactionsAsked,
-    PRICES_PER_PAGE, TRANSACTIONS_PER_PAGE,
+    ListedPrices, ListedTransaction, ListedTransactions, NamedLots, PriceRead, RecordedBy,
+    TransactionsAsked, PRICES_PER_PAGE, TRANSACTIONS_PER_PAGE,
 };
 pub use named_recording::{
     code_of, decimal, decimal_to_micro, refusal_from_account, AccountAsOf, AsShown, CashAmount,

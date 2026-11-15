@@ -8,8 +8,18 @@ them.
 
 ## list_accounts
 
-AGT-040, AGT-102. Answer: one object per account, by name — `name`, `currency`, `country`
-(two letters: its own, or the portfolio's, ACC-042), `wrapper` (an identifier, or `null`) and `holder` (or `null`).
+AGT-040, AGT-102, AGT-076. Answer: one object per account, by name — `name`, `currency`, `country`
+(two letters: its own, or the portfolio's, ACC-042), `wrapper` (an identifier, or `null`), `holder` (or `null`) and `cost_basis_method` (`WeightedAverage` or `Fifo`, CBM-010).
+
+## list_lots
+
+AGT-076, CBM-034. Input: `account`, its name, and `asset`, named as a recording names it
+(AGT-044). `MissingArgument`: either missing, empty or not text. `AccountNotFound`,
+`AccountAmbiguous`, `AssetNotFound`, `AssetAmbiguous`: a name that matches no account or
+asset, or several. `DatabaseError`: a read that fails. Answer: `{ "status": "listed",
+"account", "asset", "cost_basis_method", "lots" }` — the account's name, the asset's
+reference, the method, and the lots as CBM-034 reads them, each with the fields of the Lot
+entity (`docs/spec/cost-basis.md`): `acquired_on`, `quantity`, `cost`, `remaining`, `free`.
 
 ## add_asset
 

@@ -288,7 +288,7 @@ async fn agt_040_the_read_tools_answer_from_the_running_application() {
     assert_eq!(owner.await.expect("owner"), "claude-code");
     assert_eq!(
         result(&answered[1]),
-        json!([{ "name": "PEA", "currency": "EUR", "country": "FR", "wrapper": null, "holder": null }])
+        json!([{ "name": "PEA", "currency": "EUR", "country": "FR", "wrapper": null, "holder": null, "cost_basis_method": "WeightedAverage" }])
     );
     assert_eq!(
         result(&answered[2]),
@@ -368,7 +368,7 @@ async fn agt_100_a_session_works_in_the_profile_in_use_when_allowed() {
     owner.await.expect("owner");
     assert_eq!(
         result(&answered[1]),
-        json!([{ "name": "Livret A", "currency": "EUR", "country": "FR", "wrapper": null, "holder": "Mum" }])
+        json!([{ "name": "Livret A", "currency": "EUR", "country": "FR", "wrapper": null, "holder": "Mum", "cost_basis_method": "WeightedAverage" }])
     );
     // AGT-102 — the summaries give the holder too, of the session's profile only.
     let summary = result(&answered[4]);
@@ -2794,7 +2794,7 @@ async fn agt_068_a_session_creates_an_account() {
     assert_eq!(created["status"], "created");
     assert_eq!(
         created["account"],
-        json!({ "name": "Hardware wallet", "currency": "EUR", "country": "DE", "wrapper": "brokerage", "holder": null })
+        json!({ "name": "Hardware wallet", "currency": "EUR", "country": "DE", "wrapper": "brokerage", "holder": null, "cost_basis_method": "Fifo" })
     );
     let plain = call(
         "add_account",
@@ -3067,6 +3067,114 @@ async fn agt_069_an_account_whose_mark_cannot_be_written_is_not_created() {
         .iter()
         .all(|account| account.name != "Hardware wallet"));
     assert_eq!(bench.connections.sessions().remove(0).accounts_added, 0);
+}
+
+// AGT-076 / AGT-040 — a session reads an account's cost basis method and a holding's lots,
+// oldest first, a lot taken whole included; an account under the weighted average has none,
+// and an account or an asset it cannot name is refused. It is a read.
+#[tokio::test]
+async fn agt_076_a_session_reads_a_holdings_lots() {
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let granted = session(&bench.connections).await;
+    let call = |tool: &'static str, arguments: Value| {
+        let (tools, granted) = (&bench.tools, &granted);
+        async move { tools.call(granted, tool, &arguments).await }
+    };
+    call(
+        "add_account",
+        json!({ "name": "Depot", "currency": "EUR", "country": "DE" }),
+    )
+    .await
+    .expect("account added");
+    call(
+        "record_deposit",
+        json!({ "account": "Depot", "amount": 5000, "date": "2019-01-15" }),
+    )
+    .await
+    .expect("deposited");
+    for (date, price) in [("2019-02-01", 100), ("2019-03-01", 200)] {
+        call(
+            "record_purchase",
+            json!({ "account": "Depot", "asset": "CW8", "quantity": 10, "price": price, "date": date }),
+        )
+        .await
+        .expect("bought");
+    }
+    call(
+        "record_sale",
+        json!({ "account": "Depot", "asset": "CW8", "quantity": 12, "price": 250, "date": "2019-04-01" }),
+    )
+    .await
+    .expect("sold");
+
+    let accounts = call("list_accounts", json!({})).await.expect("listed");
+    let methods: Vec<(&str, &str)> = accounts
+        .as_array()
+        .expect("accounts")
+        .iter()
+        .map(|a| {
+            (
+                a["name"].as_str().expect("a name"),
+                a["cost_basis_method"].as_str().expect("a method"),
+            )
+        })
+        .collect();
+    assert!(methods.contains(&("Depot", "Fifo")));
+    assert!(methods.contains(&("PEA", "WeightedAverage")));
+
+    let read = call("list_lots", json!({ "account": "depot", "asset": "CW8" }))
+        .await
+        .expect("lots read");
+    assert_eq!(read["status"], "listed");
+    assert_eq!(read["account"], "Depot");
+    assert_eq!(read["asset"], "CW8");
+    assert_eq!(read["cost_basis_method"], "Fifo");
+    // AGT-014 — every figure reaches the agent as decimal text, the cost included: `call`
+    // passes each answer through `figures_as_text`.
+    let lots: Vec<(&str, &str, &str, &str, bool)> = read["lots"]
+        .as_array()
+        .expect("lots")
+        .iter()
+        .map(|lot| {
+            (
+                lot["acquired_on"].as_str().expect("a date"),
+                lot["quantity"].as_str().expect("units"),
+                lot["cost"].as_str().expect("a cost"),
+                lot["remaining"].as_str().expect("units left"),
+                lot["free"].as_bool().expect("free"),
+            )
+        })
+        .collect();
+    assert_eq!(
+        lots,
+        [
+            ("2019-02-01", "10", "1000", "0", false),
+            ("2019-03-01", "10", "2000", "8", false),
+        ]
+    );
+    // CBM-034A — the weighted average gives no lot.
+    let none = call("list_lots", json!({ "account": "PEA", "asset": "CW8" }))
+        .await
+        .expect("lots read");
+    assert_eq!(none["cost_basis_method"], "WeightedAverage");
+    assert_eq!(none["lots"], json!([]));
+    // AGT-070 — what cannot be named is refused.
+    for (arguments, code) in [
+        (
+            json!({ "account": "Nope", "asset": "CW8" }),
+            "AccountNotFound",
+        ),
+        (
+            json!({ "account": "Depot", "asset": "NOPE" }),
+            "AssetNotFound",
+        ),
+        (json!({ "asset": "CW8" }), "MissingArgument"),
+        (json!({ "account": "Depot" }), "MissingArgument"),
+    ] {
+        let refused = call("list_lots", arguments).await.expect_err("refused");
+        assert_eq!(refused.code, code);
+    }
 }
 
 // AGT-070 — a session lists an account's transactions, oldest first and in pages, with the

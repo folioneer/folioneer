@@ -5,7 +5,7 @@
 
 > **Error model on the wire**: each command's error serializes as a flat `{ code: "VariantName" }` object; a variant with fields carries them beside `code`, as `TransactionNotRemoved { reason }` does. The FE matches on `code`.
 >
-> This contract covers the commands between the window and the core. The bridge, the channel and the tools (AGT-010–021, AGT-037, AGT-038, AGT-040–044, AGT-046–051, AGT-060–063, AGT-065A, AGT-070, AGT-071, AGT-075, AGT-080, AGT-087, AGT-090, AGT-093, AGT-100–102) and the tools of AGT-064 and AGT-068 are not Tauri commands — what the window shows of an added asset is `AgentSession.assets_added` and `last_asset` here, of a created account `accounts_added` and `last_account`; what an AI agent, the bridge and the application exchange — the tools' refusal codes included — is described by the spec.
+> This contract covers the commands between the window and the core. The bridge, the channel and the tools (AGT-010–021, AGT-037, AGT-038, AGT-040–044, AGT-046–051, AGT-060–063, AGT-065A, AGT-070, AGT-071, AGT-075, AGT-076, AGT-080, AGT-087, AGT-090, AGT-093, AGT-100–102) and the tools of AGT-064 and AGT-068 are not Tauri commands — what the window shows of an added asset is `AgentSession.assets_added` and `last_asset` here, of a created account `accounts_added` and `last_account`; what an AI agent, the bridge and the application exchange — the tools' refusal codes included — is described by the spec.
 
 ---
 
@@ -196,6 +196,7 @@ The mark of a transaction an AI agent recorded (AGT-045) reaches the window in t
 
 ## Changelog
 
+- 2026-11-15 — #516 (AGT-076): `list_accounts` gives each account's cost basis method, and `list_lots` reads a holding's lots. No command or type changed.
 - 2026-11-09 — #770 (AGT-100–102): a session works in the profile in use when it is allowed; the tools read and write that profile only, and `list_accounts` gives each account's holder. No command or type changed; the window's consent text names the profile.
 - 2026-10-09 — Created: the four commands, their types and the event (AGT-022–039).
 - 2026-10-09 — AGT-045: the mark of an AI agent's recording reaches the window as `JournalRow.recorded_by` (`account-contract.md`); no command added.

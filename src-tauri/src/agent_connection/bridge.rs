@@ -321,6 +321,7 @@ mod tests {
                 "list_accounts",
                 "list_assets",
                 "list_holdings",
+                "list_lots",
                 "list_transactions",
                 "get_price",
                 "list_prices",
