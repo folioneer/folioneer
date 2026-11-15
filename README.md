@@ -174,6 +174,7 @@ What an AI agent recorded is marked in the account journal ("Recorded by"). An A
 An account's history is imported from its broker's CSV export through an import mapper. Folioneer ships built-in presets for some brokers:
 
 - [Interactive Brokers](src-tauri/presets/interactive-brokers.md) — two Flex Queries, Trades and Cash Transactions.
+- [Scalable Capital](src-tauri/presets/scalable-capital.md) — the transactions export.
 
 ## Documentation
 

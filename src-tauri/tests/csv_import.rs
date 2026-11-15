@@ -2160,7 +2160,11 @@ async fn imp_020f_the_built_in_presets_are_listed_and_never_written() {
     let providers: Vec<&str> = listed.iter().map(|m| m.info.provider.as_str()).collect();
     assert_eq!(
         providers,
-        ["Interactive Brokers — Cash", "Interactive Brokers — Trades"]
+        [
+            "Interactive Brokers — Cash",
+            "Interactive Brokers — Trades",
+            "Scalable Capital"
+        ]
     );
     assert!(listed.iter().all(|mapper| mapper.built_in));
     let trades = listed[1].clone();
@@ -2343,4 +2347,33 @@ async fn the_interactive_brokers_presets_read_a_flex_query() {
         matches!(&refused, CsvImportError::AccountImport(AccountImportError::MappedColumnsNotInFile { columns }) if columns.contains(&"TradePrice".to_string())),
         "{refused:?}"
     );
+}
+
+// #549 — the Scalable Capital preset reads the broker's transactions export: purchases and
+// sales with their fees, figures with a decimal comma.
+#[tokio::test]
+async fn the_scalable_capital_preset_reads_its_transactions_export() {
+    let (ctx, service, _folder) = with_presets().await;
+    let import = CsvImportUseCase::new(
+        Arc::clone(&service),
+        ctx.account_service.clone(),
+        ctx.asset_service.clone(),
+        Arc::new(SqliteTransactionManager::new(ctx.pool.clone())),
+    );
+    asset(&ctx, "Acme World", "ACME", Some("FR0000000010"), "EUR").await;
+    let account_id = account(&ctx, 1_000_000_000).await;
+    let file = picked(&ctx, &fixture("scalable_capital.csv"), false).await;
+    import.allow_file(file.path()).await.expect("picked");
+    let (id, draft) = preset(&service, "Scalable Capital").await;
+    let read = import
+        .preview_import(&account_id, path(&file), Some(&id), &draft)
+        .await
+        .expect("preview");
+    for line in [2, 3] {
+        assert!(
+            matches!(status(&read, line), RowStatus::Ready { .. }),
+            "line {line}: {:?}",
+            status(&read, line)
+        );
+    }
 }
