@@ -53,7 +53,7 @@ One list, each value stored or computed. Stored, and synced (ROC-051): `received
 
 **ROC-023 — No income (backend)**: (a) A return of capital is no dividend and no income: it counts in no dividend figure (DIV-024, PRF-072) and in no figure of income. (b) Its return beyond cost counts in the holding's realized result, as a sale's does (SEL-024, ACD-043).
 
-**ROC-024 — In performance (backend)**: (a) A return of capital is no flow of the account: the cash it credits moves value from the holding to the cash and lands in the period's P&L (PRF-073), never in its dividends. (b) In a position's performance it is an outflow of the position at the cash credited (ACD-056, PRF-083, PRF-084), and so in the portfolio's asset scope (GPF-040).
+**ROC-024 — In performance (backend)**: (a) A return of capital is no flow of the account: the cash it credits moves value from the holding to the cash and lands in the period's P&L (PRF-073), never in its dividends. (b) In a position's performance it is an outflow of the position at the cash credited (ACD-056, PRF-083, PRF-084), and so in the portfolio's asset scope (GPF-030, GPF-040).
 
 **ROC-025 — Later transactions (backend)**: A later sale, write-off or transfer out takes the lowered cost; an earlier one is unchanged.
 
@@ -81,8 +81,9 @@ The rules below are amended by the core's pull request (#848), each in its own s
 
 - **TRX entity, TRX-020, TRX-024, TRX-030** — `TransactionType` gains the return of capital, with no quantity; its total received meets the limit on money; the holding's cost falls by it (ROC-010, ROC-021).
 - **CBM-022** — under FIFO a return of capital lowers each lot's cost by its units (ROC-022).
-- **SEL-024, ACD-043** — a holding's realized result counts its returns of capital beyond cost (ROC-023).
-- **DIV-024, PRF-072, PRF-073, PRF-083, PRF-084, ACD-056, GPF-040** — a return of capital is no dividend; its cash lands in the P&L and is an outflow of its position (ROC-023, ROC-024).
+- **SEL entity (`realized_pnl`), SEL-024, ACD-043** — `realized_pnl` is carried by a return of capital too; a holding's realized result counts its returns of capital beyond cost (ROC-023).
+- **DIV-024, PRF-072, PRF-073, PRF-083, PRF-084, ACD-056, GPF-030, GPF-040** — a return of capital is no dividend; its cash lands in the P&L and is an outflow of its position (ROC-023, ROC-024).
+- **TXL-023** — the journal names the return of capital's type (ROC-050).
 - **EXP-031** — the export's types and columns gain the return of capital and its raw values (ROC-050).
 - **SYN-038** — the version that ships the return of capital (ROC-051).
 - **AGT-077** — the rules an AI agent is told gain the return of capital, once the core ships (#848).
