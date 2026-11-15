@@ -63,3 +63,30 @@ currency, `date` and `note`, each optional. The refusals are the recording's, am
 `AssetNotHeld` (DIV-011). Answer: as a
 recording's (AGT-044). `correct_recording` and `cancel_recording` answer
 `DividendBeforeHolding` for the refusals of DIV-040 and DIV-045.
+
+## request_transfer_replacement
+
+AGT-090, AGT-091. Title: "Ask to replace four transactions you typed with a transfer".
+Input: `transactions`, the ids of four transactions as `list_transactions` gives them
+(AGT-070), and `rate`, as `record_transfer` reads it (AGT-065A), optional.
+`MissingArgument`: `transactions` missing or not a list of texts. `InvalidArguments`: other
+than four ids, one of them twice, or an id past AGT-048A's bound. `TransactionNotFound`,
+`NotTypedByOwner`: as `request_removal` (AGT-080). `NotATransfer`: the four are no transfer,
+the reason naming what they lack. Before asking, the transfer's refusals (TRF-010 to TRF-022)
+— among them `ArchivedAsset`, `TransferReceivedAboveSent`, `TransferRateMissing`,
+`TransferRateNotOne`, `InsufficientCash` —, `DividendBeforeHolding` (DIV-045) and
+`DatabaseError`. Answer: `{"status": "replaced", "transfer": …}`, the transfer as TRF-060
+reads it, when the owner replaced them; `ReplacementRefused` when the owner refused or the
+session ended first; on a yes that replaced nothing, `TransactionChanged`,
+`TransactionNotFound`, the code of a refusal checked before asking, or `DatabaseError`; and
+`DatabaseError`, its reason saying the transfer was recorded, when it could not be read back.
+
+## replace_with_transfer
+
+AGT-093. Title: "Replace four AI agent recordings with a transfer". Input and the refusals
+of its shape: `request_transfer_replacement`'s. `NotYourRecording` (AGT-051): an id with no mark, or that no transaction has. `SessionLimitReached` (AGT-047): the session at its limit, or the transfer's parts not all fitting in it. The four and the checks before writing:
+`request_transfer_replacement`'s codes. Answer: `{"status": "replaced", "transfer": …}`, the
+transfer as TRF-060 reads it. `TransactionChanged`: one of the four changed, or the transfer
+would move another cost, between the check and the write; `TransactionNotFound`: one removed
+in that gap; `DatabaseError`: a write that fails, or, its reason saying the transfer was
+recorded, a transfer that could not be read back.
