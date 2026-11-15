@@ -7252,15 +7252,15 @@ async fn agt_090_a_replacement_leaving_a_dividend_before_any_holding_is_refused(
         asked.await.expect("asked").expect_err("not replaced").code,
         "DividendBeforeHolding"
     );
-    assert!(
-        bench
+    for kept in [&sale, &withdrawal, &deposit, &purchase] {
+        let stored = bench
             .accounts
-            .get_transaction_by_id(&purchase.id)
+            .get_transaction_by_id(&kept.id)
             .await
             .expect("read")
-            .is_some(),
-        "nothing was written"
-    );
+            .expect("nothing was removed");
+        assert_eq!(stored.transfer_id, None, "the four stand as typed");
+    }
 
     // A request not refused waits for the owner's answer: the bound keeps that a failure.
     let refused = tokio::time::timeout(Duration::from_secs(10), ask())
