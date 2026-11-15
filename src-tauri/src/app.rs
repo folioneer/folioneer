@@ -6,7 +6,7 @@ use crate::agent_connection::gate::AgentGate;
 use crate::agent_connection::tools::AgentTools;
 use crate::context::account::AccountService;
 use crate::context::account_import::{
-    AccountImportService, FsImportMapperStore, SqliteMapperChoiceRepository,
+    built_in_presets, AccountImportService, FsImportMapperStore, SqliteMapperChoiceRepository,
 };
 use crate::context::asset::{
     AssetPriceRepository, AssetService, PriceProvider, SqliteAssetPriceRepository,
@@ -285,7 +285,8 @@ pub fn run() {
                 let account_import_service = Arc::new(AccountImportService::new(
                     Box::new(FsImportMapperStore::new(mappers_folder)),
                     Box::new(SqliteMapperChoiceRepository::new(db.pool.clone())),
-                ));
+                )
+                .with_built_in(built_in_presets()));
 
                 let csv_import_uc = CsvImportUseCase::new(
                     Arc::clone(&account_import_service),

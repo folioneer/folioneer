@@ -12,9 +12,10 @@ use folioneer_lib::context::account::{
 };
 use folioneer_lib::context::account::{Transaction, TransactionType};
 use folioneer_lib::context::account_import::{
-    AccountImportError, AccountImportService, AssetMatch, DateFormat, DecimalMark, Encoding,
-    FsImportMapperStore, ImportMapperDraft, MappedColumns, MapperInfo, OperationLabel,
-    OperationType, ReadingChoices, RowRejection, Separator, SqliteMapperChoiceRepository,
+    built_in_presets, AccountImportError, AccountImportService, AssetMatch, DateFormat,
+    DecimalMark, Encoding, FsImportMapperStore, ImportMapperDraft, MappedColumns, MapperInfo,
+    OperationLabel, OperationType, ReadingChoices, RowRejection, Separator,
+    SqliteMapperChoiceRepository,
 };
 use folioneer_lib::context::asset::{
     AssetClass, AssetService, CreateAssetDTO, SqliteAssetCategoryRepository,
@@ -2132,5 +2133,214 @@ async fn pfl_051a_an_import_outside_the_profile_in_use_is_refused() {
         .await;
     assert!(
         matches!(refused, Err(CsvImportError::Account(AccountError::AccountOutsideProfileInUse { account_id: refused_id })) if refused_id == account_id)
+    );
+}
+
+/// The service and the use case over an empty mappers folder and the built-in presets.
+async fn with_presets() -> (Ctx, Arc<AccountImportService>, tempfile::TempDir) {
+    let ctx = build_ctx().await;
+    let presets_dir = tempfile::tempdir().expect("mappers folder");
+    let service = Arc::new(
+        AccountImportService::new(
+            Box::new(FsImportMapperStore::new(presets_dir.path().join("m"))),
+            Box::new(SqliteMapperChoiceRepository::new(ctx.pool.clone())),
+        )
+        .with_built_in(built_in_presets()),
+    );
+    (ctx, service, presets_dir)
+}
+
+// #548 / IMP-020F — the built-in presets are listed beside the user's mappers, read-only:
+// one is read by its identity, saving it saves a copy under a provider of its own, and it
+// is never deleted.
+#[tokio::test]
+async fn imp_020f_the_built_in_presets_are_listed_and_never_written() {
+    let (_ctx, service, _folder) = with_presets().await;
+    let listed = service.list_import_mappers().await.expect("listed");
+    let providers: Vec<&str> = listed.iter().map(|m| m.info.provider.as_str()).collect();
+    assert_eq!(
+        providers,
+        ["Interactive Brokers — Cash", "Interactive Brokers — Trades"]
+    );
+    assert!(listed.iter().all(|mapper| mapper.built_in));
+    let trades = listed[1].clone();
+    assert_eq!(
+        service.get_import_mapper(&trades.id).await.expect("read"),
+        trades
+    );
+
+    let mut draft = ImportMapperDraft {
+        info: trades.info.clone(),
+        separator: trades.separator,
+        decimal_mark: trades.decimal_mark,
+        date_format: trades.date_format,
+        encoding: trades.encoding,
+        columns: trades.columns.clone(),
+        operation_types: trades.operation_types.clone(),
+        asset_matches: Vec::new(),
+    };
+    assert!(matches!(
+        service
+            .save_import_mapper(Some(trades.id.clone()), draft.clone())
+            .await,
+        Err(AccountImportError::MapperProviderTaken { .. })
+    ));
+    draft.info.provider = "My Interactive Brokers".to_string();
+    let copy = service
+        .save_import_mapper(Some(trades.id.clone()), draft)
+        .await
+        .expect("a copy");
+    assert_ne!(copy.id, trades.id);
+    assert!(!copy.built_in);
+    assert_eq!(
+        service.get_import_mapper(&trades.id).await.expect("kept"),
+        trades
+    );
+    assert!(matches!(
+        service.delete_import_mapper(&trades.id).await,
+        Err(AccountImportError::MapperNotFound { .. })
+    ));
+}
+
+/// The preset `provider` of `service`, as the window gives it to a preview.
+async fn preset(service: &AccountImportService, provider: &str) -> (String, ImportMapperDraft) {
+    let mapper = service
+        .list_import_mappers()
+        .await
+        .expect("listed")
+        .into_iter()
+        .find(|mapper| mapper.info.provider == provider)
+        .expect(provider);
+    let draft = ImportMapperDraft {
+        info: mapper.info,
+        separator: mapper.separator,
+        decimal_mark: mapper.decimal_mark,
+        date_format: mapper.date_format,
+        encoding: mapper.encoding,
+        columns: mapper.columns,
+        operation_types: mapper.operation_types,
+        asset_matches: mapper.asset_matches,
+    };
+    (mapper.id, draft)
+}
+
+// #548 — the Interactive Brokers presets read a Flex Query's Trades and Cash Transactions
+// sections, each exported alone as CSV: purchases and sales; deposits and withdrawals by
+// their sign and dividends, a withholding tax not imported.
+#[tokio::test]
+async fn the_interactive_brokers_presets_read_a_flex_query() {
+    let (ctx, service, _folder) = with_presets().await;
+    let import = CsvImportUseCase::new(
+        Arc::clone(&service),
+        ctx.account_service.clone(),
+        ctx.asset_service.clone(),
+        Arc::new(SqliteTransactionManager::new(ctx.pool.clone())),
+    );
+    asset(&ctx, "Acme World", "ACME", Some("FR0000000010"), "EUR").await;
+    asset(&ctx, "Beta Power", "BTP", Some("FR0000000002"), "EUR").await;
+    let account_id = account(&ctx, 0).await;
+    let read = |file: &NamedTempFile, (id, draft): (String, ImportMapperDraft)| {
+        let path = path(file).to_string();
+        let import = &import;
+        let account_id = account_id.clone();
+        async move {
+            import
+                .preview_import(&account_id, &path, Some(&id), &draft)
+                .await
+                .expect("preview")
+        }
+    };
+
+    let cash_file = picked(&ctx, &fixture("interactive_brokers_cash.csv"), false).await;
+    import.allow_file(cash_file.path()).await.expect("picked");
+    let cash = read(
+        &cash_file,
+        preset(&service, "Interactive Brokers — Cash").await,
+    )
+    .await;
+    assert!(
+        matches!(status(&cash, 2), RowStatus::Ready { .. }),
+        "deposit"
+    );
+    assert!(
+        matches!(status(&cash, 4), RowStatus::NotImported { .. }),
+        "tax"
+    );
+    assert!(
+        matches!(status(&cash, 5), RowStatus::Ready { .. }),
+        "withdrawal"
+    );
+
+    let trades_file = picked(&ctx, &fixture("interactive_brokers_trades.csv"), false).await;
+    import.allow_file(trades_file.path()).await.expect("picked");
+    let trades = read(
+        &trades_file,
+        preset(&service, "Interactive Brokers — Trades").await,
+    )
+    .await;
+    for line in [2, 3, 4] {
+        assert!(
+            matches!(status(&trades, line), RowStatus::Ready { .. }),
+            "line {line}: {:?}",
+            status(&trades, line)
+        );
+    }
+
+    // The guide's order: Cash, Trades, Cash again — the dividend now comes in, gross, and
+    // what the first Cash import recorded shows as already recorded.
+    import.allow_file(cash_file.path()).await.expect("picked");
+    let (cash_id, cash_draft) = preset(&service, "Interactive Brokers — Cash").await;
+    import
+        .confirm_import(
+            &account_id,
+            path(&cash_file),
+            Some(&cash_id),
+            &cash_draft,
+            false,
+        )
+        .await
+        .expect("cash imported");
+    import.allow_file(trades_file.path()).await.expect("picked");
+    let (trades_id, trades_draft) = preset(&service, "Interactive Brokers — Trades").await;
+    import
+        .confirm_import(
+            &account_id,
+            path(&trades_file),
+            Some(&trades_id),
+            &trades_draft,
+            false,
+        )
+        .await
+        .expect("trades imported");
+    import.allow_file(cash_file.path()).await.expect("picked");
+    let again = read(
+        &cash_file,
+        preset(&service, "Interactive Brokers — Cash").await,
+    )
+    .await;
+    assert!(
+        matches!(status(&again, 3), RowStatus::Ready { .. }),
+        "dividend: {:?}",
+        status(&again, 3)
+    );
+    for line in [2, 5] {
+        assert!(
+            matches!(status(&again, line), RowStatus::AlreadyRecorded { .. }),
+            "line {line}: {:?}",
+            status(&again, line)
+        );
+    }
+
+    // A file that does not match its preset is refused with the columns that differ.
+    let other = picked(&ctx, "TradeDate,Buy/Sell,ISIN\n2024-01-02,BUY,X\n", false).await;
+    import.allow_file(other.path()).await.expect("picked");
+    let (id, draft) = preset(&service, "Interactive Brokers — Trades").await;
+    let refused = import
+        .preview_import(&account_id, path(&other), Some(&id), &draft)
+        .await
+        .expect_err("columns missing");
+    assert!(
+        matches!(&refused, CsvImportError::AccountImport(AccountImportError::MappedColumnsNotInFile { columns }) if columns.contains(&"TradePrice".to_string())),
+        "{refused:?}"
     );
 }

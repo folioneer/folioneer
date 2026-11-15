@@ -1,0 +1,5 @@
+"ClientAccountID","CurrencyPrimary","Symbol","Description","ISIN","SettleDate","Amount","Type"
+"U0000000","EUR","","CASH RECEIPTS / ELECTRONIC FUND TRANSFERS","","2024-01-10","5000","Deposits/Withdrawals"
+"U0000000","EUR","BTP","BTP(FR0000000002) CASH DIVIDEND EUR 0.50 PER SHARE","FR0000000002","2024-05-02","2","Dividends"
+"U0000000","EUR","BTP","BTP(FR0000000002) CASH DIVIDEND EUR 0.50 - DE TAX","FR0000000002","2024-05-02","-0.53","Withholding Tax"
+"U0000000","EUR","","DISBURSEMENT INITIATED BY A. HOLDER","","2024-07-01","-300","Deposits/Withdrawals"

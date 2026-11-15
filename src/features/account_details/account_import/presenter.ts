@@ -112,7 +112,11 @@ export function blankDraft(): ImportMapperDraft {
 }
 
 /** A saved mapper, as the mapper in use. */
-export function draftOf({ id: _id, ...draft }: ImportMapper): ImportMapperDraft {
+export function draftOf({
+  id: _id,
+  built_in: _builtIn,
+  ...draft
+}: ImportMapper): ImportMapperDraft {
   return draft;
 }
 

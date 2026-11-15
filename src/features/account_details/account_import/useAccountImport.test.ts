@@ -43,6 +43,7 @@ const fileRead: FileRead = {
   operation_labels: [],
 };
 const saved: ImportMapper = {
+  built_in: false,
   id: "fortuneo",
   info: { provider: "Fortuneo" },
   separator: "Comma",
