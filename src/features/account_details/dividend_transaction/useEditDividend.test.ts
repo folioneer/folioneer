@@ -146,6 +146,24 @@ describe("useEditDividend (DIV-040)", () => {
     expect(mockCorrectTransaction).not.toHaveBeenCalled();
   });
 
+  // DIV-022 / DIV-021 (#465) — an amount that converts to nothing, or past a trillion, is the
+  // amount's to fix: the reason shows on it, said as an amount, never a hint for a field the
+  // dialog does not have.
+  it.each([
+    ["TotalAmountNotPositive", "error.TotalAmountNotPositive"],
+    ["QuantityOutOfRange", "error.AmountOutOfRange"],
+  ] as const)("shows %s on the amount with its reason", async (code, key) => {
+    const { result } = renderHook(() => useEditDividend({ dividend, onSubmitSuccess: vi.fn() }));
+    await waitFor(() => expect(result.current.isFormValid).toBe(true));
+
+    mockValidateDraft.mockResolvedValue({ status: "error", error: { code } });
+    act(() => result.current.handleChange("amount", "0.000001"));
+
+    await waitFor(() => expect(result.current.fieldErrors.quantity).toEqual({ key }));
+    expect(result.current.problemHint).toBeNull();
+    expect(result.current.isFormValid).toBe(false);
+  });
+
   // F27 — a correction the core refuses on save (cash would run short later) is shown and
   // the dialog stays open.
   it("shows a refusal on save and does not close", async () => {

@@ -54,15 +54,22 @@ const HINT_OF: Record<DraftField, string> = {
   totalCost: "transaction.hint_enter_total_cost",
 };
 
+/** A form's own field for some problems, where its fields differ from a trade's. */
+export type DraftFieldOverrides = Partial<Record<TransactionDraftError["code"], DraftField>>;
+
 /**
- * The field a draft problem is shown on. While the unit price is typed the total is
- * computed, so a total that is not positive is the unit price's to fix.
+ * The field a draft problem is shown on: the form's own field for it first. While the unit
+ * price is typed the total is computed, so a total that is not positive is the unit price's
+ * to fix.
  */
 export function draftProblemField(
   problem: TransactionDraftError | null,
   entryMode: "price" | "total",
+  overrides: DraftFieldOverrides = {},
 ): DraftField | null {
   if (!problem) return null;
+  const own = overrides[problem.code];
+  if (own) return own;
   if (entryMode === "price" && problem.code === "TotalAmountNotPositive") return "unitPrice";
   return FIELD_OF[problem.code] ?? null;
 }
@@ -88,8 +95,9 @@ export function useDraftProblemDisplay(
   problem: TransactionDraftError | null,
   message: I18nMessage | null,
   entryMode: "price" | "total" = "price",
+  overrides: DraftFieldOverrides = {},
 ): DraftProblemDisplay {
-  const placement = useProblemPlacement(draftProblemField(problem, entryMode), message);
+  const placement = useProblemPlacement(draftProblemField(problem, entryMode, overrides), message);
   return useMemo(
     () => ({
       fieldErrors: placement.fieldErrors,

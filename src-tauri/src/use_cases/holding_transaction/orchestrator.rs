@@ -3704,12 +3704,21 @@ mod draft_tests {
                 .to_string(),
         };
         let unread = || split_use_case(Ok(HELD), 0, None);
-        let mut undated = split_draft(SplitSize::Factor { factor: 2 * M });
-        undated.date = String::new();
-        assert_eq!(
-            code_of(unread().validate_stock_split_draft(undated).await),
-            "DateMissing"
-        );
+        // The date is said before the ratio (#465).
+        for size in [
+            SplitSize::Factor { factor: 2 * M },
+            SplitSize::Ratio {
+                new: Some(0),
+                old: Some(1),
+            },
+        ] {
+            let mut undated = split_draft(size);
+            undated.date = String::new();
+            assert_eq!(
+                code_of(unread().validate_stock_split_draft(undated).await),
+                "DateMissing"
+            );
+        }
         for (new, old) in [
             (None, Some(1)),
             (Some(2), None),
@@ -3728,11 +3737,23 @@ mod draft_tests {
             .validate_stock_split_draft(split_draft(SplitSize::Factor { factor: 1 }))
             .await;
         assert_eq!(code_of(refused), "SplitCollapsesPosition");
-        // An account that does not exist is said before its position is asked for.
-        let mut elsewhere = split_draft(SplitSize::Factor { factor: 2 * M });
+        // An account that does not exist is said after the ratio (#465), and before its
+        // position is asked for: with nothing held, a check of the position first would say
+        // the position is closed.
+        let mut elsewhere = split_draft(SplitSize::Ratio {
+            new: Some(0),
+            old: Some(1),
+        });
         elsewhere.account_id = UNKNOWN_ACCOUNT.into();
         assert_eq!(
             code_of(unread().validate_stock_split_draft(elsewhere).await),
+            "SplitFactorNotPositive"
+        );
+        let mut elsewhere = split_draft(SplitSize::Factor { factor: 2 * M });
+        elsewhere.account_id = UNKNOWN_ACCOUNT.into();
+        let nothing_held = split_use_case_holding(None, Ok(HELD), 0, None);
+        assert_eq!(
+            code_of(nothing_held.validate_stock_split_draft(elsewhere).await),
             "AccountNotFound"
         );
     }

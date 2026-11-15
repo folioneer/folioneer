@@ -140,13 +140,31 @@ export function dividendErrorToI18n(err: DividendError): I18nMessage {
     case "InvalidDate":
     // DIV-040 — a correction that dates the dividend before its asset was first held.
     case "DividendBeforeHolding":
+    // DIV-022 — an amount that converts to nothing in the account's currency.
+    case "TotalAmountNotPositive":
       return { key: `error.${err.code}` };
+    // DIV-021 / TRX-020 — a dividend's quantity is its amount: past a trillion, either code
+    // says the figure is too large.
+    case "QuantityOutOfRange":
+    case "AmountOutOfRange":
+      return { key: "error.AmountOutOfRange" };
     // DIV-011 — a dividend is judged on its date, not today.
     case "AssetNotHeld":
       return { key: "dividend.error_not_held_on_date" };
     default:
       return { key: "error.Unknown" };
   }
+}
+
+/**
+ * DIV-021 — the message of a dividend draft's problem: a dividend's quantity is its amount,
+ * so a quantity past the limit is said as the amount past a trillion.
+ */
+export function dividendDraftMessage(
+  problem: TransactionDraftError | null,
+  message: I18nMessage | null,
+): I18nMessage | null {
+  return problem?.code === "QuantityOutOfRange" ? { key: "error.AmountOutOfRange" } : message;
 }
 
 /**

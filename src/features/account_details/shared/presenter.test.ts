@@ -8,6 +8,7 @@ import type {
 import { microToFormatted } from "@/lib/microUnits";
 import {
   assetPriceMutationErrorToI18n,
+  dividendDraftMessage,
   dividendErrorToI18n,
   formatFxStaleness,
   formatSource,
@@ -661,9 +662,26 @@ describe("priceRefreshBlockedErrorToI18n", () => {
 // dividendErrorToI18n — F27 presenter for record_dividend error surface (DIV)
 // Reachable codes per contract: AccountNotFound, DatabaseError (AccountError);
 // AssetNotFound, AssetNotHeld, DividendOnCashAsset (DividendTask);
-// AmountNotPositive, ExchangeRateNotPositive, DateInFuture, DateTooOld, InvalidDate
-// (AccountError). Unknown codes fall to error.Unknown.
+// AmountNotPositive, ExchangeRateNotPositive, DateInFuture, DateTooOld, InvalidDate,
+// TotalAmountNotPositive, QuantityOutOfRange, AmountOutOfRange (AccountError). Unknown codes
+// fall to error.Unknown.
 // ---------------------------------------------------------------------------
+
+// DIV-021 (#465) — a dividend's quantity is its amount: a quantity past the limit is said as
+// the amount past a trillion; every other problem keeps its message.
+describe("dividendDraftMessage", () => {
+  it("says a quantity past the limit as the amount past a trillion", () => {
+    expect(
+      dividendDraftMessage({ code: "QuantityOutOfRange" }, { key: "error.QuantityOutOfRange" }),
+    ).toEqual({ key: "error.AmountOutOfRange" });
+  });
+
+  it("keeps every other problem's message", () => {
+    const message = { key: "error.TotalAmountNotPositive" };
+    expect(dividendDraftMessage({ code: "TotalAmountNotPositive" }, message)).toBe(message);
+    expect(dividendDraftMessage(null, null)).toBeNull();
+  });
+});
 
 describe("dividendErrorToI18n", () => {
   it("AccountNotFound (carries account_id payload) maps to error.AccountNotFound", () => {
@@ -697,6 +715,22 @@ describe("dividendErrorToI18n", () => {
     "InvalidDate",
   ] as const)("%s maps to its flat error key", (code) => {
     expect(dividendErrorToI18n({ code })).toEqual({ key: `error.${code}` });
+  });
+
+  // DIV-022 (#465) — an amount that converts to nothing in the account's currency.
+  it("TotalAmountNotPositive maps to its flat error key", () => {
+    expect(dividendErrorToI18n({ code: "TotalAmountNotPositive" })).toEqual({
+      key: "error.TotalAmountNotPositive",
+    });
+  });
+
+  // DIV-021 / TRX-020 (#465) — a dividend's amount past a trillion, recorded or corrected:
+  // its quantity is its amount, so both codes say the figure is too large.
+  it.each([
+    "QuantityOutOfRange",
+    "AmountOutOfRange",
+  ] as const)("%s maps to the figure above a trillion", (code) => {
+    expect(dividendErrorToI18n({ code })).toEqual({ key: "error.AmountOutOfRange" });
   });
 
   it("an unrecognised code falls through to error.Unknown", () => {

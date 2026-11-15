@@ -6034,6 +6034,52 @@ mod tests {
         );
     }
 
+    // DIV-022 (#465) — a correction to an amount that, converted, floors to nothing is
+    // refused, and the dividend stays as it was.
+    #[test]
+    fn div_022_a_correction_to_an_amount_that_converts_to_nothing_is_refused() {
+        let mut acc = base_account();
+        acc.open_holding(
+            "asset-aapl".to_string(),
+            "2024-01-01".to_string(),
+            from_surface(micro(10)),
+            micro(1_000),
+        )
+        .unwrap();
+        let div_tx = Transaction::new_dividend(
+            acc.id.clone(),
+            "asset-aapl".to_string(),
+            "2024-06-15".to_string(),
+            micro(200),
+            1_000_000,
+            None,
+        )
+        .unwrap();
+        let div_id = div_tx.id.clone();
+        acc.apply_dividend(div_tx).unwrap();
+
+        // One micro at a rate of 0.5 floors to nothing in the account's currency.
+        let refused = acc.correct_transaction(
+            &div_id,
+            "2024-06-15".to_string(),
+            1,
+            0,
+            500_000,
+            0,
+            None,
+            None,
+        );
+
+        assert!(
+            matches!(
+                refused.map_err(|e| e.downcast::<AccountError>()),
+                Err(Ok(AccountError::TotalAmountNotPositive))
+            ),
+            "refused as converting to nothing"
+        );
+        assert_eq!(acc.cash_holding_quantity(), micro(200), "nothing changed");
+    }
+
     // -------------------------------------------------------------------------
     // FSD-022/023/024/027/028/040/041 — apply_free_shares aggregate-root method
     // -------------------------------------------------------------------------

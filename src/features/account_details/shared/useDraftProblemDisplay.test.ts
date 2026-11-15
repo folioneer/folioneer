@@ -57,4 +57,11 @@ describe("useDraftProblemDisplay", () => {
     expect(draftProblemField({ code: "TradeOnCashAsset" }, "price")).toBeNull();
     expect(draftProblemField(null, "price")).toBeNull();
   });
+
+  // #465 — a form whose fields differ from a trade's names its own field for a problem.
+  it("puts a problem on the form's own field when it names one", () => {
+    const own = { TotalAmountNotPositive: "quantity" } as const;
+    expect(draftProblemField({ code: "TotalAmountNotPositive" }, "price", own)).toBe("quantity");
+    expect(draftProblemField({ code: "DateInFuture" }, "price", own)).toBe("date");
+  });
 });

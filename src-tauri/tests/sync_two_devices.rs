@@ -1401,6 +1401,66 @@ async fn syn_083_a_joining_devices_reference_currency_is_replaced_by_the_shared_
     }
 }
 
+// SYN-083 / FXR-014 (#465) — a device joining with a currency pair of its own has its pairs
+// replaced by the shared portfolio's: its own pair is gone, the shared one is there.
+#[tokio::test]
+async fn syn_083_a_joining_devices_currency_pairs_are_replaced_by_the_shared_ones() {
+    let pairs = |ctx: &Ctx| {
+        let currency = ctx.currency_service.clone();
+        async move {
+            let mut pairs: Vec<String> = currency
+                .list_currency_pairs()
+                .await
+                .unwrap()
+                .into_iter()
+                .map(|pair| format!("{}/{}", pair.from_currency, pair.to_currency))
+                .collect();
+            pairs.sort();
+            pairs
+        }
+    };
+    let dir = tempfile::tempdir().unwrap();
+    let desktop = build_ctx(dir.path()).await;
+    desktop
+        .currency_service
+        .declare_currency_pair("GBP".into(), "EUR".into())
+        .await
+        .unwrap();
+    desktop
+        .orchestrator
+        .enable_sync(
+            dir.path().to_string_lossy().to_string(),
+            PASSPHRASE.into(),
+            "Desktop".into(),
+        )
+        .await
+        .expect("Desktop must enable as the first device");
+    let laptop = build_ctx(dir.path()).await;
+    laptop
+        .currency_service
+        .declare_currency_pair("CHF".into(), "EUR".into())
+        .await
+        .unwrap();
+    assert!(pairs(&laptop).await.contains(&"CHF/EUR".to_string()));
+
+    laptop
+        .orchestrator
+        .enable_sync(
+            dir.path().to_string_lossy().to_string(),
+            PASSPHRASE.into(),
+            "Laptop".into(),
+        )
+        .await
+        .expect("a currency pair is not user data that blocks the join (SYN-014)");
+
+    assert_eq!(
+        pairs(&laptop).await,
+        pairs(&desktop).await,
+        "the shared portfolio's pairs replace the joining device's"
+    );
+    assert!(!pairs(&laptop).await.contains(&"CHF/EUR".to_string()));
+}
+
 // SYN-013 / SYN-021 — a reference currency chosen before sync is turned on travels with the
 // first publish: a device joining takes it.
 #[tokio::test]
