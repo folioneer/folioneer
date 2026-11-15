@@ -1,5 +1,5 @@
 import { AlertTriangle, Bot, ChevronRight, Edit2, Trash2, X } from "lucide-react";
-import { Fragment, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { AgentRecording } from "@/bindings";
 import { logger } from "@/lib/logger";
@@ -7,7 +7,6 @@ import { microToFormatted } from "@/lib/microUnits";
 import { Button } from "@/ui/components/button/Button";
 import { IconButton } from "@/ui/components/button/IconButton";
 import { WarningChip } from "@/ui/components/chip/WarningChip";
-import { SelectField } from "@/ui/components/field/SelectField";
 import { ConfirmationDialog } from "@/ui/components/modal/Dialog";
 import { SortIcon } from "@/ui/components/SortIcon";
 import { formatIsoDateTime } from "@/ui/format/date";
@@ -15,7 +14,6 @@ import { EditAccountModal } from "../edit_account_modal/EditAccountModal";
 import {
   formatAccountRowTotalUnrealizedPnl,
   formatAccountRowYtdPerformancePct,
-  groupByWrapper,
   wrapperLabel,
 } from "../shared/presenter";
 import { useAccountSummaries } from "../useAccountSummaries";
@@ -36,9 +34,8 @@ export function AccountTable({ searchTerm, onAccountClick }: AccountTableProps) 
       agent: createdBy.agent,
       when: formatIsoDateTime(createdBy.session_started_at, i18n.language),
     });
-  // ACC-046/047 — the wrapper lists name each account's wrapper; the list groups on demand.
+  // ACC-046 — the wrapper lists name each account's wrapper.
   const wrapperLists = useWrapperLists();
-  const [groupBy, setGroupBy] = useState<"none" | "wrapper">("none");
   // ACC-051 (#769, the validated mock) — the holder whose accounts are shown; none for all.
   const [holder, setHolder] = useState<string | null>(null);
   const labelOf = (wrapperId: string | null) =>
@@ -102,9 +99,6 @@ export function AccountTable({ searchTerm, onAccountClick }: AccountTableProps) 
     !fetchError &&
     searchTerm.trim().length === 0 &&
     portfolioTotal !== null;
-
-  // ACC-047 — grouping is offered once the lists are read and there are accounts to group.
-  const showGroupBy = !loading && !isEmpty && !fetchError && wrapperLists !== null;
 
   const renderRow = (account: (typeof sortedAndFilteredAccounts)[number]) => (
     <tr
@@ -259,21 +253,6 @@ export function AccountTable({ searchTerm, onAccountClick }: AccountTableProps) 
               {name ?? t("account.filter_all")}
             </button>
           ))}
-        </div>
-      )}
-      {/* ACC-047 — group the list by wrapper */}
-      {showGroupBy && (
-        <div className="mb-3 w-48 px-2">
-          <SelectField
-            id="account-group-by"
-            label={t("account.group_by_label")}
-            value={groupBy}
-            onChange={(event) => setGroupBy(event.target.value as "none" | "wrapper")}
-            options={[
-              { value: "none", label: t("account.group_by_none") },
-              { value: "wrapper", label: t("account.group_by_wrapper") },
-            ]}
-          />
         </div>
       )}
       <table className="w-full border-collapse">
@@ -439,22 +418,6 @@ export function AccountTable({ searchTerm, onAccountClick }: AccountTableProps) 
                 {t("account.no_search_results")}
               </td>
             </tr>
-          ) : showGroupBy && groupBy === "wrapper" ? (
-            groupByWrapper(sortedAndFilteredAccounts, wrapperLists, labelOf).map((group) => (
-              <Fragment key={group.wrapper ?? ""}>
-                <tr
-                  id={`account-wrapper-group-${group.wrapper ?? "none"}`}
-                  className="bg-m3-surface-container-high"
-                >
-                  <td colSpan={8} className="m3-td">
-                    <span className="text-xs font-semibold uppercase tracking-wide text-m3-on-surface-variant">
-                      {group.label ?? t("account.group_no_wrapper")}
-                    </span>
-                  </td>
-                </tr>
-                {group.rows.map(renderRow)}
-              </Fragment>
-            ))
           ) : (
             sortedAndFilteredAccounts.map(renderRow)
           )}

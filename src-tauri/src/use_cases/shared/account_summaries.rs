@@ -30,8 +30,8 @@ pub struct AccountSummary {
     pub name: String,
     /// ISO 4217 currency code; matches `Account.currency`.
     pub currency: String,
-    /// ACC-046 — the identifier of the account's tax wrapper (ACC-043), for the list's column
-    /// and grouping; none when unset.
+    /// ACC-046 — the identifier of the account's tax wrapper (ACC-043), for the list's column;
+    /// none when unset.
     pub wrapper: Option<String>,
     /// ACC-050 — whose name the account is in; none when unset.
     pub holder: Option<String>,
