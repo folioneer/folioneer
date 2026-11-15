@@ -7202,6 +7202,79 @@ async fn agt_090_what_is_no_transfer_is_refused_before_asking() {
     );
 }
 
+// AGT-090 / AGT-091 / DIV-045 (#852) — a replacement whose transfer in comes after a
+// dividend the purchase it removes made held is refused, as the window refuses a transfer in
+// moved after it: on the owner's yes when the dividend came while the request waited, nothing
+// written; before asking once it is there.
+#[tokio::test]
+async fn agt_090_a_replacement_leaving_a_dividend_before_any_holding_is_refused() {
+    use super::gate::{answer_replacement, AnswerRefused};
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = Arc::new(workbench(data_dir.path()).await);
+    let granted = session(&bench.connections).await;
+    euro_account(&bench, "A1").await;
+    euro_account(&bench, "A2").await;
+    typed(&bench, owner::deposit("A1", "2019-01-15", 2000)).await;
+    typed(&bench, owner::buy("A1", "2019-01-20", 10, 100)).await;
+    let deposit = typed(&bench, owner::deposit("A2", "2019-02-01", 600)).await;
+    let purchase = typed(&bench, owner::buy("A2", "2019-02-02", 4, 150)).await;
+    let sale = typed(&bench, owner::sell("A1", "2019-04-01", 4, 150)).await;
+    let withdrawal = typed(&bench, owner::withdraw("A1", "2019-04-02", 600)).await;
+    let four = json!({ "transactions": [sale.id, withdrawal.id, deposit.id, purchase.id] });
+    let ask = || {
+        let (bench, granted, four) = (Arc::clone(&bench), granted.clone(), four.clone());
+        tokio::spawn(async move {
+            bench
+                .tools
+                .call(&granted, "request_transfer_replacement", &four)
+                .await
+        })
+    };
+
+    let asked = ask();
+    let request = replacement_waiting(&bench.connections).await;
+    bench
+        .tools
+        .call(
+            &granted,
+            "record_dividend",
+            &json!({ "account": "A2", "asset": "CW8", "amount": 4, "date": "2019-03-01" }),
+        )
+        .await
+        .expect("held since the purchase");
+    assert_eq!(
+        answer_replacement(&bench.connections, &bench.transfers, request.id, true).await,
+        Err(AnswerRefused::NotDone {
+            reason: "DividendBeforeHolding".to_string()
+        })
+    );
+    assert_eq!(
+        asked.await.expect("asked").expect_err("not replaced").code,
+        "DividendBeforeHolding"
+    );
+    assert!(
+        bench
+            .accounts
+            .get_transaction_by_id(&purchase.id)
+            .await
+            .expect("read")
+            .is_some(),
+        "nothing was written"
+    );
+
+    // A request not refused waits for the owner's answer: the bound keeps that a failure.
+    let refused = tokio::time::timeout(Duration::from_secs(10), ask())
+        .await
+        .expect("refused before asking")
+        .expect("asked")
+        .expect_err("the transfer in comes after the dividend");
+    assert_eq!(refused.code, "DividendBeforeHolding");
+    assert!(
+        bench.connections.replacements().is_empty(),
+        "nothing was asked"
+    );
+}
+
 // AGT-091 — a refusal replaces nothing; a yes on four that changed since the owner was shown
 // them replaces nothing and says so; an answer to a request no longer waiting is refused;
 // a session that ends withdraws its request.

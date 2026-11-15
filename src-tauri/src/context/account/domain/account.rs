@@ -2442,7 +2442,10 @@ impl Account {
     }
 
     /// DIV-011 — the dividends of `asset_id` dated before the account first held it.
-    fn dividends_before_holding(&self, asset_id: &str) -> std::collections::BTreeSet<String> {
+    pub(crate) fn dividends_before_holding(
+        &self,
+        asset_id: &str,
+    ) -> std::collections::BTreeSet<String> {
         self.transactions
             .iter()
             .filter(|t| {
@@ -2456,7 +2459,7 @@ impl Account {
 
     /// DIV-040 — a change is refused when it leaves a dividend of `asset_id` dated before
     /// the asset was first held; one `already` so before the change does not refuse it.
-    fn ensure_dividends_follow_holding(
+    pub(crate) fn ensure_dividends_follow_holding(
         &self,
         asset_id: &str,
         already: &std::collections::BTreeSet<String>,

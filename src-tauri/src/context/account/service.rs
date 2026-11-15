@@ -1780,8 +1780,8 @@ impl AccountService {
     }
 
     /// AGT-091 — both accounts with the transactions `replaced` taken out and a new transfer
-    /// placed from `figures` in their stead, the cash replayed, checked as TRF-010 to TRF-022
-    /// and CSH-080 check them; nothing written. No state between the two is checked: the
+    /// placed from `figures` in their stead, the cash replayed, checked as TRF-010 to TRF-022,
+    /// CSH-080 and DIV-045 check them; nothing written. No state between the two is checked: the
     /// accounts stand as if the transfer had been recorded instead from the start. Also
     /// answers the four as they were stored, in the order of `replaced`.
     async fn stage_replacement(
@@ -1810,6 +1810,13 @@ impl AccountService {
             .collect::<Result<Vec<_>, _>>()?;
         let (sending_before, receiving_before) =
             (sending.transactions.clone(), receiving.transactions.clone());
+        // DIV-045 — what the replaced purchase made held counts: the dividends unheld are
+        // read before anything is taken out.
+        let asset_id = figures.asset_id.clone();
+        let unheld = (
+            sending.dividends_before_holding(&asset_id),
+            receiving.dividends_before_holding(&asset_id),
+        );
         let ids_in = |account_id: &str| -> Vec<String> {
             stored
                 .iter()
@@ -1830,6 +1837,12 @@ impl AccountService {
             .receiving
             .settle_cash()
             .map_err(to_holding_tx_error)?;
+        staged
+            .sending
+            .ensure_dividends_follow_holding(&asset_id, &unheld.0)?;
+        staged
+            .receiving
+            .ensure_dividends_follow_holding(&asset_id, &unheld.1)?;
         staged.sending_before = sending_before;
         staged.receiving_before = receiving_before;
         Ok((staged, stored))
