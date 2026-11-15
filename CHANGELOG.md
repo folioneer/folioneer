@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.0] - 2026-11-15
+
+### Added
+
+- [agent] an AI agent reads the rules behind a holding's figures, each with a worked example, and no tax
+- [agent] an AI agent reads each account's cost basis method and a holding's lots
+- [account] a transfer under FIFO carries its lots, each with the date and cost it was acquired at
+- [account] the account table no longer offers a Group by choice
+- [import] a built-in preset reads Scalable Capital's transactions export
+- [import] built-in presets read Interactive Brokers' Flex Query trades and cash transactions
+- [import] an import mapper can read a deposit or a withdrawal from the sign of its amount
+
+### Fixed
+
+- [performance] a holding with no recorded price is worth what it cost, not zero
+- [import] a transaction whose note spans several lines is no longer lost on import
+- [split] a bonus issue recorded as free shares no longer shows as an unrecorded split
+- [dividend] a dividend paid after its asset was sold is recorded on the day it was paid
+- two accounts, profiles or categories cannot share a name that differs only by an accented capital
+- the data export carries each account's holder
+
 ## [0.19.0] - 2026-11-09
 
 ### Added
