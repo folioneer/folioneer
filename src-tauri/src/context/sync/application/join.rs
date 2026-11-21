@@ -30,7 +30,8 @@ use crate::shared::infrastructure::change_recorder::ChangeRecorder;
 pub enum JoinError {
     /// A sync-BC rejection: folder, passphrase, data format, device name, database.
     Sync(SyncError),
-    /// A device's published history is missing a manifest or a segment (SYN-036).
+    /// A device's published history has a gap, an unreadable file or a segment outside
+    /// its own area (SYN-036, SYN-036A).
     HistoryIncomplete,
     /// The rebuild failed partway and was rolled back; the installation is as before
     /// (SYN-080).
@@ -67,21 +68,27 @@ fn unreadable(error: SyncError) -> JoinError {
 }
 
 /// Reads one device's complete history: its manifest, then its segments, which must cover
-/// `1..=latest_sequence` without a gap (SYN-036).
+/// `1..=latest_sequence` without a gap (SYN-036). An area without a manifest is a device
+/// that left (SYN-082) or whose manifest has not arrived: its changes must run from 1
+/// without a gap, and what arrives after the join is applied by a later sync (SYN-036A).
 async fn read_device_history(
     folder_store: &dyn FolderStore,
     key: &crate::context::sync::infrastructure::crypto::Key,
     device_id: &str,
     history: &mut History,
 ) -> Result<(), JoinError> {
-    let manifest_bytes = folder_store
+    let latest_sequence = folder_store
         .read_manifest_bytes(device_id)
         .await?
-        .ok_or(JoinError::HistoryIncomplete)?;
-    let manifest = decode_manifest(key, &manifest_bytes).map_err(|error| {
-        tracing::warn!(target: BACKEND, device_id, err = %error, "join: manifest unreadable");
-        unreadable(error)
-    })?;
+        .map(|manifest_bytes| {
+            decode_manifest(key, &manifest_bytes)
+                .map(|manifest| manifest.latest_sequence)
+                .map_err(|error| {
+                    tracing::warn!(target: BACKEND, device_id, err = %error, "join: manifest unreadable");
+                    unreadable(error)
+                })
+        })
+        .transpose()?;
     let mut names: Vec<(i64, i64, String)> = folder_store
         .list_segment_names(device_id)
         .await?
@@ -102,6 +109,12 @@ async fn read_device_history(
             tracing::warn!(target: BACKEND, device_id, name = %name, err = %error, "join: segment unreadable");
             unreadable(error)
         })?;
+        // A segment is replayed only from its own device's area: without a manifest, the
+        // area's name is all that vouches for it (SYN-036A).
+        if segment.device_id != device_id {
+            tracing::warn!(target: BACKEND, device_id, name = %name, "join: segment of another device");
+            return Err(JoinError::HistoryIncomplete);
+        }
         let written_in = segment.data_format_version;
         for segment_change in segment.changes {
             let sequence = segment_change.sequence;
@@ -121,12 +134,18 @@ async fn read_device_history(
         }
         expected = last + 1;
     }
-    if expected <= manifest.latest_sequence {
-        return Err(JoinError::HistoryIncomplete);
-    }
+    let applied_through = match latest_sequence {
+        // The manifest says how far the history goes: every change up to it is needed.
+        Some(latest) if expected <= latest => return Err(JoinError::HistoryIncomplete),
+        Some(latest) => latest,
+        // SYN-036A — an area with no segment holds nothing to replay: no cursor to keep.
+        None if expected == 1 => return Ok(()),
+        // SYN-036A — as far as its changes run from 1 without a gap.
+        None => expected - 1,
+    };
     history.cursors.push(SyncCursor {
         device_id: device_id.to_string(),
-        applied_through: manifest.latest_sequence,
+        applied_through,
         last_applied_at: Some(chrono::Utc::now().to_rfc3339()),
     });
     Ok(())
@@ -449,6 +468,24 @@ mod tests {
             read(damaged).await,
             Err(JoinError::HistoryIncomplete)
         ));
+    }
+
+    // SYN-036A — an area without a manifest is read as far as its changes run from 1: none
+    // means nothing to replay and no cursor; one segment, a cursor through it.
+    #[tokio::test]
+    async fn syn_036a_an_area_without_a_manifest_is_read_as_far_as_it_runs() {
+        let mut empty = MockFolderStore::new();
+        empty.expect_read_manifest_bytes().returning(|_| Ok(None));
+        empty.expect_list_segment_names().returning(|_| Ok(vec![]));
+        assert!(matches!(read(empty).await, Ok(0)));
+
+        let mut one = MockFolderStore::new();
+        one.expect_read_manifest_bytes().returning(|_| Ok(None));
+        one.expect_list_segment_names()
+            .returning(|_| Ok(vec![segment_file_name(1, 1)]));
+        one.expect_read_segment_bytes()
+            .returning(|_, _| Ok(Some(segment_written_in(DATA_FORMAT_VERSION))));
+        assert!(matches!(read(one).await, Ok(1)));
     }
 
     // SYN-038 — a history written in an older format joins in the current form: a device

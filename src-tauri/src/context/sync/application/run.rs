@@ -211,7 +211,8 @@ impl SyncRun {
     }
 
     /// The full sync run (SYN-060/065): publishes this device's unpublished changes, reads
-    /// every other device's manifest and unapplied segments from its own sync cursor,
+    /// every other device's area — its manifest when it has one (SYN-036A) — and unapplied
+    /// segments from its own sync cursor,
     /// applies each change as the resolution engine decides, and commits the outcomes in
     /// one SQLite transaction under the `SyncGate` — so an interrupted run leaves the
     /// portfolio exactly as it was and the next run retries from the same cursors
