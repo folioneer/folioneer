@@ -95,7 +95,7 @@ export function UpdateBanner({ data }: UpdateBannerProps) {
         </>
       )}
 
-      {/* UPD-023 — error state with retry; UPD-029 — a refused access can only be dismissed */}
+      {/* UPD-023 — error state with retry; #873's mock — a refused access can only be dismissed */}
       {state === "error" && (
         <>
           <span className="text-m3-error-on-container">{t(errorKey)}</span>

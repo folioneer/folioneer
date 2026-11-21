@@ -46,9 +46,21 @@ describe("useAboutPage", () => {
     expect(result.current.checkStatus).toBe("idle");
   });
 
-  // UPD-027 — a refused access is a failed check, never "up to date".
+  // #873's mock — a refused access is a failed check, never "up to date".
   it("sets error when the check is refused", async () => {
     mockCheckForUpdate.mockResolvedValue({ status: "error", error: { code: "AccessRefused" } });
+    const { result } = renderHook(() => useAboutPage());
+
+    await act(async () => {
+      await result.current.handleCheckForUpdate();
+    });
+
+    expect(result.current.checkStatus).toBe("error");
+  });
+
+  // #873's mock — a check that fails for any other reason says so, never "up to date".
+  it("sets error when the check fails without a refusal", async () => {
+    mockCheckForUpdate.mockResolvedValue({ status: "error", error: { code: "OperationFailed" } });
     const { result } = renderHook(() => useAboutPage());
 
     await act(async () => {

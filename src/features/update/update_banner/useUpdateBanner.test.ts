@@ -138,7 +138,7 @@ describe("useUpdateBanner", () => {
     expect(result.current.canRetry).toBe(false);
   });
 
-  // UPD-029 — the startup check's own answer is enough: the refusal shows without
+  // #873's mock — the startup check's own answer is enough: the refusal shows without
   // waiting for an event.
   it("shows the refusal when the startup check itself is refused", async () => {
     mockCheckForUpdate.mockResolvedValueOnce({ status: "error", error: { code: "AccessRefused" } });
@@ -149,7 +149,7 @@ describe("useUpdateBanner", () => {
     expect(result.current.errorKey).toBe("update.error_access_refused");
   });
 
-  // UPD-029 — a refused access is dismissed for the session; a download failure is not dismissible.
+  // #873's mock — a refused access is dismissed for the session; a download failure is not dismissible.
   it("dismisses a refused access but not a download failure", async () => {
     const { result } = renderHook(() => useUpdateBanner());
 
@@ -248,5 +248,107 @@ describe("useUpdateBanner", () => {
     expect(result.current.state).toBe("error");
     expect(result.current.errorKey).toBe("update.error");
     expect(result.current.canRetry).toBe(true);
+  });
+
+  // UPD-021 — a startup check that fails for any reason but a refusal shows nothing.
+  it("stays silent when the startup check fails without a refusal", async () => {
+    mockCheckForUpdate.mockResolvedValueOnce({
+      status: "error",
+      error: { code: "OperationFailed" },
+    });
+
+    const { result } = renderHook(() => useUpdateBanner());
+
+    await waitFor(() => expect(mockCheckForUpdate).toHaveBeenCalled());
+    await act(async () => {});
+    expect(result.current.state).toBe("idle");
+  });
+
+  // #873's mock — a manual check that finds a version dismissed earlier shows the banner again.
+  it("shows the banner again when a check finds a version dismissed earlier", async () => {
+    const { result } = renderHook(() => useUpdateBanner());
+    await act(async () => {
+      onAvailableCb?.({ version: "1.2.3" });
+    });
+    act(() => {
+      result.current.handleDismiss();
+    });
+    expect(result.current.state).toBe("idle");
+
+    await act(async () => {
+      onAvailableCb?.({ version: "1.2.3" });
+    });
+
+    expect(result.current.state).toBe("available");
+    expect(result.current.version).toBe("1.2.3");
+  });
+
+  // #873's mock / UPD-012 — a refusal a check finds while "Ready to install" leaves the banner.
+  it("keeps the ready banner when a check is refused", async () => {
+    const { result } = renderHook(() => useUpdateBanner());
+    await act(async () => {
+      onAvailableCb?.({ version: "1.2.3" });
+    });
+    act(() => {
+      result.current.handleInstall();
+    });
+    act(() => {
+      onCompleteCb?.();
+    });
+
+    act(() => {
+      onErrorCb?.({ code: "AccessRefused" });
+    });
+
+    expect(result.current.state).toBe("ready");
+  });
+
+  // UPD-012 — a startup check refused after the download finished leaves "Ready to install".
+  it("keeps the ready banner when the startup check is refused late", async () => {
+    let answer: (value: unknown) => void = () => {};
+    mockCheckForUpdate.mockReturnValueOnce(
+      new Promise((resolve) => {
+        answer = resolve;
+      }),
+    );
+    const { result } = renderHook(() => useUpdateBanner());
+    await act(async () => {
+      onAvailableCb?.({ version: "1.2.3" });
+    });
+    act(() => {
+      result.current.handleInstall();
+    });
+    act(() => {
+      onCompleteCb?.();
+    });
+
+    await act(async () => {
+      answer({ status: "error", error: { code: "AccessRefused" } });
+    });
+
+    expect(result.current.state).toBe("ready");
+  });
+
+  // #873's mock / UPD-028 — an installation refused shows the refusal, with Dismiss only.
+  it("shows the refusal when the installation is refused", async () => {
+    mockInstallUpdate.mockResolvedValueOnce({ status: "error", error: { code: "AccessRefused" } });
+    const { result } = renderHook(() => useUpdateBanner());
+    await act(async () => {
+      onAvailableCb?.({ version: "1.2.3" });
+    });
+    act(() => {
+      result.current.handleInstall();
+    });
+    act(() => {
+      onCompleteCb?.();
+    });
+
+    await act(async () => {
+      await result.current.handleRestart();
+    });
+
+    expect(result.current.state).toBe("error");
+    expect(result.current.errorKey).toBe("update.error_access_refused");
+    expect(result.current.canRetry).toBe(false);
   });
 });

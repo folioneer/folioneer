@@ -12,7 +12,7 @@ The application is distributed as a desktop executable. When a new version is pu
 
 **UPD-001 (was R1) — Automatic check at startup (backend)**: At each launch, a background check runs to detect whether a new version is available. It starts once the UI is fully loaded.
 
-**UPD-002 (was R2) — No notification when no update (frontend)**: If the UPD-001 check detects no new version, nothing is shown to the user and the application stays in its normal state. A refused access is not "no new version": see UPD-029.
+**UPD-002 (was R2) — No notification when no update (frontend)**: If the UPD-001 check detects no new version, nothing is shown to the user and the application stays in its normal state. A refused access is not "no new version": see #873's mock.
 
 ### Notification
 
@@ -44,11 +44,17 @@ The application is distributed as a desktop executable. When a new version is pu
 
 **UPD-013 (was R13) — Restart and installation (frontend + backend)**: When the user clicks "Restart now", the update is installed and the application restarts automatically.
 
-**UPD-013A — An installation that fails (backend)**: An installation restarts nothing and is rejected with an error when nothing was downloaded, when the update server no longer offers the update or cannot be asked, or when the installation itself fails. The attempt uses the downloaded file up: trying again downloads it anew (UPD-024). A failure here is never classified as a refused access (UPD-028): UPD-028 asks only for a check or a download.
+**UPD-013A — An installation that fails (backend)**: An installation restarts nothing and is rejected with an error when nothing was downloaded — before any request to the update server —, when the update server no longer offers the update or cannot be asked at the re-check (UPD-013C), or when the installation itself fails. The attempt uses the downloaded file up: trying again downloads it anew (UPD-024). A refused re-check is a refused access (UPD-028).
+
+**UPD-013B — A newer version at installation (backend)**: When the update server offers, at the re-check, a newer version than the one downloaded, the downloaded version is installed: its signature was verified at download (UPD-009), and the newer one is offered at the next launch (UPD-010, UPD-020) (owner, 2026-11-21, #873).
+
+**UPD-013C — The re-check (backend)**: Before installing, the application asks the update server again for the update.
 
 **UPD-014 (was R14) — User data preservation (backend)**: The update only replaces the application executable. All user data (assets, accounts, categories, prices, operations) is preserved intact after restart, except what a migration removes under UPD-015.
 
-**UPD-015 (was R15) — Backward compatibility (backend)**: Each new version guarantees compatibility with data produced by any earlier version. No update may introduce a change incompatible with an existing schema or data. A UPD-016 migration never loses data the user entered that this version or a later one still reads; it removes only what this version and later ones no longer read, and that removal cannot be undone (owner, 2026-11-15, #732).
+**UPD-015 (was R15) — Backward compatibility (backend)**: Each new version guarantees compatibility with data produced by any earlier version. No update may introduce a change incompatible with an existing schema or data. A UPD-016 migration never loses data that this version or a later one still reads, whether the user entered it or the application fetched or worked it out; it removes only what this version and later ones no longer read, and that removal cannot be undone (owner, 2026-11-15, #732; 2026-11-21, #873).
+
+**UPD-015A — Each device migrates its own copy (backend)**: Each device migrates its own copy of the portfolio: a removal (UPD-015) waits for no other device sharing it. A device on an older version keeps the data and behaves as SYN-035 says (owner, 2026-11-21, #873).
 
 **UPD-016 (was R16) — Automatic schema migration (backend)**: If the new version introduces database schema changes, migrations are applied automatically at the first launch after the update, before the UI is accessible. If multiple versions have been skipped, all intermediate migrations are applied in order, without exception.
 
@@ -74,17 +80,19 @@ The application is distributed as a desktop executable. When a new version is pu
 
 ### Errors
 
-**UPD-021 (was R21) — Silent check failure (frontend)**: If the startup check fails (no network, server unavailable), no notification is displayed and the application starts normally — except a refused access (UPD-029).
+**UPD-021 (was R21) — Silent check failure (frontend)**: If the startup check fails (no network, server unavailable), no notification is displayed and the application starts normally — except a refused access (#873's mock).
 
-**UPD-022 (was R22) — Logging check failures (backend)**: Any error during the startup check is logged in the application logs.
+**UPD-022 (was R22) — Logging check failures (backend)**: Any error during a check, at startup or by the manual check, is logged in the application logs.
 
-**UPD-023 (was R23) — Download error display (frontend)**: If the download fails (network error, insufficient disk space, or any other cause), if the UPD-009 checksum fails, or if the installation fails (UPD-013A), the banner displays an error message and a "Retry" button — except a refused access (UPD-029).
+**UPD-023 (was R23) — Download error display (frontend)**: If the download fails (network error, insufficient disk space, or any other cause), if the UPD-009 checksum fails, or if the installation fails (UPD-013A), the banner displays an error message and a "Retry" button — except a refused access (#873's mock).
 
 **UPD-024 (was R24) — Retry action (frontend + backend)**: Clicking "Retry" restarts the download from the beginning.
 
-**UPD-028 — Refused access is recognised (backend)**: An update channel may identify itself to the update server with credentials, and the server may refuse them (missing, expired or revoked). When a check or a download fails on such a channel, the application asks the update server once more to tell a refused access from any other failure, and logs a refusal. The answer to that second request is the one classified: "unauthorised", "forbidden" and "not found" are a refusal, since a server that hides what the credentials cannot reach answers "not found" to a refused access. On a channel that sends credentials, a missing update file or installer is therefore reported as a refused access — a misreport accepted in exchange for recognising those servers. A channel that sends no credentials cannot be refused: its failures are never classified as a refusal and cost no extra request.
+**UPD-028 — Refused access is recognised (backend)**: An update channel may identify itself to the update server with credentials, and the server may refuse them (missing, expired or revoked). When a check, a download or the re-check (UPD-013C) fails on such a channel, the application asks the update server again (UPD-028A) to tell a refused access from any other failure, and logs a refusal. The answer UPD-028A reaches is the one classified: "unauthorised", "forbidden" and "not found" are a refusal, since a server that hides what the credentials cannot reach answers "not found" to a refused access. On a channel that sends credentials, a missing update file or installer is therefore reported as a refused access — a misreport accepted in exchange for recognising those servers. A channel that sends no credentials cannot be refused: its failures are never classified as a refusal and cost no extra request.
 
-**UPD-029 — Refused access banner (frontend)**: When an access is refused (UPD-028) — at the startup check, a manual check or a download — the banner shows a message naming the refusal and a "Dismiss" button. It offers no "Retry": trying again cannot succeed until the credentials are fixed and the application restarted. Dismissing closes the banner for the session; it returns at the next launch while the access is still refused.
+**UPD-028A — The endpoints asked (backend)**: An update channel lists the endpoints of its update server (ADR-020). After a failed check or re-check, the application asks them in their order until one answers, an endpoint that cannot be reached passed over; after a failed download, it asks the installer's address. The first answer is the one classified; when no endpoint answers, the failure is not a refusal, since nothing shows the credentials were refused.
+
+**UPD-029 — A refusal is not lifted by trying again (backend)**: A refused access (UPD-028) stays refused until the credentials are fixed and the application restarted: trying again within the launch cannot succeed, and each launch's check asks again. How the window shows it is #873's mock.
 
 ### Build identity
 
@@ -98,7 +106,7 @@ The application is distributed as a desktop executable. When a new version is pu
 
 **UPD-026 (was R26) — Manual check loading state (frontend)**: During the check triggered by UPD-025, the "Check for updates" button is disabled and shows a loading indicator to prevent multiple triggers.
 
-**UPD-027 (was R27) — Manual check result (frontend)**: At the end of the UPD-025 check: if an update is available, the UPD-003 banner is displayed; if no update is available, a message on the "About" page confirms that the application is up to date; if the access is refused (UPD-028), the "About" page says the check failed while the banner names the refusal (UPD-029).
+**UPD-036 — A check that fails is an error (backend)**: A check that fails, at startup (UPD-001) or by the manual check (UPD-025), is rejected with an error, never reported as no update; a refused access is told apart (UPD-028). Staying silent at startup is UPD-021's.
 
 ---
 
@@ -109,9 +117,10 @@ The application is distributed as a desktop executable. When a new version is pu
   → Background check (UPD-001)                       → Check + spinner (UPD-025, UPD-026)
         │                                                   │ (same flow as UPD-001)
         ├─ No update → nothing displayed (UPD-002) ────────┤
-        │                                             └─ Up to date → confirmation message (UPD-027)
-        ├─ Network/server error → silent log, nothing displayed (UPD-021, UPD-022)
-        ├─ Access refused → banner names the refusal + [Dismiss] (UPD-028, UPD-029); About page: "check failed" (UPD-027)
+        │                                             └─ Up to date → confirmation message (#873's mock)
+        ├─ Startup: network/server error → silent log, nothing displayed (UPD-021, UPD-022)
+        ├─ Access refused → banner names the refusal + [Dismiss] (UPD-028, #873's mock); About page: "check failed" (#873's mock)
+        ├─ Manual check, other failure → rejected with an error (UPD-036)
         │
         └─ New version available
               → Banner: "Version X.Y.Z available" + [Install] [Dismiss] (UPD-003, UPD-004)
@@ -122,7 +131,7 @@ The application is distributed as a desktop executable. When a new version is pu
                           → Progress visible in the banner (UPD-008)
                           → If newer version published → keep going (UPD-010)
                                 │
-                                ├─ Access refused → banner names the refusal + [Dismiss] (UPD-028, UPD-029)
+                                ├─ Access refused → banner names the refusal + [Dismiss] (UPD-028, #873's mock)
                                 ├─ Failure → error banner + [Retry] (UPD-023)
                                 │            [Retry] → restarts from the beginning (UPD-024)
                                 │
@@ -137,6 +146,8 @@ The application is distributed as a desktop executable. When a new version is pu
                                                 │
                                                 └─ [Restart now] (UPD-013)
                                                       ├─ Fails → nothing restarts, error banner + [Retry] (UPD-013A, UPD-023, UPD-024)
+                                                      ├─ Newer version at the re-check → the downloaded one is installed (UPD-013B)
+                                                      ├─ Re-check refused → rejected as a refused access (UPD-013A, UPD-028)
                                                       → Data preserved (UPD-014)
                                                       → DB migration if needed (UPD-016, UPD-017), a copy first (UPD-032, UPD-033)
                                                            ├─ Copy failed → no migration, critical error, app blocked (UPD-018, UPD-035)
@@ -160,7 +171,7 @@ The version, on the About page and in the sidebar footer, is followed by the bui
 
 ### Main component
 
-Fixed banner integrated into the application shell (header or footer), visible across all pages. It only appears while an update is in progress or available, or when the update server refuses this installation's access (UPD-029), and disappears once the application has restarted. It is not a dialog or an ephemeral notification: the banner is part of the permanent layout.
+Fixed banner integrated into the application shell (header or footer), visible across all pages. It only appears while an update is in progress or available, or when the update server refuses this installation's access (#873's mock), and disappears once the application has restarted. It is not a dialog or an ephemeral notification: the banner is part of the permanent layout.
 
 ### Banner states
 
@@ -169,10 +180,10 @@ Fixed banner integrated into the application shell (header or footer), visible a
 - **Download in progress**: progress indicator, "Install" button replaced (UPD-008)
 - **Ready to install**: "Ready to install" + "Restart now" button — non-dismissible (UPD-011, UPD-012)
 - **Download error**: error message + "Retry" button (UPD-023)
-- **Access refused**: message naming the refusal + "Dismiss" button, no "Retry" (UPD-029)
+- **Access refused**: message naming the refusal + "Dismiss" button, no "Retry" (#873's mock)
 - **Migration in progress**: loading screen outside the banner ("Updating database…") (UPD-017)
 - **Migration error**: critical error message, application blocked at startup, outside the banner; after the copy was put back, it says nothing was lost and names the `backups` folder (UPD-018, UPD-035)
-- **Up to date** / **Check failed**: contextual message on the "About" page, outside the banner (UPD-027)
+- **Up to date** / **Check failed**: contextual message on the "About" page, outside the banner (#873's mock)
 
 ### User flow
 
@@ -193,5 +204,4 @@ Fixed banner integrated into the application shell (header or footer), visible a
 
 ## Open questions
 
-- UPD-015: does a migration's removal wait until every device sharing the portfolio (SYN) runs a version that no longer reads the data?
-- UPD-015: is data the application fetched or worked out (fetched prices, exchange rates) under the same guarantee as data the user entered?
+None.

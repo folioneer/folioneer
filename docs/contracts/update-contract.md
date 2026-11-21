@@ -11,12 +11,12 @@
 
 ## Commands
 
-| Command               | Args | Return                     | Errors                                                                                                                                                                                                                                          |
-| --------------------- | ---- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `check_for_update`    | —    | `Option<UpdateInfo>`       | `AccessRefused` _(UPD-028 — the update server refuses this build's access; also emitted as `update:error`. Other network/server errors are silent per UPD-021: the command returns None)_                                                       |
-| `download_update`     | —    | `()`                       | _(none — returns immediately (UPD-006, UPD-007); failures are emitted as `update:error` with `OperationFailed` (UPD-023) or `AccessRefused` (UPD-028); re-invoke to retry per UPD-024; concurrent calls silently ignored per UPD-010)_          |
-| `install_update`      | —    | `()`                       | `NoDownloadedUpdate` _(precondition guard — UPD-013A: install requires a completed download)_, `OperationFailed` _(updater initialisation, the release is no longer found or cannot be asked for, or the installation itself fails — UPD-013A)_ |
-| `get_startup_failure` | —    | `Option<MigrationFailure>` | _(infallible — reads what is kept in memory; `None` while no failure is kept: the portfolio opened, or is still opening and `db:migration_error` brings it; UPD-018A)_                                                                          |
+| Command               | Args | Return                     | Errors                                                                                                                                                                                                                                                                                                          |
+| --------------------- | ---- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `check_for_update`    | —    | `Option<UpdateInfo>`       | `AccessRefused` _(UPD-028 — the update server refuses this build's access; also emitted as `update:error`)_, `OperationFailed` _(any other failure: updater initialisation, network, server — UPD-036; the startup check's silence is the window's, UPD-021)_                                                   |
+| `download_update`     | —    | `()`                       | _(none — returns immediately (UPD-006, UPD-007); failures are emitted as `update:error` with `OperationFailed` (UPD-023) or `AccessRefused` (UPD-028); re-invoke to retry per UPD-024; concurrent calls silently ignored per UPD-010)_                                                                          |
+| `install_update`      | —    | `()`                       | `NoDownloadedUpdate` _(precondition guard — UPD-013A: install requires a completed download)_, `AccessRefused` _(the re-check is refused — UPD-013C, UPD-028)_, `OperationFailed` _(updater initialisation, the release is no longer found or cannot be asked for or the installation itself fails — UPD-013A)_ |
+| `get_startup_failure` | —    | `Option<MigrationFailure>` | _(infallible — reads what is kept in memory; `None` while no failure is kept: the portfolio opened, or is still opening and `db:migration_error` brings it; UPD-018A)_                                                                                                                                          |
 
 ---
 
@@ -55,4 +55,5 @@ struct MigrationFailure {         // UPD-018, UPD-035
 
 ## Changelog
 
+- 2026-11-21 — #873 (UPD-036, UPD-028): `check_for_update` returns `OperationFailed` for a failure that is not a refusal, instead of `None`; `install_update` returns `AccessRefused` when its re-check is refused.
 - 2026-11-21 — #732 (UPD-018A): new `get_startup_failure -> Option<MigrationFailure>`; the `db:migration_error` event and `MigrationFailure` are listed.

@@ -18,7 +18,7 @@ Every external data source already sits behind a trait (`PriceProvider`, `RatePr
 
 Another build replaces that one file before compiling. The file adds no command and no type on the wire. A source that does not exist yet (a bank feed, the advice module) gets its slot in the file when it exists, not before.
 
-A channel that sends credentials can be refused; the refusal is recognised and shown (UPD-028, UPD-029), because such a build would otherwise stop updating without a word. A channel without credentials is never classified as refused.
+A channel that sends credentials can be refused; the refusal is recognised and shown (UPD-028), because such a build would otherwise stop updating without a word. A channel without credentials is never classified as refused.
 
 Alternatives considered:
 
