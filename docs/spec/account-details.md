@@ -204,7 +204,7 @@ UPDATE holdings SET
           ├─ [use_cases/account_details/: Compute total_cost_basis (ACD-031)]
           ├─ [use_cases/account_details/: Compute total_realized_pnl = Σ holding.total_realized_pnl (ACD-045)]
           │
-          └─ [Frontend: Loading state → Header (Account name + Total Cost Basis + Total Realized P&L)]
+          └─ [Frontend: Loading state → Header (the validated mock on #864)]
              [Frontend: Active holdings table (one row per HoldingDetail)]
              [Frontend: Closed positions section (one row per ClosedHoldingDetail, ACD-047–ACD-049)]
              [Frontend: Empty / Error state as applicable]
@@ -222,7 +222,7 @@ UPDATE holdings SET
 
 **ManagerLayout** containing:
 
-- **Header**: Account name + Total Cost Basis + Total Realized P&L (large).
+- **Header**: the validated mock on #864 (folioneer/folioneer-design, `864/`).
 - **Active Positions Table**:
   - Asset (Name + Ticker)
   - Quantity

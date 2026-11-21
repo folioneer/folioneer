@@ -473,7 +473,7 @@ The header tells how recent the portfolio's prices are, and each holding whether
 
 **MKT-207 — An outdated price on its row (frontend)**: On a holding row whose price is outdated (MKT-206), the staleness label (MKT-140) reads "Outdated price · Nd", N being MKT-140's count of calendar days, in the warning colour with a warning icon, on one line; a current price keeps its staleness label as it is. In French "Prix ancien · N j"; both themes.
 
-**MKT-208 — The counts of outdated prices (frontend)**: The account's header shows its count (MKT-206) as a warning chip after its figures, and the accounts list's total row shows the portfolio's count the same way: "1 outdated price" / "N outdated prices" ("1 prix ancien" / "N prix anciens"). A count is of holdings, as MKT-206 counts them: an asset held in two accounts counts twice on the total. Neither shows anything at zero, nor in a read with a date. The count of each account in the account summaries is not shown on its row; an AI agent reads it (AGT-040).
+**MKT-208 — The counts of outdated prices (frontend)**: The account's header shows its count (MKT-206) as a warning chip after its Global Value, and the accounts list's total row shows the portfolio's count the same way: "1 outdated price" / "N outdated prices" ("1 prix ancien" / "N prix anciens"). A count is of holdings, as MKT-206 counts them: an asset held in two accounts counts twice on the total. Neither shows anything at zero, nor in a read with a date. The count of each account in the account summaries is not shown on its row; an AI agent reads it (AGT-040).
 
 ### Without an External provider (210–219)
 

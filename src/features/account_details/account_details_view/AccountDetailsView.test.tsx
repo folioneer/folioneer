@@ -556,14 +556,6 @@ describe("AccountDetailsView — header totals (#864)", () => {
       expect(document.querySelector(id)).toBeNull();
     }
   });
-});
-
-describe("AccountDetailsView — management fees (FEE-010/011)", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockUseRefreshAccountPrices.mockReturnValue({ isPending: false, refresh: vi.fn() });
-    mockUseAccountDetailsView.mockReturnValue(makeView());
-  });
 
   // MKT-208 — the header counts the account's outdated prices, and says nothing at zero
   it("counts the outdated prices in the header, only when there are some (MKT-208)", () => {
@@ -577,6 +569,14 @@ describe("AccountDetailsView — management fees (FEE-010/011)", () => {
     expect(document.querySelector("#account-details-outdated-price-count")).toHaveTextContent(
       "mkt.outdated.count",
     );
+  });
+});
+
+describe("AccountDetailsView — management fees (FEE-010/011)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUseRefreshAccountPrices.mockReturnValue({ isPending: false, refresh: vi.fn() });
+    mockUseAccountDetailsView.mockReturnValue(makeView());
   });
 
   it("routes the Management fee button to its handler (FEE-010)", () => {

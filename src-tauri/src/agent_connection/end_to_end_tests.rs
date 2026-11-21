@@ -307,6 +307,10 @@ async fn agt_040_the_read_tools_answer_from_the_running_application() {
     assert_eq!(holdings["account_name"], "PEA");
     assert_eq!(holdings["total_global_value"], "5000");
     assert_eq!(holdings["outdated_price_count"], 0);
+    // ACD-053, ACD-058, FEE-053 (#864) — the totals the window no longer shows reach the agent.
+    assert_eq!(holdings["total_net_cash_input"], "5000");
+    assert_eq!(holdings["total_capital_brought_in"], "5000");
+    assert_eq!(holdings["total_management_fees"], "0");
     assert!(holdings["holdings"]
         .as_array()
         .expect("holdings")

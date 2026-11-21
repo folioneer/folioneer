@@ -182,7 +182,8 @@ pub struct AccountDetailsResponse {
     /// Sum of dividend cash credited across all of the account's dividend transactions, in account
     /// currency (i64 micros). 0 when none (DIV-073).
     pub total_dividends_received: i64,
-    /// Sum of `management_fees` across all active holdings, in account-currency micros (FEE-072/073).
+    /// Sum of every management fee deduction's value across the account, closed holdings
+    /// included, in account-currency micros (FEE-053, FEE-072/073).
     /// 0 when no management fee transactions have been recorded.
     pub total_management_fees: i64,
     /// Net external cash input since inception: Σ Deposit − Σ Withdrawal amounts, in
@@ -5543,6 +5544,8 @@ mod tests {
             as_of_row.management_fees, 10_000_000,
             "as-of Management Fees must include only deductions dated ≤ the as-of date (FEE-072)"
         );
+        // FEE-053 — the account's total counts the same deductions (#864).
+        assert_eq!(as_of_resp.total_management_fees, 10_000_000);
 
         // Live view (no cutoff): BOTH deductions count.
         // 1 unit × 10.00 + 0.99 unit × 10.00 = 10_000_000 + 9_900_000 = 19_900_000.
@@ -5556,6 +5559,7 @@ mod tests {
             live_row.management_fees, 19_900_000,
             "without a cutoff both deductions count — confirming the as-of filter excluded the later one (FEE-072)"
         );
+        assert_eq!(live_resp.total_management_fees, 19_900_000);
     }
 
     // ── ACD-054–057 — windowed position performance ──────────────────────────
