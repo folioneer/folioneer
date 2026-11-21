@@ -553,7 +553,7 @@ mod tests {
     // the startup check's silence is the window's (UPD-021). A channel that sends nothing
     // is not probed, so the failure is no refusal.
     #[tokio::test]
-    async fn upd_027_a_failed_check_is_reported_as_a_failure() {
+    async fn upd_027a_a_failed_check_is_reported_as_a_failure() {
         let (endpoint, _served) = serve_once("500 Internal Server Error").await;
         let app = app_with(Some(UpdateChannel {
             endpoints: vec![endpoint],
@@ -571,7 +571,7 @@ mod tests {
     // UPD-028A — the endpoints are asked in their order until one answers: one that
     // cannot be reached is passed over, and the first answer decides.
     #[tokio::test]
-    async fn upd_028_an_unreachable_endpoint_is_passed_over() {
+    async fn upd_028a_an_unreachable_endpoint_is_passed_over() {
         let unreachable: Url = {
             let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
             let address = listener.local_addr().expect("address");
