@@ -2936,3 +2936,21 @@ async fn syn_036a_a_segment_copied_into_another_area_refuses_the_join() {
     let refused = joined.expect_err("a segment out of its area refuses the join");
     assert!(refused.contains("HistoryIncomplete"), "{refused}");
 }
+
+// SYN-036A / SYN-035 (#730) — a segment in a newer data format, in the area of a device
+// that left, asks for an update, as one behind a manifest does.
+#[tokio::test]
+async fn syn_036a_a_newer_segment_without_a_manifest_asks_for_an_update() {
+    let dir = tempfile::tempdir().unwrap();
+    let (desktop, laptop_area) = leave_after_two_segments(dir.path()).await;
+    let first = segment_names(&laptop_area).into_iter().next().unwrap();
+    let path = laptop_area.join("segments").join(first);
+    let mut segment = std::fs::read(&path).unwrap();
+    segment[..4].copy_from_slice(&(DATA_FORMAT_VERSION + 1).to_be_bytes());
+    std::fs::write(&path, segment).unwrap();
+
+    let run = desktop.orchestrator.sync_now().await.unwrap();
+
+    let failures = format!("{:?}", run.failures);
+    assert!(failures.contains("UpdateRequired"), "{failures}");
+}

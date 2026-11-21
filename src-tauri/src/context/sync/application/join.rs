@@ -30,7 +30,8 @@ use crate::shared::infrastructure::change_recorder::ChangeRecorder;
 pub enum JoinError {
     /// A sync-BC rejection: folder, passphrase, data format, device name, database.
     Sync(SyncError),
-    /// A device's published history is missing a manifest or a segment (SYN-036).
+    /// A device's published history has a gap, an unreadable file or a segment outside
+    /// its own area (SYN-036, SYN-036A).
     HistoryIncomplete,
     /// The rebuild failed partway and was rolled back; the installation is as before
     /// (SYN-080).
@@ -467,6 +468,24 @@ mod tests {
             read(damaged).await,
             Err(JoinError::HistoryIncomplete)
         ));
+    }
+
+    // SYN-036A — an area without a manifest is read as far as its changes run from 1: none
+    // means nothing to replay and no cursor; one segment, a cursor through it.
+    #[tokio::test]
+    async fn syn_036a_an_area_without_a_manifest_is_read_as_far_as_it_runs() {
+        let mut empty = MockFolderStore::new();
+        empty.expect_read_manifest_bytes().returning(|_| Ok(None));
+        empty.expect_list_segment_names().returning(|_| Ok(vec![]));
+        assert!(matches!(read(empty).await, Ok(0)));
+
+        let mut one = MockFolderStore::new();
+        one.expect_read_manifest_bytes().returning(|_| Ok(None));
+        one.expect_list_segment_names()
+            .returning(|_| Ok(vec![segment_file_name(1, 1)]));
+        one.expect_read_segment_bytes()
+            .returning(|_, _| Ok(Some(segment_written_in(DATA_FORMAT_VERSION))));
+        assert!(matches!(read(one).await, Ok(1)));
     }
 
     // SYN-038 — a history written in an older format joins in the current form: a device

@@ -1,5 +1,5 @@
-//! The intake of one sync run (SYN-033/034/035/037/063): every other device's manifest and
-//! the segments past this device's sync cursor, decoded and shape-checked into the changes
+//! The intake of one sync run (SYN-033/034/035/036A/037/063): every other device's area —
+//! its manifest when it has one — and the segments past this device's sync cursor, decoded and shape-checked into the changes
 //! the apply transaction (`run.rs`) will hand to the executor, plus the cursors to advance
 //! and the roster the manifests name.
 
@@ -161,7 +161,19 @@ async fn read_segments(
         let Some(bytes) = folder_store.read_segment_bytes(other, &name).await? else {
             break;
         };
-        let changes = decode_segment(key, &bytes)
+        let decoded = decode_segment(key, &bytes);
+        // SYN-035 — a segment written in a newer format asks for an update; nothing past
+        // it is read, so the cursor stays before it.
+        if let Err(SyncError::UpdateRequired {
+            data_format_version,
+        }) = decoded
+        {
+            intake.failures.push(SyncFailure::UpdateRequired {
+                data_format_version,
+            });
+            break;
+        }
+        let changes = decoded
             .map_err(|error| error.to_string())
             .and_then(|segment| {
                 if segment.device_id != other {
