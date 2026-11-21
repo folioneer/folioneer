@@ -1,6 +1,7 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
 import App from "./App";
+import { commands } from "./bindings";
 
 // Mock Tauri event system (used by useUpdateBanner and db:migration_error listener)
 vi.mock("@tauri-apps/api/event", () => ({
@@ -40,6 +41,7 @@ vi.mock("./bindings", async (importOriginal) => ({
     checkForUpdate: vi.fn(() => Promise.resolve({ status: "ok", data: null })),
     downloadUpdate: vi.fn(() => Promise.resolve({ status: "ok", data: null })),
     installUpdate: vi.fn(() => Promise.resolve({ status: "ok", data: null })),
+    getStartupFailure: vi.fn(() => Promise.resolve(null)),
     applyDueFeeDeductions: vi.fn(() => Promise.resolve({ status: "ok", data: null })),
     getAgentConnectionState: vi.fn(() =>
       Promise.resolve({
@@ -97,4 +99,21 @@ test("renders Categories navigation item", async () => {
   render(<App />);
   const categoriesElements = await screen.findAllByText(/Categories/i);
   expect(categoriesElements.length).toBeGreaterThan(0);
+});
+
+// UPD-018A (#732) — a migration that failed while the window was still loading is not lost: the
+// window asks the core for it and shows the error screen, even though the portfolio's reads fail.
+test("shows the migration error screen for a failure that happened before it listened", async () => {
+  vi.mocked(commands.getStartupFailure).mockResolvedValueOnce({
+    detail: "migration 202611010002 failed",
+    backups_dir: null,
+  });
+  vi.mocked(commands.getAssets).mockRejectedValueOnce(new Error("no database"));
+  render(<App />);
+  await waitFor(() =>
+    expect(document.querySelector("#migration-error-message")).toBeInTheDocument(),
+  );
+  expect(document.querySelector("#migration-error-detail")).toHaveTextContent(
+    "migration 202611010002 failed",
+  );
 });

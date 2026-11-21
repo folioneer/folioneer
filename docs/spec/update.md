@@ -46,15 +46,17 @@ The application is distributed as a desktop executable. When a new version is pu
 
 **UPD-013A — An installation that fails (backend)**: An installation restarts nothing and is rejected with an error when nothing was downloaded, when the update server no longer offers the update or cannot be asked, or when the installation itself fails. The attempt uses the downloaded file up: trying again downloads it anew (UPD-024). A failure here is never classified as a refused access (UPD-028): UPD-028 asks only for a check or a download.
 
-**UPD-014 (was R14) — User data preservation (backend)**: The update only replaces the application executable. All user data (assets, accounts, categories, prices, operations) is preserved intact after restart.
+**UPD-014 (was R14) — User data preservation (backend)**: The update only replaces the application executable. All user data (assets, accounts, categories, prices, operations) is preserved intact after restart, except what a migration removes under UPD-015.
 
-**UPD-015 (was R15) — Backward compatibility (backend)**: Each new version guarantees compatibility with data produced by any earlier version. No update may introduce a change incompatible with an existing schema or data. UPD-016 migrations may only extend or adapt the schema, never destructively remove or modify data.
+**UPD-015 (was R15) — Backward compatibility (backend)**: Each new version guarantees compatibility with data produced by any earlier version. No update may introduce a change incompatible with an existing schema or data. A UPD-016 migration never loses data the user entered that this version or a later one still reads; it removes only what this version and later ones no longer read, and that removal cannot be undone (owner, 2026-11-15, #732).
 
 **UPD-016 (was R16) — Automatic schema migration (backend)**: If the new version introduces database schema changes, migrations are applied automatically at the first launch after the update, before the UI is accessible. If multiple versions have been skipped, all intermediate migrations are applied in order, without exception.
 
 **UPD-017 (was R17) — Loading screen during migrations (frontend)**: During the UPD-016 migration phase, a loading screen is displayed with a message indicating that the database update is in progress.
 
 **UPD-018 (was R18) — Migration failure (backend)**: If a migration fails at startup, or the copy before it cannot be made (UPD-032), the application refuses to start in order to protect data integrity; the error screen says so (UPD-035).
+
+**UPD-018A — The startup failure stays readable (backend)**: The failure that stopped the portfolio from opening stays readable for the rest of the launch, whenever a surface asks for it, besides being announced once when it happens; a later launch tries again (UPD-032).
 
 **UPD-032 — A copy before migrating (backend)**: Before a launch applies its first migration to an existing portfolio's database, the database is copied, once for the whole launch, into a `backups` folder beside it — on this computer, never in the shared folder — under a name that carries the time of the copy. A new portfolio, or a launch with no migration to apply, copies nothing. When the copy cannot be made, no migration runs and UPD-018 applies. A later launch of a version whose migration failed copies again: each attempt has its own copy.
 
@@ -191,4 +193,5 @@ Fixed banner integrated into the application shell (header or footer), visible a
 
 ## Open questions
 
-None — all questions have been resolved.
+- UPD-015: does a migration's removal wait until every device sharing the portfolio (SYN) runs a version that no longer reads the data?
+- UPD-015: is data the application fetched or worked out (fetched prices, exchange rates) under the same guarantee as data the user entered?

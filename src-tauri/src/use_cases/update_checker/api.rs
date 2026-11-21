@@ -6,7 +6,7 @@ use std::sync::Arc;
 use tauri::AppHandle;
 
 use super::error::UpdateError;
-use super::service::{self, UpdateInfo, UpdateState};
+use super::service::{self, StartupFailure, UpdateInfo, UpdateState};
 
 /// Checks whether a new application version is available (R1, R25).
 ///
@@ -52,4 +52,14 @@ pub async fn install_update(
     update_state: tauri::State<'_, Arc<UpdateState>>,
 ) -> Result<(), UpdateError> {
     service::install(app_handle, Arc::clone(&update_state)).await
+}
+
+/// UPD-018A / UPD-035 — the failure that stopped the portfolio from opening at startup, if any:
+/// the window asks for it once it is ready, as the event was sent before it listened.
+#[tauri::command]
+#[specta::specta]
+pub fn get_startup_failure(
+    startup_failure: tauri::State<'_, Arc<StartupFailure>>,
+) -> Option<crate::core::MigrationFailure> {
+    startup_failure.read()
 }

@@ -59,11 +59,20 @@ function App() {
 
   useEffect(() => {
     logger.info("[App] mounted");
-    // UPD-018 — listen for the critical startup failure from the backend
+    // UPD-018 / UPD-018A — listen for the critical startup failure from the backend, and read
+    // the one that happened before the window listened.
     const unlistenPromise = shellGateway.onMigrationError((failure) => {
       setDbError(failure);
     });
+    let cancelled = false;
+    shellGateway
+      .getStartupFailure()
+      .then((failure) => {
+        if (failure && !cancelled) setDbError(failure);
+      })
+      .catch((error) => logger.error("[App] startup failure unreadable", { error }));
     return () => {
+      cancelled = true;
       unlistenPromise.then((fn) => fn()).catch(() => {});
     };
   }, []);

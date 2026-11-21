@@ -143,6 +143,9 @@ pub fn run() {
 
             // Manage update state before DB init so it is available even on migration failure (R10, R18)
             app_handle.manage(Arc::new(UpdateState::new()) as ManagedUpdateState);
+            // UPD-018 — kept for the window, which may not listen yet when the open fails.
+            let startup_failure = Arc::new(crate::use_cases::update_checker::StartupFailure::default());
+            app_handle.manage(Arc::clone(&startup_failure));
 
             // The update channel and the external data sources come from `extensions.rs`
             // (ADR-020). The HTTP clients are built here, outside the keep-running async
@@ -165,7 +168,9 @@ pub fn run() {
                     Ok(db) => Arc::new(db),
                     Err(e) => {
                         tracing::error!(target: BACKEND, error = %e, "Database initialization failed (UPD-018)");
-                        let _ = app_handle.emit("db:migration_error", MigrationFailure::from_error(&e));
+                        let failure = MigrationFailure::from_error(&e);
+                        startup_failure.record(failure.clone());
+                        let _ = app_handle.emit("db:migration_error", failure);
                         return;
                     }
                 };
