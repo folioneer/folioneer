@@ -134,7 +134,7 @@ describe("ClosedHoldingRow", () => {
       actionsCell?.querySelector("#action-view-closed-transactions-asset-1"),
     ).toBeInTheDocument();
     expect(actionsCell).toHaveClass("sticky", "left-0", "bg-m3-surface-container-low");
-    expect(assetCell).toHaveClass("sticky", "left-[224px]", "bg-m3-surface-container-low");
+    expect(assetCell).toHaveClass("sticky", "left-[260px]", "bg-m3-surface-container-low");
     expect(document.querySelector("tr > td:nth-child(3)")).not.toHaveClass("sticky");
   });
 });

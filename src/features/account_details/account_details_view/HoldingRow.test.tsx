@@ -1213,7 +1213,7 @@ describe("HoldingRow — split action (SPL-061)", () => {
     const assetCell = document.querySelector("tr > td:nth-child(2)");
     expect(actionsCell?.querySelector("#action-buy-asset-1")).toBeInTheDocument();
     expect(actionsCell).toHaveClass("sticky", "left-0", "bg-m3-surface-container-low");
-    expect(assetCell).toHaveClass("sticky", "left-[224px]", "bg-m3-surface-container-low");
+    expect(assetCell).toHaveClass("sticky", "left-[260px]", "bg-m3-surface-container-low");
     expect(document.querySelector("tr > td:nth-child(3)")).not.toHaveClass("sticky");
   });
 
@@ -1223,7 +1223,7 @@ describe("HoldingRow — split action (SPL-061)", () => {
     const assetCell = document.querySelector("tr > td:nth-child(2)");
     expect(actionsCell?.querySelector("#action-record-deposit-asset-1")).toBeInTheDocument();
     expect(actionsCell).toHaveClass("sticky", "left-0");
-    expect(assetCell).toHaveClass("sticky", "left-[224px]");
+    expect(assetCell).toHaveClass("sticky", "left-[260px]");
     expect(document.querySelector("tr > td:nth-child(3)")).not.toHaveClass("sticky");
   });
 });
@@ -1315,5 +1315,18 @@ describe("HoldingRow — lots (#515, the validated mock)", () => {
     unmount();
     const { container: without } = renderInTable(baseRow);
     expect(without.querySelector("#action-lots-asset-1")).toBeNull();
+  });
+});
+
+// #712 (the validated mock) — every action of the row shows its name on hover.
+describe("HoldingRow — action labels (#712)", () => {
+  beforeEach(() => {
+    useAppStore.setState({ assets: [], accounts: [] });
+  });
+
+  it("shows an action's name while it is hovered", () => {
+    const { container } = renderInTable(baseRow);
+    fireEvent.mouseEnter(container.querySelector("#action-buy-asset-1")!);
+    expect(screen.getByTestId("icon-button-label")).toHaveTextContent("transaction.action_buy");
   });
 });

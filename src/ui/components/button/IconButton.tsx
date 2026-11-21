@@ -1,4 +1,13 @@
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import {
+  type ButtonHTMLAttributes,
+  type FocusEvent,
+  type KeyboardEvent,
+  type MouseEvent,
+  type ReactNode,
+  useEffect,
+  useState,
+} from "react";
+import { createPortal } from "react-dom";
 
 type IconButtonVariant = "filled" | "outlined" | "tonal" | "ghost" | "danger" | "success" | "error";
 type IconButtonShape = "round" | "square";
@@ -10,6 +19,19 @@ interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   shape?: IconButtonShape;
   size?: IconButtonSize;
   "aria-label": string;
+  /**
+   * #712 — shows the button's name in a small label under it, on hover and on keyboard focus.
+   * The label is drawn on the page, outside any scrolling area, so a table never clips it. It
+   * repeats the name the button already carries, so assistive technologies skip it; it closes
+   * on Escape, on any scroll, and when the button becomes disabled.
+   */
+  tooltip?: boolean;
+}
+
+/** Where the label sits: centred under the button, in the viewport's coordinates. */
+interface LabelPlace {
+  left: number;
+  top: number;
 }
 
 export function IconButton({
@@ -18,8 +40,36 @@ export function IconButton({
   shape = "square",
   size = "md",
   className = "",
+  tooltip = false,
+  onMouseEnter,
+  onMouseLeave,
+  onFocus,
+  onBlur,
+  onKeyDown,
   ...props
 }: IconButtonProps) {
+  const [labelAt, setLabelAt] = useState<LabelPlace | null>(null);
+  const showLabel = (target: HTMLButtonElement) => {
+    if (!tooltip) return;
+    const rect = target.getBoundingClientRect();
+    setLabelAt({ left: rect.left + rect.width / 2, top: rect.bottom + 6 });
+  };
+  const hideLabel = () => setLabelAt(null);
+  const shown = labelAt !== null;
+
+  // A label placed from the button's position leaves it as soon as anything scrolls.
+  useEffect(() => {
+    if (!shown) return;
+    const hide = () => setLabelAt(null);
+    window.addEventListener("scroll", hide, true);
+    return () => window.removeEventListener("scroll", hide, true);
+  }, [shown]);
+
+  // A button disabled under the pointer or the focus gets no leave nor blur.
+  useEffect(() => {
+    if (props.disabled) setLabelAt(null);
+  }, [props.disabled]);
+
   const sizeClasses: Record<IconButtonSize, string> = {
     sm: "h-8 w-8",
     md: "h-10 w-10",
@@ -59,8 +109,40 @@ export function IconButton({
         ${className}
       `}
       {...props}
+      onMouseEnter={(event: MouseEvent<HTMLButtonElement>) => {
+        showLabel(event.currentTarget);
+        onMouseEnter?.(event);
+      }}
+      onMouseLeave={(event: MouseEvent<HTMLButtonElement>) => {
+        hideLabel();
+        onMouseLeave?.(event);
+      }}
+      onFocus={(event: FocusEvent<HTMLButtonElement>) => {
+        showLabel(event.currentTarget);
+        onFocus?.(event);
+      }}
+      onBlur={(event: FocusEvent<HTMLButtonElement>) => {
+        hideLabel();
+        onBlur?.(event);
+      }}
+      onKeyDown={(event: KeyboardEvent<HTMLButtonElement>) => {
+        if (event.key === "Escape") hideLabel();
+        onKeyDown?.(event);
+      }}
     >
       {icon}
+      {labelAt &&
+        createPortal(
+          <span
+            aria-hidden="true"
+            data-testid="icon-button-label"
+            style={{ left: labelAt.left, top: labelAt.top }}
+            className="pointer-events-none fixed z-[60] -translate-x-1/2 whitespace-nowrap rounded px-2 py-1 text-xs bg-m3-on-surface text-m3-surface shadow-elevation-2"
+          >
+            {props["aria-label"]}
+          </span>,
+          document.body,
+        )}
     </button>
   );
 }
