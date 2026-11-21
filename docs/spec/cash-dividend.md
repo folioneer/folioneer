@@ -54,7 +54,7 @@ The `AccountDetailsResponse` DTO (owned by ACD) gains one field.
 
 ### Eligibility and Initiation (010–019)
 
-**DIV-010 — Entry point (frontend)**: The dividend recording flow is initiated from the Account Details header's consolidated "Record" menu (DIV-012), via a "Dividend" item that opens the dividend modal (#734's mock). The paying asset is chosen inside the modal (#734's mock), not derived from a holding row. v1 does **not** add a per-holding-row dividend action (deferred — see Open Questions / Deferred).
+**DIV-010 — Entry point (frontend)**: The dividend recording flow is initiated from the Account Details header's consolidated "Record" menu (DIV-012), via a "Dividend" item that opens the dividend modal (the validated mock on #734). The paying asset is chosen inside the modal, not derived from a holding row. v1 does **not** add a per-holding-row dividend action (deferred — see Open Questions / Deferred).
 
 **DIV-011 — Eligibility (backend)**: A dividend is recorded only for an `(account, asset)` pair where the account held the asset on the dividend's date or before it — a purchase, an opening balance or a transfer in of the asset is dated on or before it — and the asset is not a Cash Asset (owner, 2026-11-14, #774). A dividend is recorded on the day it was paid: everywhere the right to it is fixed at the ex-date and the cash comes later — two trading days in France, Italy and Spain, weeks in the United States, up to about three months in Poland — so one paid after the whole position was sold is recorded. The action is rejected with a specific error when the account is unknown, the asset is unknown, the asset was never held in that account on or before that date, or the asset is a Cash Asset. The rule is the same whatever records the dividend (TRX-012).
 
@@ -90,7 +90,7 @@ The `AccountDetailsResponse` DTO (owned by ACD) gains one field.
 
 **DIV-043 — The correction keeps the recorded entry mode (frontend)**: The amount is shown in the currency it was recorded in. For a dividend recorded in asset currency (DIV-022), that is the asset's currency, and the exchange rate is shown when the asset and the account differ in currency. For one recorded in account-currency mode (DIV-029), it is the account's currency and no rate is shown. The mode is read from the stored rate: between two different currencies, a rate of exactly 1 is account-currency mode. A dividend typed in asset currency at a rate of exactly 1 is stored identically and is shown the same way; the figures it records are the same in either view.
 
-**DIV-044 — A correction saved untouched changes nothing (frontend)**: The amount and the rate are filled to their last recorded decimal, so saving the modal without typing records the same figures — except a same-currency dividend previously stored at another rate, which the correction saves at a rate of 1 (DIV-022A). The first problem the draft check reports is shown as on the other transaction forms (TRX-067).
+**DIV-044 — A correction saved untouched changes nothing (frontend)**: The amount and the rate are filled to their last recorded decimal, so saving the modal without typing records the same figures; for a dividend whose asset and account share a currency, the rate filled is 1, the only one DIV-022A accepts. The first problem the draft check reports is shown as on the other transaction forms (TRX-067).
 
 **DIV-045 — Another transaction's change never leaves a dividend before any holding (backend)**: Correcting or cancelling a transaction of the paying asset — a transfer's parts included —, or replacing four transactions with a transfer (AGT-090, AGT-091, AGT-093), is rejected with a specific error, the one DIV-040A gives, when it would leave a dividend dated before the asset was first held: the purchase, the opening balance or the transfer in that first brought it in moved after the dividend or cancelled, or the purchase replaced by a transfer in dated after it. It is refused as SEL-032 refuses a change that leaves a later sale short (owner, 2026-11-14, #774); the dividend is moved or removed first.
 
@@ -118,7 +118,7 @@ The `AccountDetailsResponse` DTO (owned by ACD) gains one field.
 
 ## Workflow
 
-The Record-dividend form is #734's validated mock.
+The Record-dividend form is the validated mock on #734 (folioneer/folioneer-design, `734/`).
 
 ```
 record a dividend
