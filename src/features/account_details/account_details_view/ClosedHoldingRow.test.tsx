@@ -161,3 +161,12 @@ describe("ClosedHoldingRow — price history backfill (MKT-190)", () => {
     expect(document.querySelector("#action-backfill-closed-price-history-asset-1")).toBeNull();
   });
 });
+
+// #712 (the validated mock) — a closed position's actions show their name as an open one's do.
+describe("ClosedHoldingRow — action labels (#712)", () => {
+  it("shows an action's name while it is hovered", () => {
+    renderInTable(baseRow);
+    fireEvent.mouseEnter(document.querySelector("#action-view-closed-transactions-asset-1")!);
+    expect(screen.getByTestId("icon-button-label")).toHaveTextContent("transaction.list_title");
+  });
+});
