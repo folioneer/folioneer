@@ -10,10 +10,10 @@ use super::service::{self, StartupFailure, UpdateInfo, UpdateState};
 
 /// Checks whether a new application version is available (R1, R25).
 ///
-/// Returns `None` if the application is up to date or if the check fails due
-/// to network or server errors (R21); `AccessRefused` when the update server
-/// refuses this build's access (UPD-028). Emits `"update:available"` on the app
-/// handle if an update is found.
+/// Returns `None` if the application is up to date; `AccessRefused` when the update
+/// server refuses this build's access (UPD-028), `OperationFailed` for any other failure
+/// (UPD-027A) — staying silent at startup is the window's (UPD-021). Emits
+/// `"update:available"` on the app handle if an update is found.
 #[tauri::command]
 #[specta::specta]
 pub async fn check_for_update(app_handle: AppHandle) -> Result<Option<UpdateInfo>, UpdateError> {

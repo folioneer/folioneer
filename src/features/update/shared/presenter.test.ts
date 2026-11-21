@@ -15,7 +15,7 @@ describe("presentUpdateError", () => {
 });
 
 describe("isRetryable", () => {
-  // UPD-029 — trying again cannot lift a refusal; any other failure can be retried (UPD-024).
+  // #873's mock — trying again cannot lift a refusal; any other failure can be retried (UPD-024).
   it("is false for a refused access only", () => {
     expect(isRetryable({ code: "AccessRefused" })).toBe(false);
     expect(isRetryable({ code: "OperationFailed" })).toBe(true);

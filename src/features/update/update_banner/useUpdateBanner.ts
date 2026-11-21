@@ -10,9 +10,9 @@ export type UpdateBannerState = "idle" | "available" | "downloading" | "ready" |
 
 export interface UpdateBannerData {
   state: UpdateBannerState;
-  /** i18n key of the message shown in the error state (UPD-023, UPD-029). */
+  /** i18n key of the message shown in the error state (UPD-023, #873's mock). */
   errorKey: string;
-  /** Whether the error state offers "Retry" (UPD-023) or "Dismiss" (UPD-029). */
+  /** Whether the error state offers "Retry" (UPD-023) or "Dismiss" (#873's mock). */
   canRetry: boolean;
   version: string | null;
   progress: number;
@@ -37,8 +37,11 @@ export function useUpdateBanner(): UpdateBannerData {
   const [progress, setProgress] = useState(0);
   const [isRestarting, setIsRestarting] = useState(false);
 
-  // Track if dismissed so we can ignore a re-emitted update:available in same session
-  const dismissedVersion = useRef<string | null>(null);
+  // UPD-012 — the events below read the state without re-subscribing.
+  const stateRef = useRef<UpdateBannerState>(state);
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   useEffect(() => {
     logger.info("[UpdateBanner] mounted — starting update check (R1)");
@@ -49,16 +52,19 @@ export function useUpdateBanner(): UpdateBannerData {
     updateGateway
       .checkForUpdate()
       .then((result) => {
-        if (mounted && result.status === "error") showError(result.error);
+        // UPD-021 — only a refusal shows (#873's mock); any other failure stays silent.
+        if (mounted && result.status === "error" && !isRetryable(result.error)) {
+          showError(result.error);
+        }
       })
       .catch((e) => {
         logger.error("[UpdateBanner] Startup check failed", e);
       });
 
-    // Listen for update:available (R3) — emitted by backend on check
+    // Listen for update:available (R3) — emitted by backend on check; a manual check shows
+    // a version dismissed earlier again (#873's mock).
     const unlistenAvailable = updateGateway.onUpdateAvailable((info) => {
       if (!mounted) return;
-      if (dismissedVersion.current === info.version) return;
       setState((prev) => {
         if (prev === "idle") {
           setVersion(info.version);
@@ -77,14 +83,17 @@ export function useUpdateBanner(): UpdateBannerData {
     // Listen for download complete (R11)
     const unlistenComplete = updateGateway.onUpdateComplete(() => {
       if (!mounted) return;
+      // Read at once by the error listener, before the effect catches up (UPD-012).
+      stateRef.current = "ready";
       setState("ready");
       setProgress(100);
     });
 
     // Listen for update errors: a failed download (R23), or an access the update
-    // server refuses, announced by any check (UPD-028).
+    // server refuses, announced by any check (UPD-028) — which leaves "Ready to install"
+    // as it is (UPD-012, #873's mock).
     const unlistenError = updateGateway.onUpdateError((error) => {
-      if (!mounted) return;
+      if (!mounted || stateRef.current === "ready") return;
       showError(error);
     });
 
@@ -107,13 +116,12 @@ export function useUpdateBanner(): UpdateBannerData {
     });
   }, [showError]);
 
-  // R5 — dismiss: allowed in 'available' state and for a refused access (UPD-029); no-op in 'ready' (R12)
+  // R5 — dismiss: allowed in 'available' state and for a refused access (#873's mock); no-op in 'ready' (R12)
   const handleDismiss = useCallback(() => {
     const refused = state === "error" && !canRetry;
     if (state !== "available" && !refused) return;
-    dismissedVersion.current = version;
     setState("idle");
-  }, [state, version, canRetry]);
+  }, [state, canRetry]);
 
   // R24 — retry download from scratch
   const handleRetry = useCallback(() => {

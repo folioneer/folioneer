@@ -127,21 +127,29 @@ fn channel_updater<R: Runtime>(
 
 /// Whether the update server refuses this build's access (UPD-028). The updater plugin
 /// hides the response status, so a failed check on a channel that sends headers is
-/// followed by one request of our own; 401, 403 and 404 are a refusal — a host hiding
-/// what a credential cannot reach answers 404 to a refused token. A channel without
-/// headers is never probed — an anonymous failure stays silent (UPD-021).
+/// followed by requests of our own: the endpoints in their order until one answers, an
+/// unreachable one passed over (UPD-028A); 401, 403 and 404 are a refusal — a host hiding what a
+/// credential cannot reach answers 404 to a refused token. A channel without headers is
+/// never probed — it cannot be refused.
 async fn access_refused(channel: &UpdateChannel) -> bool {
-    match channel.endpoints.first() {
-        Some(endpoint) => access_refused_at(endpoint, channel).await,
-        None => false,
+    for endpoint in &channel.endpoints {
+        if let Some(refused) = answer_at(endpoint, channel).await {
+            return refused;
+        }
     }
+    false
 }
 
-/// [`access_refused`] for one address of the channel: its endpoint after a failed
-/// check, the installer's address after a failed download.
+/// [`access_refused`] for the installer's address, after a failed download.
 async fn access_refused_at(address: &Url, channel: &UpdateChannel) -> bool {
+    answer_at(address, channel).await.unwrap_or(false)
+}
+
+/// Whether one address refuses the channel's access; `None` when it gives no answer, or
+/// when the channel sends no headers (no request is made).
+async fn answer_at(address: &Url, channel: &UpdateChannel) -> Option<bool> {
     if channel.headers.is_empty() {
-        return false;
+        return None;
     }
     // The answer of the endpoint itself is the one that counts, and no header of the
     // channel may travel to another host: redirects are not followed.
@@ -153,7 +161,7 @@ async fn access_refused_at(address: &Url, channel: &UpdateChannel) -> bool {
         Ok(client) => client,
         Err(error) => {
             tracing::warn!(target: BACKEND, error = %error, "Update access probe could not start");
-            return false;
+            return None;
         }
     };
     let mut request = client.get(address.clone());
@@ -161,15 +169,15 @@ async fn access_refused_at(address: &Url, channel: &UpdateChannel) -> bool {
         request = request.header(name, value);
     }
     match request.send().await {
-        Ok(response) => matches!(
+        Ok(response) => Some(matches!(
             response.status(),
             reqwest::StatusCode::UNAUTHORIZED
                 | reqwest::StatusCode::FORBIDDEN
                 | reqwest::StatusCode::NOT_FOUND
-        ),
+        )),
         Err(error) => {
             tracing::warn!(target: BACKEND, error = %error.without_url(), "Update access probe failed");
-            false
+            None
         }
     }
 }
@@ -186,10 +194,11 @@ fn failure_of(refused: bool) -> UpdateError {
 
 /// Checks whether a new application version is available.
 ///
-/// Returns `Ok(None)` silently on network or server errors (UPD-021), logging them for
-/// diagnostics (UPD-022) — except a refused access, which is returned and announced on
-/// `"update:error"` (UPD-028). Emits `"update:available"` on the app handle if an update
-/// is found, so that all listeners (banner, manual check) react consistently.
+/// A failed check is returned, never read as "up to date" (UPD-027A): `AccessRefused`, also
+/// announced on `"update:error"` (UPD-028), or `OperationFailed`, logged for diagnostics
+/// (UPD-022) — the startup check's silence is the window's (UPD-021). Emits
+/// `"update:available"` on the app handle if an update is found, so that all listeners
+/// (banner, manual check) react consistently.
 pub async fn check<R: Runtime>(
     app_handle: &AppHandle<R>,
 ) -> Result<Option<UpdateInfo>, UpdateError> {
@@ -198,7 +207,7 @@ pub async fn check<R: Runtime>(
         Ok(u) => u,
         Err(e) => {
             tracing::warn!(target: BACKEND, error = %e, "Failed to initialize updater (R22)");
-            return Ok(None);
+            return Err(UpdateError::OperationFailed);
         }
     };
 
@@ -216,13 +225,11 @@ pub async fn check<R: Runtime>(
         }
         Err(e) => {
             tracing::warn!(target: BACKEND, error = %e, "Update check failed (R21, R22)");
-            match failure_of(access_refused(&channel).await) {
-                UpdateError::AccessRefused => {
-                    let _ = app_handle.emit("update:error", &UpdateError::AccessRefused);
-                    Err(UpdateError::AccessRefused)
-                }
-                _ => Ok(None),
+            let failure = failure_of(access_refused(&channel).await);
+            if matches!(failure, UpdateError::AccessRefused) {
+                let _ = app_handle.emit("update:error", &UpdateError::AccessRefused);
             }
+            Err(failure)
         }
     }
 }
@@ -233,7 +240,10 @@ pub async fn check<R: Runtime>(
 /// Emits `"update:progress"` (percent 0–100) during download,
 /// `"update:complete"` on success, or `"update:error"` on failure (R23).
 /// Checksum verification is performed by the Tauri updater plugin (R9).
-pub async fn download(app_handle: AppHandle, state: Arc<UpdateState>) -> Result<(), UpdateError> {
+pub async fn download<R: Runtime>(
+    app_handle: AppHandle<R>,
+    state: Arc<UpdateState>,
+) -> Result<(), UpdateError> {
     // R10 — prevent concurrent downloads
     if state
         .is_downloading
@@ -256,7 +266,10 @@ pub async fn download(app_handle: AppHandle, state: Arc<UpdateState>) -> Result<
     result
 }
 
-async fn do_download(app_handle: &AppHandle, state: &UpdateState) -> Result<(), UpdateError> {
+async fn do_download<R: Runtime>(
+    app_handle: &AppHandle<R>,
+    state: &UpdateState,
+) -> Result<(), UpdateError> {
     let channel = managed_channel(app_handle);
     let updater = channel_updater(app_handle, &channel).map_err(|e| {
         tracing::error!(target: BACKEND, error = %e, "Failed to initialize updater (R23)");
@@ -319,22 +332,24 @@ pub async fn install<R: Runtime>(
     // UPD-013A — the attempt uses the download up; trying again downloads anew (UPD-024).
     let bytes = state.take_bytes().ok_or(UpdateError::NoDownloadedUpdate)?;
 
-    let updater = channel_updater(&app_handle, &managed_channel(&app_handle)).map_err(|e| {
+    let channel = managed_channel(&app_handle);
+    let updater = channel_updater(&app_handle, &channel).map_err(|e| {
         tracing::error!(target: BACKEND, error = %e, "Failed to initialize updater for install");
         UpdateError::OperationFailed
     })?;
 
-    let update = updater
-        .check()
-        .await
-        .map_err(|e| {
+    // UPD-013C / UPD-028 — a refused access at the re-check is a refusal, as for a check or a download.
+    let found = match updater.check().await {
+        Ok(found) => found,
+        Err(e) => {
             tracing::error!(target: BACKEND, error = %e, "Failed to get update for installation");
-            UpdateError::OperationFailed
-        })?
-        .ok_or_else(|| {
-            tracing::error!(target: BACKEND, "No update found for installation");
-            UpdateError::OperationFailed
-        })?;
+            return Err(failure_of(access_refused(&channel).await));
+        }
+    };
+    let update = found.ok_or_else(|| {
+        tracing::error!(target: BACKEND, "No update found for installation");
+        UpdateError::OperationFailed
+    })?;
 
     update.install(bytes).map_err(|e| {
         tracing::error!(target: BACKEND, error = %e, "Installation failed");
@@ -534,9 +549,11 @@ mod tests {
         assert!(matches!(outcome, Err(UpdateError::AccessRefused)));
     }
 
-    // UPD-021 — a failure on a channel that sends nothing stays silent.
+    // UPD-027A — a check that fails is reported as a failure, never as "up to date";
+    // the startup check's silence is the window's (UPD-021). A channel that sends nothing
+    // is not probed, so the failure is no refusal.
     #[tokio::test]
-    async fn an_anonymous_failure_stays_silent() {
+    async fn upd_027_a_failed_check_is_reported_as_a_failure() {
         let (endpoint, _served) = serve_once("500 Internal Server Error").await;
         let app = app_with(Some(UpdateChannel {
             endpoints: vec![endpoint],
@@ -545,7 +562,89 @@ mod tests {
 
         let outcome = check(app.handle()).await;
 
-        assert!(matches!(outcome, Ok(None)));
+        assert!(
+            matches!(outcome, Err(UpdateError::OperationFailed)),
+            "{outcome:?}"
+        );
+    }
+
+    // UPD-028A — the endpoints are asked in their order until one answers: one that
+    // cannot be reached is passed over, and the first answer decides.
+    #[tokio::test]
+    async fn upd_028_an_unreachable_endpoint_is_passed_over() {
+        let unreachable: Url = {
+            let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
+            let address = listener.local_addr().expect("address");
+            format!("http://{address}/latest.json")
+                .parse()
+                .expect("url")
+        };
+        let (refusing, _served) = serve("403 Forbidden", 2).await;
+        let app = app_with(Some(UpdateChannel {
+            endpoints: vec![unreachable, refusing],
+            headers: vec![("authorization".into(), "Bearer revoked".into())],
+        }));
+
+        let outcome = check(app.handle()).await;
+
+        assert!(
+            matches!(outcome, Err(UpdateError::AccessRefused)),
+            "{outcome:?}"
+        );
+    }
+
+    // UPD-023 / UPD-028 — a download whose check is refused reports the refusal and frees
+    // the next attempt (UPD-024).
+    #[tokio::test]
+    async fn upd_028_a_refused_download_is_a_refusal_and_frees_the_next_attempt() {
+        let (endpoint, _served) = serve("401 Unauthorized", 2).await;
+        let app = app_with(Some(channel(
+            endpoint,
+            &[("authorization", "Bearer expired")],
+        )));
+        let state = Arc::new(UpdateState::new());
+
+        let refused = download(app.handle().clone(), Arc::clone(&state)).await;
+
+        assert!(
+            matches!(refused, Err(UpdateError::AccessRefused)),
+            "{refused:?}"
+        );
+        assert!(!state.is_downloading.load(Ordering::SeqCst));
+        assert!(state.take_bytes().is_none());
+    }
+
+    // UPD-010 — a download already under way is not started twice.
+    #[tokio::test]
+    async fn upd_010_a_second_download_is_ignored() {
+        let app = app_with(None);
+        let state = Arc::new(UpdateState::new());
+        state.is_downloading.store(true, Ordering::SeqCst);
+
+        let ignored = download(app.handle().clone(), Arc::clone(&state)).await;
+
+        assert!(ignored.is_ok());
+        assert!(state.is_downloading.load(Ordering::SeqCst));
+    }
+
+    // UPD-028 (#873) — a refused access during the install's re-check is recognised as a
+    // refusal, as for a check or a download.
+    #[tokio::test]
+    async fn upd_028_a_refusal_at_install_is_a_refusal() {
+        let (endpoint, _served) = serve("401 Unauthorized", 2).await;
+        let app = app_with(Some(channel(
+            endpoint,
+            &[("authorization", "Bearer expired")],
+        )));
+        let state = Arc::new(UpdateState::new());
+        state.set_bytes(vec![1, 2, 3]);
+
+        let refused = install(app.handle().clone(), Arc::clone(&state)).await;
+
+        assert!(
+            matches!(refused, Err(UpdateError::AccessRefused)),
+            "{refused:?}"
+        );
     }
 
     // TODO-037 — the endpoint and the headers of the channel are the ones the updater's own

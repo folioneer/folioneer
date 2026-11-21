@@ -25,7 +25,7 @@ export function useAboutPage(): AboutPageData {
     try {
       const result = await aboutGateway.checkForUpdate();
       if (result.status === "error") {
-        // UPD-027 — a refused access is a failed check; the banner names it (UPD-029)
+        // #873's mock — any failed check says so, a refusal too; the banner names a refusal
         logger.error("[AboutPage] Manual check refused", result.error);
         setCheckStatus("error");
         return;
