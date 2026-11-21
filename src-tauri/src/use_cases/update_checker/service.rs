@@ -645,6 +645,7 @@ mod tests {
             matches!(refused, Err(UpdateError::AccessRefused)),
             "{refused:?}"
         );
+        assert!(state.take_bytes().is_none());
     }
 
     // TODO-037 — the endpoint and the headers of the channel are the ones the updater's own

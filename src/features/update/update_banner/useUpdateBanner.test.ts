@@ -303,6 +303,32 @@ describe("useUpdateBanner", () => {
     expect(result.current.state).toBe("ready");
   });
 
+  // UPD-012 — a startup check refused after the download finished leaves "Ready to install".
+  it("keeps the ready banner when the startup check is refused late", async () => {
+    let answer: (value: unknown) => void = () => {};
+    mockCheckForUpdate.mockReturnValueOnce(
+      new Promise((resolve) => {
+        answer = resolve;
+      }),
+    );
+    const { result } = renderHook(() => useUpdateBanner());
+    await act(async () => {
+      onAvailableCb?.({ version: "1.2.3" });
+    });
+    act(() => {
+      result.current.handleInstall();
+    });
+    act(() => {
+      onCompleteCb?.();
+    });
+
+    await act(async () => {
+      answer({ status: "error", error: { code: "AccessRefused" } });
+    });
+
+    expect(result.current.state).toBe("ready");
+  });
+
   // #873's mock / UPD-028 — an installation refused shows the refusal, with Dismiss only.
   it("shows the refusal when the installation is refused", async () => {
     mockInstallUpdate.mockResolvedValueOnce({ status: "error", error: { code: "AccessRefused" } });

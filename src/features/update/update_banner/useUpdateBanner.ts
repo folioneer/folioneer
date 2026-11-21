@@ -53,7 +53,13 @@ export function useUpdateBanner(): UpdateBannerData {
       .checkForUpdate()
       .then((result) => {
         // UPD-021 — only a refusal shows (#873's mock); any other failure stays silent.
-        if (mounted && result.status === "error" && !isRetryable(result.error)) {
+        // UPD-012 — a late answer leaves "Ready to install" as it is.
+        if (
+          mounted &&
+          result.status === "error" &&
+          !isRetryable(result.error) &&
+          stateRef.current !== "ready"
+        ) {
           showError(result.error);
         }
       })
