@@ -196,40 +196,6 @@ App open → for each active schedule (FEE-040):
 
 ---
 
-## UX Draft
-
-### Entry Point
-
-- **One-off**: a "Management fee" button of the Account Details header (the validated mock on #864).
-- **Schedule**: a "Manage fee" action on each non-cash holding row (FEE-011), opening the schedule modal with the asset pre-selected.
-
-### Main Component
-
-Two small `FormModal`s:
-
-- **One-off fee modal** — asset selector (active non-cash holdings), date (`DateField`, default as FEE-020 says), a two-way toggle (Percentage, the default / Resulting quantity), then either the percentage to remove (strictly positive, ≤ 100%) or the quantity held after the fee with its preview line under the field (held as of the date → removed quantity and the share it represents), optional note, Submit / Cancel.
-- **Fee schedule modal** — annual rate (% input), frequency selector, start date, optional end date, an active/pause toggle, and Save / Delete for an existing schedule.
-
-The Account Details holdings table gains a **Management Fees** column.
-
-### States
-
-- **Idle**: the one-off form with its default date (FEE-020), the schedule form with today's; empty quantity/rate, submit disabled until valid.
-- **In-flight**: submit disabled + spinner (FEE-025).
-- **Validation / backend error**: in the one-off modal, an entry the form refuses alone keeps submit disabled and a rejection shows as one alert at the bottom of the form (FEE-025); modal stays open. In resulting-quantity mode a rejected preview is the field's error and replaces the preview line (FEE-029).
-- **Success**: modal closes; snackbar; Account Details re-fetches — quantity ↓, average price ↑, Management Fees ↑, performance recomputed.
-- **Empty Management Fees**: a holding with no deductions shows `—` (or `0`) in the Management Fees column.
-
-### User Flow
-
-1. User opens Account Details for an account holding 1000 shares of an ETF.
-2. User opens the holding row's "Manage fee" action and sets an annual rate of 0.20%, monthly cadence, starting today.
-3. Each month, on the next app open, a deduction removes ~0.0167% of the current quantity, dated at month end.
-4. The holding row shows the gradually shrinking quantity, a slowly rising average price, and a growing **Management Fees** figure.
-5. For an ad-hoc charge, the user instead presses "Management fee" in the header and records a single percentage removal (e.g. 1% of the holding) — or, to align the holding with the real position, switches to Resulting quantity and types what it should hold (25 held, 24.5 typed: the form shows that 0.5 will be removed).
-
----
-
 ## Open Questions
 
 Interview decisions (all resolved):

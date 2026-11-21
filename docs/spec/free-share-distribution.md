@@ -100,40 +100,6 @@ Transaction list (filtered by the distributing asset)
 
 ---
 
-## UX Draft
-
-### Entry Point
-
-A "Record free shares" button of the Account Details header (the validated mock on #864) opens the free-shares modal.
-
-### Main Component
-
-A small `FormModal` — the free-shares modal:
-
-- Asset selector — the account's active, non-cash holdings (the distributing asset).
-- Date (default today, `DateField`).
-- Quantity of free shares (strictly positive decimal).
-- Note (optional `TextField`).
-- Submit / Cancel.
-
-### States
-
-- **Idle**: form with today's date, empty quantity, submit disabled until valid.
-- **In-flight**: submit disabled + spinner (FSD-025).
-- **Validation / backend error**: inline error adjacent to the field; modal stays open (FSD-025).
-- **Success**: modal closes; snackbar "Free shares recorded"; Account Details re-fetches — quantity rises, average price dilutes, performance recomputes (FSD-026/051).
-
-### User Flow
-
-1. User opens Account Details for an account holding 50 shares of an asset.
-2. User clicks the header's "Record free shares" button (the validated mock on #864).
-3. Modal opens; user picks the distributing asset from their active holdings, enters the number of free shares received (e.g. 5), adjusts the date if needed.
-4. User submits.
-5. Backend validates, increases the holding quantity to 55, leaves the cost basis unchanged (average price dilutes), moves no cash, persists the distribution, publishes `TransactionUpdated`.
-6. Modal closes, snackbar confirms; the holding row shows 55 shares at the diluted average price; the transaction list shows the distribution under that asset with Type "Free shares".
-
----
-
 ## Open Questions / Deferred
 
 **Deferred to future specs** (explicitly out of v1 scope, agreed with the user):

@@ -13,8 +13,8 @@
  *   - All scenarios start from a freshly seeded account (no holdings). The cash row is
  *     created eagerly at €0 (CSH-012), so its inline Deposit action is reachable
  *     immediately; the Withdraw action is disabled until the balance is non-zero (CSH-097).
- *   - Deposit / Withdraw are reached from the cash-row inline actions (CSH-019/091) — there
- *     are no cash actions in the header "Record" menu anymore.
+ *   - Deposit / Withdraw are reached from the cash-row inline actions (CSH-019/091) — the
+ *     header has no cash action.
  */
 
 import assert from "node:assert";

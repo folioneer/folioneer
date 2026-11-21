@@ -123,8 +123,6 @@ The top-level response returned by the `get_account_details(account_id)` Tauri c
 
 **ACD-058 — Capital brought in (backend)**: The account's details carry the capital brought in — the net cash input (ACD-053) plus every `OpeningBalance` at its recorded cost, in account-currency micros: what the owner brought into the account, cash and positions together. An account opened with positions costing 50 000 and a deposit of 500 brings in 50 500, of which 500 is net cash input. It equals the total net invested of PRF-035 at the view's date: the same deposits, withdrawals and opening balances at their recorded cost (PRF-086). The as-of view counts only transactions dated on or before the as-of date. The window does not show it (the validated mock on #864); an AI agent reads it with the account's figures (AGT-040).
 
-**ACD-059 — The as-of view records nothing (frontend)**: In the read-only as-of view, the header's record actions (the validated mock on #864) and its price refresh are absent; the live view shows them.
-
 ### Windowed Position Performance
 
 **ACD-054 — Windowed position returns (backend)**: Each `HoldingDetail` carries `period_performance: HoldingPeriodPerformance` with five optional micro-percent fields — `ytd`, `one_year`, `two_years`, `five_years`, `ten_years` — each the Simple Dietz position return of that holding over the window ending today (ACD-055/056). The since-start figure remains `performance_pct`, unchanged. The Cash Holding carries all-`None`, and the as-of view (`get_account_details_as_of`) carries all-`None` for every holding — the windowed returns are a live-view metric only. On the frontend, the window shown in the performance column is a per-account persisted UI preference (localStorage), defaulting to since-start.

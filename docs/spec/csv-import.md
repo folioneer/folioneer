@@ -174,7 +174,7 @@ One row of the file that is not blank — one line, or several when a quoted fie
 
 ### The window (060–069)
 
-**IMP-060 — The window opens from the account (frontend)**: The live view of an account's details, even one holding nothing, has an Import action in its header (the validated mock on #864), absent from the as-of view. Each opening starts from picking a file, nothing of the last opening kept; a dialog closed unpicked changes nothing.
+**IMP-060 — The window opens from the account (frontend)**: The live view of an account's details, even one holding nothing, has an Import action in its header (the validated mock on #864, its as-of view included). Each opening starts from picking a file, nothing of the last opening kept; a dialog closed unpicked changes nothing.
 
 **IMP-061 — A new mapper is filled in the window (frontend)**: With no mapper preselected, the window shows the file's format as read, each to change (IMP-018); a select per field of IMP-021, listing the file's columns; once the operation column is chosen, each label of the file with its count and a select of operation types (IMP-022, IMP-022A), and no list before; no column is guessed; and the provider, to save the mapper with (IMP-024). A saved mapper says so; a refused one says why. A date format not detected says so (IMP-014). A file that cannot be read, at first or after a change, shows why and only its format, so that it can be changed.
 

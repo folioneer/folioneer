@@ -17,7 +17,7 @@ interface OpenBalanceModalProps {
   onClose: () => void;
   accountId: string;
   accountName: string;
-  /** Pre-selected asset ID. When empty, a combobox is shown so the user can pick an asset (#864's mock). */
+  /** Pre-selected asset ID. When empty, a combobox is shown so the user can pick an asset (TRX-043). */
   assetId: string;
   /** Display name for the pre-selected asset. Only used when assetId is non-empty. */
   assetName: string;
@@ -66,7 +66,7 @@ export function OpenBalanceModal({
           aria-readonly="true"
         />
 
-        {/* Asset: read-only when pre-selected, combobox when opened from page header (#864's mock) */}
+        {/* Asset: read-only when pre-selected, combobox when opened from page header (TRX-043, #864's mock) */}
         {assetId ? (
           <TextField
             id="ob-asset-display"

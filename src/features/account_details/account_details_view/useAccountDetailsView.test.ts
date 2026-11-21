@@ -198,9 +198,7 @@ describe("useAccountDetailsView — price typed by hand toggle (MKT-156/157)", (
 
 // ---------------------------------------------------------------------------
 // #864's mock — the header's Record dividend action: dividend modal state in useAccountDetailsView.
-// The AccountDetailsView component replaces three standalone header buttons
-// with a consolidated "Record" dropdown; the dividend modal open/close/success
-// state is managed here. The view-level menu composition (button ids, item
+// The dividend modal open/close/success state is managed here. The view-level menu composition (button ids, item
 // routing) is a render concern covered in AccountDetailsView.test.tsx.
 // ---------------------------------------------------------------------------
 

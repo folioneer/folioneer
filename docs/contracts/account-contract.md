@@ -663,7 +663,7 @@ struct AccountDetailsResponse {
     total_unrealized_pnl: Option<i64>,         // micros; sum across same-currency priced active holdings; None when none qualify (MKT-040)
     total_global_value: i64,                   // micros, account currency: cash_holding.quantity + Σ_h (h.quantity × latest_price(h)) over non-cash active holdings; a non-cash holding with no recorded price contributes its cost basis (PRF-022A, CSH-094)
     total_dividends_received: i64,             // micros, account currency: sum of dividend cash across all the account's dividend transactions; 0 when none (DIV-073)
-    total_management_fees: i64,                // micros, account currency: sum of per-holding management_fees across the account; 0 when none (FEE-053)
+    total_management_fees: i64,                // micros, account currency: sum of per-holding management_fees across the account, closed holdings included, as-of cutoff in the as-of view; 0 when none (FEE-053)
     total_net_cash_input: i64,                 // micros, account currency: deposits minus withdrawals since inception; negative when more was withdrawn (ACD-053)
     total_capital_brought_in: i64,             // micros, account currency: net cash input plus every opening balance at its cost (ACD-058)
     outdated_price_count: i64,                 // active holdings whose price is outdated (MKT-205); 0 in a read with a date (MKT-206)

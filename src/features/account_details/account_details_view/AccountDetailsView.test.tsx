@@ -184,7 +184,6 @@ describe("AccountDetailsView — header actions (#864's mock)", () => {
 
   it("renders the record actions as direct buttons — no dropdown trigger", () => {
     render(<AccountDetailsView />);
-    // The former consolidated dropdown is gone; actions are direct icon buttons.
     expect(document.querySelector("#account-details-add-menu")).toBeNull();
     expect(document.querySelector("#add-menu-open-balance")).toBeInTheDocument();
     expect(document.querySelector("#add-menu-import")).toBeInTheDocument();
@@ -662,7 +661,7 @@ describe("AccountDetailsView — interest (#864's mock, INT-050)", () => {
     expect(screen.getByTestId("interest-modal-mounted")).toBeInTheDocument();
   });
 
-  it("hides the Interest button in the read-only as-of view (ACD-059)", () => {
+  it("hides the Interest button in the read-only as-of view (#864's mock)", () => {
     mockUseAccountDetailsView.mockReturnValue(makeView({ isAsOf: true, asOfDate: "2024-06-01" }));
     render(<AccountDetailsView />);
     expect(document.querySelector("#add-menu-interest")).toBeNull();

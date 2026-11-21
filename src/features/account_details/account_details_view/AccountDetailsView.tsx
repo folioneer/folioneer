@@ -148,7 +148,6 @@ export function AccountDetailsView() {
                   />
                 )}
               </div>
-              {/* #864's mock — open balance always accessible (migration tool for any account state) */}
               {/* ACD-036 — header actions: big square icon buttons, name shown as tooltip */}
               <div className="flex items-center gap-2 flex-wrap">
                 {/* PRF-010 — per-account "Performance" entry point (navigates via router path) */}
@@ -202,7 +201,7 @@ export function AccountDetailsView() {
                 )}
                 {/* #864's mock — Record actions, big square buttons. Cash Deposit/Withdraw
                     are NOT here — they live on the always-present cash row (CSH-019).
-                    Hidden in read-only as-of (ACD-059). */}
+                    Hidden in read-only as-of (#864's mock). */}
                 {!view.isAsOf && (
                   <>
                     {/* #864's mock — Open balance ("Add a position") */}
