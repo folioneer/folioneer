@@ -53,7 +53,7 @@ export function useDividendTransaction({
   }));
   const [error, setError] = useState<I18nMessage | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  // DIV-028 — when the paying asset's currency differs, the amount can be
+  // #734's mock — when the paying asset's currency differs, the amount can be
   // typed directly in the account currency (no rate to look up).
   const [amountInAccountCurrency, setAmountInAccountCurrency] = useState(false);
 
@@ -62,30 +62,32 @@ export function useDividendTransaction({
     [heldAssets, formData.assetId],
   );
 
-  // DIV-028 — the entry-mode switch only exists when the currencies differ.
+  // #734's mock — the entry-mode switch only exists when the currencies differ.
   const showCurrencyModeSwitch = useMemo(
     () => selectedAsset !== null && selectedAsset.assetCurrency !== accountCurrency,
     [selectedAsset, accountCurrency],
   );
 
-  // DIV-022/028 — exchange rate only relevant when the paying asset's currency
+  // DIV-022 / #734's mock — exchange rate only relevant when the paying asset's currency
   // differs from the account currency AND the amount is typed in the asset
   // currency (account-currency mode needs no rate).
   const showExchangeRate = showCurrencyModeSwitch && !amountInAccountCurrency;
 
-  // DIV-028 — the currency the typed amount is denominated in.
+  // #734's mock — the currency the typed amount is denominated in.
   const amountCurrency =
     amountInAccountCurrency || selectedAsset === null
       ? accountCurrency
       : selectedAsset.assetCurrency;
 
-  // DIV-021 — asset selected, amount strictly positive, date valid.
+  // DIV-021 — asset selected, amount strictly positive, date valid, and the rate strictly
+  // positive while the form asks for one.
   const isFormValid = useMemo(
     () =>
       formData.assetId !== "" &&
       validateAmount(formData.amount) === null &&
-      validateDate(formData.date) === null,
-    [formData.assetId, formData.amount, formData.date],
+      validateDate(formData.date) === null &&
+      (!showExchangeRate || validateAmount(formData.exchangeRate) === null),
+    [formData.assetId, formData.amount, formData.date, formData.exchangeRate, showExchangeRate],
   );
 
   const handleChange = useCallback((field: keyof DividendFormData, value: string) => {
@@ -98,8 +100,10 @@ export function useDividendTransaction({
   const record = useCallback(async (): Promise<boolean> => {
     const amountErr = validateAmount(formData.amount);
     const dateErr = validateDate(formData.date);
+    // DIV-021 — the rate shown is checked here too, for every path that records.
+    const rateErr = showExchangeRate ? validateAmount(formData.exchangeRate) : null;
     const validationError =
-      formData.assetId === "" ? { key: "error.AssetNotHeld" } : (amountErr ?? dateErr);
+      formData.assetId === "" ? { key: "error.AssetNotHeld" } : (amountErr ?? dateErr ?? rateErr);
     if (validationError) {
       setError(validationError);
       return false;
@@ -113,12 +117,9 @@ export function useDividendTransaction({
         asset_id: formData.assetId,
         date: formData.date,
         amount_micros: decimalToMicro(formData.amount),
-        // DIV-029 — account-currency mode credits the typed amount verbatim
-        // (rate 1); asset-currency mode converts via the supplied rate.
-        exchange_rate:
-          showCurrencyModeSwitch && amountInAccountCurrency
-            ? decimalToMicro("1")
-            : decimalToMicro(formData.exchangeRate),
+        // DIV-022 / DIV-029 — the rate typed is sent only while the form shows it: a
+        // same-currency asset and account-currency mode both credit at a rate of 1.
+        exchange_rate: decimalToMicro(showExchangeRate ? formData.exchangeRate : "1"),
         note: formData.note || null,
       });
       if (result.status === "error") {
@@ -132,7 +133,7 @@ export function useDividendTransaction({
     } finally {
       setIsSubmitting(false);
     }
-  }, [accountId, formData, t, showSnackbar, showCurrencyModeSwitch, amountInAccountCurrency]);
+  }, [accountId, formData, t, showSnackbar, showExchangeRate]);
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {

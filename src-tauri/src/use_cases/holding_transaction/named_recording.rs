@@ -2125,6 +2125,9 @@ pub fn refusal_from_account(error: &AccountError) -> Refusal {
         AccountError::TransferRateNotOne => {
             "the two accounts share a currency: a transfer between them takes no rate".to_string()
         }
+        AccountError::DividendRateNotOne => {
+            "the asset and the account share a currency: the dividend's rate is 1".to_string()
+        }
         AccountError::PartOfTransfer => {
             "this is part of a transfer: correct the transfer".to_string()
         }

@@ -1210,3 +1210,125 @@ async fn div_040_another_transaction_s_change_never_leaves_a_dividend_before_any
         "{cancelled:?}"
     );
 }
+
+// -------------------------------------------------------------------------
+// #734 — DIV-041, DIV-051
+// -------------------------------------------------------------------------
+
+/// An account in USD holding 10 AAPL bought at 50, with 100 of cash left and a dividend of
+/// 200 on 2024-06-15. Returns the account's id and the dividend's id.
+async fn account_with_a_dividend(ctx: &Ctx) -> (String, String) {
+    let asset = ctx
+        .asset_service
+        .create_asset(stocks_asset_dto("AAPL", "AAPL", "USD"))
+        .await
+        .unwrap();
+    let account = ctx
+        .account_service
+        .create(
+            "Portfolio".to_string(),
+            String::new(),
+            "USD".to_string(),
+            false,
+        )
+        .await
+        .unwrap();
+    ctx.use_case
+        .record_deposit(&account.id, "2024-01-01".to_string(), micro(600), None)
+        .await
+        .unwrap();
+    ctx.use_case
+        .buy_holding(
+            &account.id,
+            asset.id.clone(),
+            "2024-01-15".to_string(),
+            folioneer_lib::shared::domain::quantity::from_surface(micro(10)),
+            micro(50),
+            micro(1),
+            0,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+    let dividend = ctx
+        .use_case
+        .record_dividend(
+            &account.id,
+            asset.id,
+            "2024-06-15".to_string(),
+            micro(200),
+            micro(1),
+            None,
+        )
+        .await
+        .unwrap();
+    (account.id, dividend.id)
+}
+
+/// DIV-051 — a dividend counts in the account's global value through the cash it credits.
+#[tokio::test]
+async fn div_051_a_dividend_is_in_the_global_value_through_its_cash() {
+    let ctx = build_ctx().await;
+    let (account_id, dividend_id) = account_with_a_dividend(&ctx).await;
+    let with = ctx
+        .details_use_case
+        .get_account_details(&account_id, None)
+        .await
+        .unwrap()
+        .total_global_value;
+
+    ctx.use_case
+        .cancel_transaction(&account_id, &dividend_id)
+        .await
+        .expect("nothing spends the dividend");
+    let without = ctx
+        .details_use_case
+        .get_account_details(&account_id, None)
+        .await
+        .unwrap()
+        .total_global_value;
+
+    assert_eq!(with - without, micro(200));
+}
+
+/// DIV-041 — deleting a dividend whose cash a later debit spent is refused, and the
+/// dividend stays; once nothing spends it, it is deleted.
+#[tokio::test]
+async fn div_041_a_dividend_whose_cash_was_spent_cannot_be_deleted() {
+    let ctx = build_ctx().await;
+    let (account_id, dividend_id) = account_with_a_dividend(&ctx).await;
+    let withdrawal = ctx
+        .use_case
+        .record_withdrawal(&account_id, "2024-07-01".to_string(), micro(250), None)
+        .await
+        .expect("100 of cash and 200 of dividend");
+
+    let refused = ctx
+        .use_case
+        .cancel_transaction(&account_id, &dividend_id)
+        .await
+        .expect_err("the withdrawal spent the dividend");
+    assert!(
+        matches!(
+            refused,
+            folioneer_lib::context::account::AccountError::InsufficientCash { .. }
+        ),
+        "{refused:?}"
+    );
+    assert!(ctx
+        .account_service
+        .get_transaction_by_id(&dividend_id)
+        .await
+        .unwrap()
+        .is_some());
+
+    ctx.use_case
+        .cancel_transaction(&account_id, &withdrawal.id)
+        .await
+        .unwrap();
+    ctx.use_case
+        .cancel_transaction(&account_id, &dividend_id)
+        .await
+        .expect("nothing spends it any more");
+}

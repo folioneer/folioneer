@@ -1172,7 +1172,8 @@ async fn agt_060_a_session_records_cash_and_a_dividend() {
     assert_eq!(withdrawal["transaction"]["transaction_type"], "Withdrawal");
 
     // A dividend of an asset the account does not hold is refused; held, it is recorded
-    // in the account's currency at the rate given.
+    // in the account's currency. The asset and the account share the euro: a rate other
+    // than one is refused (DIV-022A, #734).
     let not_held = call(
         "record_dividend",
         json!({ "account": "PEA", "asset": "CW8", "amount": 10, "date": "2019-03-01" }),
@@ -1186,14 +1187,21 @@ async fn agt_060_a_session_records_cash_and_a_dividend() {
     )
     .await
     .expect("bought");
-    let dividend = call(
+    let inconsistent = call(
         "record_dividend",
         json!({ "account": "PEA", "asset": "cw8", "amount": "10", "rate": 0.5, "date": "2019-06-01" }),
     )
     .await
+    .expect_err("one currency, a rate of 0.5");
+    assert_eq!(inconsistent.code, "DividendRateNotOne");
+    let dividend = call(
+        "record_dividend",
+        json!({ "account": "PEA", "asset": "cw8", "amount": "10", "date": "2019-06-01" }),
+    )
+    .await
     .expect("paid");
     assert_eq!(dividend["transaction"]["transaction_type"], "Dividend");
-    assert_eq!(dividend["transaction"]["total_amount"], "5");
+    assert_eq!(dividend["transaction"]["total_amount"], "10");
     assert_eq!(dividend["asset"], "CW8");
 
     // What is missing or misread is refused as for any recording (AGT-048).
@@ -1282,8 +1290,16 @@ async fn agt_060_a_session_records_cash_and_a_dividend() {
     )
     .await
     .expect("corrected");
-    assert_eq!(paid_more["transaction"]["total_amount"], "6");
-    // DIV-040 — the rate changes what the amount comes to in the account's currency.
+    assert_eq!(paid_more["transaction"]["total_amount"], "12");
+    // DIV-022A (#734) — corrected, a dividend in the account's own currency keeps a rate of
+    // one: another is refused, one is taken.
+    let off_par = call(
+        "correct_recording",
+        json!({ "transaction": recorded_id(&dividend), "rate": 0.5 }),
+    )
+    .await
+    .expect_err("one currency, a rate of 0.5");
+    assert_eq!(off_par.code, "DividendRateNotOne");
     let at_par = call(
         "correct_recording",
         json!({ "transaction": recorded_id(&dividend), "rate": 1 }),

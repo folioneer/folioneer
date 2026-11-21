@@ -1382,6 +1382,7 @@
     "FeesNegative": "Die Gebühren dürfen nicht negativ sein.",
     "ExchangeRateNotPositive": "Der Wechselkurs muss strikt positiv sein.",
     "TotalAmountNotPositive": "Der Gesamtbetrag muss strikt positiv sein.",
+    "DividendRateNotOne": "Anlage und Konto haben dieselbe Währung: Der Kurs ist eins.",
     "TotalAmountBelowFees": "Der Gesamtbetrag darf nicht unter den enthaltenen Gebühren liegen.",
     "UnitPriceOutOfRange": "Der abgeleitete Stückkurs liegt außerhalb des zulässigen Bereichs — prüfen Sie Menge und Gesamtbetrag.",
     "QuantityOutOfRange": "Diese Menge ist zu groß.",

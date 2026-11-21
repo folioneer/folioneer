@@ -8635,6 +8635,112 @@ mod tests {
         );
     }
 
+    // DIV-045B (#734, from #852) — a dividend a computer applied already dated before any
+    // holding (CFR-017) does not refuse a replacement with a transfer: the unheld dividends
+    // are read before the four are taken out.
+    #[tokio::test]
+    async fn div_045b_a_dividend_already_before_any_holding_does_not_refuse_a_replacement() {
+        let pool = make_pool().await;
+        let (svc, asset_id) = setup(&pool).await;
+        seed_cash_asset_row(&pool, "EUR").await;
+        let mut ids = Vec::new();
+        let mut accounts = Vec::new();
+        for name in ["Sending", "Receiving"] {
+            let account = svc
+                .create(name.into(), String::new(), "EUR".into(), false)
+                .await
+                .unwrap();
+            seed_cash_for_account(&pool, &svc, &account.id, "EUR").await;
+            accounts.push(account.id);
+        }
+        let (sending, receiving) = (&accounts[0], &accounts[1]);
+        svc.record_deposit(sending, "2024-01-01".into(), micro(1_000), None)
+            .await
+            .unwrap();
+        svc.buy_holding(
+            sending,
+            asset_id.clone(),
+            "2024-01-02".into(),
+            from_surface(micro(4)),
+            micro(100),
+            micro(1),
+            0,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+        ids.push(
+            svc.sell_holding(
+                sending,
+                asset_id.clone(),
+                "2024-04-01".into(),
+                from_surface(micro(4)),
+                micro(150),
+                micro(1),
+                0,
+                None,
+                None,
+            )
+            .await
+            .unwrap()
+            .id,
+        );
+        ids.push(
+            svc.record_withdrawal(sending, "2024-04-02".into(), micro(600), None)
+                .await
+                .unwrap()
+                .id,
+        );
+        ids.push(
+            svc.record_deposit(receiving, "2024-02-01".into(), micro(600), None)
+                .await
+                .unwrap()
+                .id,
+        );
+        ids.push(
+            svc.buy_holding(
+                receiving,
+                asset_id.clone(),
+                "2024-02-02".into(),
+                from_surface(micro(4)),
+                micro(150),
+                micro(1),
+                0,
+                None,
+                None,
+            )
+            .await
+            .unwrap()
+            .id,
+        );
+        let content = format!(
+            r#"{{"id":"tx-unheld","account_id":"{receiving}","asset_id":"{asset_id}",
+                "transaction_type":"Dividend","date":"2024-01-10","quantity":0,
+                "unit_price":1000000,"exchange_rate":1000000,"fees":0,
+                "total_amount":4000000,"dividend_amount":4000000,"note":null,
+                "realized_pnl":null,"created_at":"2024-01-10T10:00:00Z"}}"#
+        );
+        let mut conn = pool.acquire().await.unwrap();
+        svc.apply_transaction(&mut conn, &content, incoming_rank("laptop", 200))
+            .await
+            .unwrap();
+        drop(conn);
+
+        svc.preview_replacement(
+            &ids,
+            sending,
+            receiving,
+            asset_id,
+            "2024-04-01".into(),
+            from_surface(micro(4)),
+            from_surface(micro(4)),
+            micro(1),
+        )
+        .await
+        .expect("a dividend already before any holding refuses nothing");
+    }
+
     // SYN-038 (#577) — a change written before data format 13 carries a split's factor and a
     // dividend's amount in `quantity`: applied, each is in its field.
     #[tokio::test]

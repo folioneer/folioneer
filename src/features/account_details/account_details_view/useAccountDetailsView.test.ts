@@ -463,7 +463,7 @@ describe("useAccountDetailsView — activeNonCashHoldings filter (DIV-011/020)",
     ]);
   });
 
-  // DIV-020 / DIV-011 — the dividend candidates are the open positions, then the closed
+  // #734's mock / DIV-011 — the dividend candidates are the open positions, then the closed
   // ones, so a dividend dated while a position sold since was held can be recorded; a closed
   // position takes its currency from the asset catalog.
   it("dividendPayingAssets lists the open positions, then the closed ones", async () => {

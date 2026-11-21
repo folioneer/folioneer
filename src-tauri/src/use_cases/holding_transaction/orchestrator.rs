@@ -301,6 +301,9 @@ impl HoldingTransactionUseCase {
                         ..
                     } => (0, exchange_rate, fees),
                 };
+                // DIV-022A — what the correction would refuse, the draft reports.
+                self.ensure_rate_for(&draft.account_id, &draft.asset_id, exchange_rate)
+                    .await?;
                 let total_amount = Account::preview_dividend_correction(
                     &draft.date,
                     draft.quantity,
@@ -745,6 +748,8 @@ impl HoldingTransactionUseCase {
         total_amount: Option<i64>,
         note: Option<String>,
     ) -> Result<Transaction, AccountError> {
+        self.ensure_corrected_dividend_rate(transaction_id, exchange_rate)
+            .await?;
         self.ensure_cash_for(account_id, "correct_transaction")
             .await?;
         self.account_service
@@ -829,7 +834,9 @@ impl HoldingTransactionUseCase {
         exchange_rate: i64,
         note: Option<String>,
     ) -> Result<Transaction, DividendError> {
-        let account = self.ensure_payable(account_id, &asset_id, &date).await?;
+        let account = self
+            .ensure_payable(account_id, &asset_id, &date, exchange_rate)
+            .await?;
 
         // CSH-010 — ensure the system Cash Asset for the account's currency exists.
         ensure_cash_asset(&self.asset_service, &account.currency)
@@ -1164,21 +1171,74 @@ impl HoldingTransactionUseCase {
     }
 
     /// DIV-011 — the account exists, the paying asset exists, is not the cash line and was
-    /// held on the dividend's date or before it. The account is returned for its currency.
+    /// held on the dividend's date or before it. DIV-022A — within one currency, the rate is
+    /// one. The account is returned.
     async fn ensure_payable(
         &self,
         account_id: &str,
         asset_id: &str,
         date: &str,
+        exchange_rate: i64,
     ) -> Result<crate::context::account::Account, DividendError> {
-        self.ensure_held_asset(account_id, asset_id, Some(date))
+        let (account, asset_currency) = self
+            .ensure_held_asset(account_id, asset_id, Some(date))
             .await
-            .map_err(|refused| match refused {
-                HeldAsset::Refused(error) => error.into(),
-                HeldAsset::NotFound => DividendTask::AssetNotFound.into(),
-                HeldAsset::Cash => DividendTask::DividendOnCashAsset.into(),
-                HeldAsset::NotHeld => DividendTask::AssetNotHeld.into(),
-            })
+            .map_err(|refused| -> DividendError {
+                match refused {
+                    HeldAsset::Refused(error) => error.into(),
+                    HeldAsset::NotFound => DividendTask::AssetNotFound.into(),
+                    HeldAsset::Cash => DividendTask::DividendOnCashAsset.into(),
+                    HeldAsset::NotHeld => DividendTask::AssetNotHeld.into(),
+                }
+            })?;
+        account.ensure_dividend_rate(&asset_currency, exchange_rate)?;
+        Ok(account)
+    }
+
+    /// DIV-022A — a corrected dividend's rate, checked against its asset's and its account's
+    /// currencies. A transaction that is not a dividend is not this check's.
+    async fn ensure_corrected_dividend_rate(
+        &self,
+        transaction_id: &str,
+        exchange_rate: i64,
+    ) -> Result<(), AccountError> {
+        let Some(stored) = self
+            .account_service
+            .get_transaction_by_id(transaction_id)
+            .await?
+        else {
+            return Ok(());
+        };
+        if stored.transaction_type != TransactionType::Dividend {
+            return Ok(());
+        }
+        self.ensure_rate_for(&stored.account_id, &stored.asset_id, exchange_rate)
+            .await
+    }
+
+    /// DIV-022A — `exchange_rate` checked for a dividend of `asset_id` in `account_id`. An
+    /// account or an asset that is not there is not this check's to refuse.
+    async fn ensure_rate_for(
+        &self,
+        account_id: &str,
+        asset_id: &str,
+        exchange_rate: i64,
+    ) -> Result<(), AccountError> {
+        let account = self.account_service.get_by_id(account_id).await?;
+        let asset = self
+            .asset_service
+            .get_asset_by_id(asset_id)
+            .await
+            .map_err(|e| {
+                tracing::error!(target: BACKEND, account_id = %account_id, asset_id = %asset_id, err = ?e, "dividend rate: get_asset_by_id failed");
+                AccountError::DatabaseError
+            })?;
+        match (account, asset) {
+            (Some(account), Some(asset)) => {
+                account.ensure_dividend_rate(&asset.currency, exchange_rate)
+            }
+            _ => Ok(()),
+        }
     }
 
     /// FSD-011 — the account exists, the distributing asset exists, is not the cash line and
@@ -1203,13 +1263,14 @@ impl HoldingTransactionUseCase {
 
     /// DIV-011 / FSD-011 — what a dividend and free shares both check: the account exists,
     /// the asset exists, is not the cash line and is held — on `held_on` or before it when
-    /// given (a dividend's date), today otherwise. The account is returned.
+    /// given (a dividend's date), today otherwise. The account and the asset's currency are
+    /// returned.
     async fn ensure_held_asset(
         &self,
         account_id: &str,
         asset_id: &str,
         held_on: Option<&str>,
-    ) -> Result<crate::context::account::Account, HeldAsset> {
+    ) -> Result<(crate::context::account::Account, String), HeldAsset> {
         let account = self
             .account_service
             .get_by_id(account_id)
@@ -1228,11 +1289,11 @@ impl HoldingTransactionUseCase {
                 tracing::error!(target: BACKEND, account_id = %account_id, asset_id = %asset_id, err = ?e, "held asset: get_asset_by_id failed");
                 HeldAsset::Refused(AccountError::DatabaseError)
             })?;
-        match asset {
+        let asset_currency = match asset {
             None => return Err(HeldAsset::NotFound),
             Some(a) if a.class == AssetClass::Cash => return Err(HeldAsset::Cash),
-            Some(_) => {}
-        }
+            Some(a) => a.currency,
+        };
         let held = match held_on {
             Some(date) => self.held_on(account_id, asset_id, date).await,
             None => self.holds(account_id, asset_id).await,
@@ -1240,7 +1301,7 @@ impl HoldingTransactionUseCase {
         if !held.map_err(HeldAsset::Refused)? {
             return Err(HeldAsset::NotHeld);
         }
-        Ok(account)
+        Ok((account, asset_currency))
     }
 
     /// DIV-011 — whether the account held the asset on `date` or before it: a dividend is
@@ -1284,7 +1345,8 @@ impl HoldingTransactionUseCase {
         exchange_rate: i64,
         note: Option<String>,
     ) -> Result<RecordingPreview, DividendError> {
-        self.ensure_payable(account_id, &asset_id, &date).await?;
+        self.ensure_payable(account_id, &asset_id, &date, exchange_rate)
+            .await?;
         let op = RecordingOp::Dividend {
             asset_id,
             date,
@@ -1895,6 +1957,107 @@ mod tests {
         );
     }
 
+    // DIV-022A (#734) — a dividend whose asset and account share a currency takes a rate of
+    // one: any other rate is refused, on recording, its preview and a correction, and nothing
+    // is written; a rate of one is recorded.
+    #[tokio::test]
+    async fn div_022a_a_rate_other_than_one_within_one_currency_is_refused() {
+        use crate::context::account::AccountError;
+        let pool = setup_pool().await;
+        let (account_svc, asset_svc) = make_services(&pool);
+        let asset = asset_svc.create_asset(base_asset_dto()).await.unwrap();
+        let account = account_svc
+            .create("Acc".to_string(), String::new(), "USD".to_string(), false)
+            .await
+            .unwrap();
+        let uc = HoldingTransactionUseCase::new(account_svc.clone(), asset_svc);
+        uc.record_deposit(&account.id, "2024-01-01".to_string(), micro(1_000), None)
+            .await
+            .unwrap();
+        uc.buy_holding(
+            &account.id,
+            asset.id.clone(),
+            "2024-01-15".to_string(),
+            from_surface(micro(10)),
+            micro(50),
+            micro(1),
+            0,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+        let refused = |result: Result<(), DividendError>| {
+            matches!(
+                result,
+                Err(DividendError::Account(AccountError::DividendRateNotOne))
+            )
+        };
+
+        // A rate typed for another asset.
+        let stale = 1_085_000;
+        assert!(refused(
+            uc.record_dividend(
+                &account.id,
+                asset.id.clone(),
+                "2024-06-15".to_string(),
+                micro(200),
+                stale,
+                None,
+            )
+            .await
+            .map(|_| ())
+        ));
+        assert!(refused(
+            uc.preview_dividend(
+                &account.id,
+                asset.id.clone(),
+                "2024-06-15".to_string(),
+                micro(200),
+                stale,
+                None,
+            )
+            .await
+            .map(|_| ())
+        ));
+        let recorded = uc
+            .record_dividend(
+                &account.id,
+                asset.id.clone(),
+                "2024-06-15".to_string(),
+                micro(200),
+                micro(1),
+                None,
+            )
+            .await
+            .expect("a rate of one");
+        assert_eq!(recorded.total_amount, micro(200));
+
+        let corrected = uc
+            .correct_transaction(
+                &account.id,
+                &recorded.id,
+                recorded.date.clone(),
+                micro(300),
+                recorded.unit_price,
+                stale,
+                0,
+                None,
+                None,
+            )
+            .await;
+        assert!(
+            matches!(corrected, Err(AccountError::DividendRateNotOne)),
+            "{corrected:?}"
+        );
+        let stored = account_svc
+            .get_transaction_by_id(&recorded.id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(stored.total_amount, micro(200), "nothing was written");
+    }
+
     // DIV-011 — AccountNotFound: unknown account is rejected before any asset check.
     #[tokio::test]
     async fn record_dividend_rejects_unknown_account() {
@@ -2208,14 +2371,15 @@ mod tests {
         );
     }
 
-    // DIV-022 — ExchangeRateNotPositive: exchange_rate = 0.
+    // DIV-021 / DIV-022 — ExchangeRateNotPositive: exchange_rate = 0 between two currencies,
+    // where a rate is required.
     #[tokio::test]
     async fn record_dividend_rejects_zero_exchange_rate() {
         let pool = setup_pool().await;
         let (account_svc, asset_svc) = make_services(&pool);
         let asset = asset_svc.create_asset(base_asset_dto()).await.unwrap();
         let account = account_svc
-            .create("Acc".to_string(), String::new(), "USD".to_string(), false)
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
         let uc = HoldingTransactionUseCase::new(account_svc.clone(), asset_svc);
@@ -3554,7 +3718,37 @@ mod draft_tests {
                 after: vec![],
             })
         });
-        HoldingTransactionUseCase::new(Arc::new(account), Arc::new(MockAssetServiceContract::new()))
+        // DIV-022A — a dividend's draft reads its account (in EUR) and its asset: in EUR when
+        // its id says so, in USD otherwise, so every other rate is the dividend's own.
+        expect_known_accounts(&mut account);
+        let mut assets = MockAssetServiceContract::new();
+        assets.expect_get_asset_by_id().returning(|asset_id| {
+            use crate::context::asset::{Asset, AssetCategory, AssetClass, AssetKind};
+            Ok(Some(Asset::restore(
+                asset_id.to_string(),
+                AssetKind::Custom,
+                asset_id.to_string(),
+                AssetClass::Stocks,
+                AssetCategory::from_storage(
+                    crate::context::asset::SYSTEM_CATEGORY_ID.to_string(),
+                    "generic.uncategorized".to_string(),
+                ),
+                if asset_id.starts_with("eur-") {
+                    "EUR"
+                } else {
+                    "USD"
+                }
+                .to_string(),
+                3,
+                asset_id.to_string(),
+                None,
+                false,
+                None,
+                false,
+                false,
+            )))
+        });
+        HoldingTransactionUseCase::new(Arc::new(account), Arc::new(assets))
     }
 
     /// A use case holding `held` units bought at 40 before any draft's date.
@@ -4077,6 +4271,38 @@ mod draft_tests {
 
     // TRX-062 / DIV-040 — a corrected dividend totals its amount at the exchange rate,
     // rounded down, whatever its unit price and fees.
+    // DIV-022A (#734) — the draft of a dividend whose asset and account share a currency
+    // reports a rate other than one as the correction would refuse it, and takes a rate of one.
+    #[tokio::test]
+    async fn div_022a_a_dividend_draft_within_one_currency_takes_a_rate_of_one() {
+        let dividend = |exchange_rate: i64| {
+            let mut d = draft(DraftKind::Dividend);
+            d.asset_id = "eur-asset".into();
+            d.entered = EnteredAmount::UnitPrice {
+                unit_price: M,
+                exchange_rate,
+                fees: 0,
+            };
+            d
+        };
+        let code_of = |result: Result<TransactionPreview, TransactionDraftError>| match result {
+            Ok(_) => "ok".to_string(),
+            Err(error) => serde_json::to_value(&error).expect("serialize")["code"]
+                .as_str()
+                .expect("code")
+                .to_string(),
+        };
+
+        assert_eq!(
+            code_of(use_case(None).validate_draft(dividend(1_085_000)).await),
+            "DividendRateNotOne"
+        );
+        assert_eq!(
+            code_of(use_case(None).validate_draft(dividend(M)).await),
+            "ok"
+        );
+    }
+
     #[tokio::test]
     async fn div_040_a_dividend_correction_draft_totals_amount_times_rate() {
         let dividend = |quantity: i64, unit_price: i64, exchange_rate: i64, fees: i64| {

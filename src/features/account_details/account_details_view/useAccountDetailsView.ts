@@ -432,7 +432,7 @@ export function useAccountDetailsView(accountId: string) {
         })),
     [data.holdingDetails],
   );
-  // DIV-020 / DIV-011 — the dividend modal's candidates: the open positions, then the closed
+  // #734's mock / DIV-011 — the dividend modal's candidates: the open positions, then the closed
   // ones, since a dividend counts what was held on its date. A closed position's currency
   // comes from the cached asset catalog; one the catalog does not know is left out.
   const dividendPayingAssets = useMemo(() => {

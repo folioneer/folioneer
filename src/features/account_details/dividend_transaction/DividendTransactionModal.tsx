@@ -99,7 +99,7 @@ export function DividendTransactionModal({
       maxWidth="max-w-2xl"
     >
       <form id="dividend-transaction-form" onSubmit={handleSubmit} className="flex flex-col gap-4">
-        {/* DIV-020 — paying asset chosen inside the modal via fuzzy-search combobox */}
+        {/* #734's mock — paying asset chosen inside the modal via fuzzy-search combobox */}
         <ComboboxField
           id="dividend-trx-asset"
           label={t("dividend.form_asset_label")}
@@ -121,7 +121,7 @@ export function DividendTransactionModal({
           required
         />
 
-        {/* DIV-028 — entry-mode switch, only when the currencies differ */}
+        {/* #734's mock — entry-mode switch, only when the currencies differ */}
         {showCurrencyModeSwitch && (
           <label className="flex items-center gap-3 cursor-pointer group">
             <input

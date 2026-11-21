@@ -276,6 +276,21 @@ describe("toTransactionRow — Dividend (DIV-023)", () => {
     };
     expect(toTransactionRow(dividend, "Asset", "Account").quantity).toBe("2,500");
   });
+
+  // DIV-050 (#734) — a dividend row is typed "Dividend" and has no realized result: the
+  // column shows its neutral placeholder.
+  it("DIV-050: a dividend row is typed Dividend, with no realized result", () => {
+    const dividend = {
+      ...splitTx(0),
+      transaction_type: "Dividend" as const,
+      split_factor: null,
+      dividend_amount: 2_500_000,
+      realized_pnl: null,
+    };
+    const row = toTransactionRow(dividend, "Asset", "Account");
+    expect(row.type).toBe("Dividend");
+    expect(row.realizedPnl).toBeNull();
+  });
 });
 
 // F27 layer-3 presenter — exhaustive variant coverage across AccountError

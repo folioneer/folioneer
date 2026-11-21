@@ -29,7 +29,7 @@ A cash income event paid by a held asset, recorded against that asset and credit
 | `total_amount`     | The cash credited to the account's Cash Holding, in **account currency** (i64 micros) — the net dividend converted at `exchange_rate`.                       |
 | `note`             | Optional free-text note.                                                                                                                                     |
 
-> A dividend carries **no share quantity and no per-unit price** — it does not change how many units of the asset are held. The net amount the user receives is entered in the asset's native currency (DIV-020) and converted to `total_amount` in account currency (DIV-022). Fields that exist on `Transaction` but carry no business meaning for a dividend follow a fixed convention rather than user input: its `quantity` is 0, and the surfaces that give a quantity give its net amount there (TRX-024A).
+> A dividend carries **no share quantity and no per-unit price** — it does not change how many units of the asset are held. The net amount the user receives is entered in the asset's native currency and converted to `total_amount` in account currency (DIV-022), or entered in the account's currency (DIV-029). Fields that exist on `Transaction` but carry no business meaning for a dividend follow a fixed convention rather than user input: its `quantity` is 0, and the surfaces that give a quantity give its net amount there (TRX-024A).
 
 ### HoldingDetail (extended)
 
@@ -54,7 +54,7 @@ The `AccountDetailsResponse` DTO (owned by ACD) gains one field.
 
 ### Eligibility and Initiation (010–019)
 
-**DIV-010 — Entry point (frontend)**: The dividend recording flow is initiated from the Account Details header's consolidated "Record" menu (DIV-012), via a "Dividend" item that opens the dividend modal (DIV-020). The paying asset is chosen inside the modal (DIV-020), not derived from a holding row. v1 does **not** add a per-holding-row dividend action (deferred — see Open Questions / Deferred).
+**DIV-010 — Entry point (frontend)**: The dividend recording flow is initiated from the Account Details header's consolidated "Record" menu (DIV-012), via a "Dividend" item that opens the dividend modal (#734's mock). The paying asset is chosen inside the modal (#734's mock), not derived from a holding row. v1 does **not** add a per-holding-row dividend action (deferred — see Open Questions / Deferred).
 
 **DIV-011 — Eligibility (backend)**: A dividend is recorded only for an `(account, asset)` pair where the account held the asset on the dividend's date or before it — a purchase, an opening balance or a transfer in of the asset is dated on or before it — and the asset is not a Cash Asset (owner, 2026-11-14, #774). A dividend is recorded on the day it was paid: everywhere the right to it is fixed at the ex-date and the cash comes later — two trading days in France, Italy and Spain, weeks in the United States, up to about three months in Poland — so one paid after the whole position was sold is recorded. The action is rejected with a specific error when the account is unknown, the asset is unknown, the asset was never held in that account on or before that date, or the asset is a Cash Asset. The rule is the same whatever records the dividend (TRX-012).
 
@@ -62,11 +62,11 @@ The `AccountDetailsResponse` DTO (owned by ACD) gains one field.
 
 ### Recording a Dividend (020–029)
 
-**DIV-020 — Form fields (frontend)**: The Record-dividend form accepts an **asset selector** (the paying asset; the Cash Holding is excluded) listing the account's non-cash active holdings first, then its closed positions (ACD-044), since a dividend counts what was held on its date or before it (DIV-011; owner, 2026-11-07) — a date before the asset was first held is refused on submit, the reason shown as DIV-025 says —, `date` (default: today), the **total net amount received** (positive decimal, in the selected asset's native currency), an `exchange_rate` (shown only when the asset currency differs from the account currency — DIV-022), and an optional `note`. There is no quantity, unit-price, or fees input. The currency label next to the amount reflects the selected asset's currency.
+**DIV-021 — Input validation (backend)**: The net amount is strictly positive and passes no limit TRX-020 puts on money; the date is a well-formed ISO 8601 calendar date, not in the future and not older than the TRX lower bound; between two currencies the rate is strictly positive (TRX-020). Each is refused with a specific error.
 
-**DIV-021 — Input validation (frontend + backend)**: The amount must parse as a strictly positive decimal (`> 0`); the `date` must be a well-formed ISO 8601 calendar date that is not in the future and not older than the TRX lower bound; when an exchange rate is required (DIV-022, currencies differ) it must be strictly positive (mirroring TRX-020); the amount, money, is no larger than a trillion, what every device reads (TRX-020) . The frontend checks the sign, the date and the rate inline and disables submit until they are valid; an amount past the limit is refused on submit; the backend re-validates and rejects each with a specific error.
+**DIV-022 — Currency conversion (backend)**: The net amount is credited to the account in account currency, converted via `exchange_rate`, reusing the same mechanism as Buy/Sell (TRX-021): `total_amount = net_amount × exchange_rate`. The net amount is in the asset's currency, or in the account's when DIV-029 applies; the rate is 1 when the asset and the account share a currency (DIV-022A). An amount that converts to nothing in the account's currency — the product floors to zero — is refused with a specific error.
 
-**DIV-022 — Currency conversion (frontend + backend)**: The dividend is entered in the asset's native currency and credited to the account in account currency, converted via `exchange_rate`, reusing the same mechanism as Buy/Sell (TRX-021). When the asset currency equals the account currency, `exchange_rate` is `1` and no rate input is shown; otherwise the user supplies the rate and `total_amount = net_amount × exchange_rate`. An amount that converts to nothing in the account's currency — the product floors to zero — is refused.
+**DIV-022A — Within one currency the rate is 1 (backend)**: When the asset's currency equals the account's, a dividend given any other rate is refused with a specific error, on recording and on a correction alike; it is never replaced by 1 (owner, 2026-11-16, #734).
 
 **DIV-023 — Recording effect (backend)**: Recording a Dividend, within a single Unit of Work ([ADR-006](../adr/006-unit-of-work.md)): (a) credits the account's always-present Cash Holding by `total_amount` (account currency) — identical to how Sell credits cash (CSH-050, CSH-012); (b) leaves the paying asset's holding `quantity`, average cost, and cost basis **unchanged**; (c) persists the Transaction with `transaction_type = Dividend` attributed to the paying asset, its net amount, in the currency it was entered in (DIV-022, DIV-029), in a field of its own, `dividend_amount`, and its `quantity` 0. All steps commit together or all roll back.
 
@@ -74,11 +74,7 @@ The `AccountDetailsResponse` DTO (owned by ACD) gains one field.
 
 **DIV-027 — No effect on recorded market price (backend)**: Recording a dividend **does not create or modify any `AssetPrice` record** for the asset. The ex-dividend drop in market price is reflected by the price-fetch feed (or manual entry), never synthesised by the dividend — modelling it as a price cut would double-count the market's own ex-div adjustment and corrupt the price history. The dividend's value is conserved as the cash credit (DIV-023).
 
-**DIV-028 — Account-currency entry mode (frontend)**: When the selected asset's currency differs from the account currency, the form offers a two-way entry-mode switch: **asset currency + rate** (DIV-020/022, the default) or **account currency**. In account-currency mode the amount field's currency label shows the account currency and the exchange-rate input is hidden — the user types exactly what was credited to the account (e.g. the euros received for a USD asset's dividend), with no rate to look up.
-
-**DIV-029 — Account-currency recording (frontend)**: In account-currency mode the typed amount is credited verbatim: the entry is recorded with the amount equal to the typed value and an exchange rate of 1, so `total_amount = typed amount` (the same typed-verbatim philosophy as TRX-060). The asset-currency gross is deliberately not captured in this mode — the stored amount is the account-currency credit.
-
-**DIV-025 — In-flight, success, and error feedback (frontend)**: While the request is in progress the submit button is disabled and shows a spinner. On success the form closes and a snackbar confirms "Dividend recorded". On validation failure or backend rejection the form stays open with an inline error adjacent to the offending field; the user can correct and resubmit.
+**DIV-029 — A dividend in the account's currency (backend)**: Between two currencies, a dividend at a rate of exactly 1 has its net amount in the account's currency and is credited verbatim, `total_amount = net amount` (the typed-verbatim philosophy of TRX-060): this is the account-currency mode, in which the gross in the asset's currency is not captured.
 
 **DIV-026 — Reactivity (backend + frontend)**: Recording a Dividend publishes the existing `TransactionUpdated` event (per the AccountService convention, as Deposit/Withdrawal do in CSH-100). The Account Details view re-fetches on that event (ACD-039), so the Cash row balance and the Global Value total (CSH-094) reflect the new dividend without a manual refresh.
 
@@ -92,7 +88,7 @@ The `AccountDetailsResponse` DTO (owned by ACD) gains one field.
 
 **DIV-042 — Correction modal (frontend)**: A dividend is corrected in its own modal (`EditDividendModal`), never in the generic correction modal of a trade: the edit action of a Dividend row (TXL-030) opens it. It states the paying asset and the account without offering to change them (DIV-040), and shows the date, the net amount, the exchange rate when one applies, the total credited to the account as the draft check returns it (TRX-062), and the note. It shows no unit price, no fees and no market price to record.
 
-**DIV-043 — The correction keeps the recorded entry mode (frontend)**: The amount is shown in the currency it was recorded in. For a dividend recorded in asset currency (DIV-020/022), that is the asset's currency, and the exchange rate is shown when the asset and the account differ in currency. For one recorded in account-currency mode (DIV-029), it is the account's currency and no rate is shown. The mode is read from the stored rate: between two different currencies, a rate of exactly 1 is account-currency mode. A dividend typed in asset currency at a rate of exactly 1 is stored identically and is shown the same way; the figures it records are the same in either view.
+**DIV-043 — The correction keeps the recorded entry mode (frontend)**: The amount is shown in the currency it was recorded in. For a dividend recorded in asset currency (DIV-022), that is the asset's currency, and the exchange rate is shown when the asset and the account differ in currency. For one recorded in account-currency mode (DIV-029), it is the account's currency and no rate is shown. The mode is read from the stored rate: between two different currencies, a rate of exactly 1 is account-currency mode. A dividend typed in asset currency at a rate of exactly 1 is stored identically and is shown the same way; the figures it records are the same in either view.
 
 **DIV-044 — A correction saved untouched changes nothing (frontend)**: The amount and the rate are filled to their last recorded decimal, so saving the modal without typing records the same figures. The first problem the draft check reports is shown as on the other transaction forms (TRX-067).
 
@@ -116,66 +112,27 @@ The `AccountDetailsResponse` DTO (owned by ACD) gains one field.
 
 **DIV-072 — Total-return display (frontend)**: The Account Details holding row surfaces `dividends_received` (formatted in account currency) and `total_return_pct` alongside the existing price-only Performance % (MKT-035). `dividends_received` is **always** shown (it is always computable — DIV-070), even when `total_return_pct` is `None`: a currency-mismatched or unpriced holding therefore shows its real dividends-received amount next to a `—` total return. When `total_return_pct` is `None` it renders the neutral placeholder `—`, consistent with MKT-034. The price-only Performance % column is retained so the user can distinguish price return from total return. (Exact column-vs-sub-line layout is a UX detail.)
 
-**DIV-073 — Account total dividends (backend + frontend)**: `AccountDetailsResponse.total_dividends_received` is the sum of dividend cash credited across all of the account's dividend transactions, in account currency (`0` when none). The Account Details header displays it alongside the existing Global Value / Total Cost Basis / Total Realized P&L totals.
+**DIV-073 — Account total dividends (backend)**: The account's total dividends received is the sum of the dividend cash credited across all of the account's dividend transactions, in account currency (`0` when none).
 
 ---
 
 ## Workflow
 
+The Record-dividend form is #734's validated mock.
+
 ```
-Account Details header → "Record" menu → "Dividend" (DIV-010/012)
-  → modal: asset selector (active non-cash holdings, then closed positions), date (today),
-           net amount (selected-asset currency), exchange rate (if currencies differ), note (DIV-020)
-  → submit
-      backend validate: amount > 0, date ≤ today, asset held on the date or before (DIV-011), not cash (DIV-011/021)
-      backend (single Unit of Work, ADR-006):
-        ├─ credit the always-present Cash Holding by total_amount        (DIV-023, CSH-050/012)
-        ├─ leave paying asset's holding qty / cost basis unchanged        (DIV-024)
-        └─ persist Transaction(type=Dividend, asset_id=paying asset)      (DIV-023)
-      publish TransactionUpdated                                          (DIV-026)
-  → modal closes + snackbar "Dividend recorded"                          (DIV-025)
-  → Account Details re-fetches → Cash row + Global Value updated         (DIV-026)
+record a dividend
+  backend validate: amount > 0, date ≤ today, rate > 0 between two currencies, 1 within one
+                    (DIV-021, DIV-022A), asset held on the date or before, not cash (DIV-011)
+  backend (single Unit of Work, ADR-006):
+    ├─ credit the always-present Cash Holding by total_amount        (DIV-023, CSH-050/012)
+    ├─ leave paying asset's holding qty / cost basis unchanged        (DIV-024)
+    └─ persist Transaction(type=Dividend, asset_id=paying asset)      (DIV-023)
+  publish TransactionUpdated                                          (DIV-026)
 
-Transaction list (filtered by the paying asset)
-  → dividend row shows Type = "Dividend", Realized P&L = "—"             (DIV-050)
-  → edit (date / amount / rate / note) → chronological replay            (DIV-040)
-  → delete → replay without the credit; rejected if it underflows cash   (DIV-041)
+correct a dividend → the same checks, chronological replay            (DIV-040, DIV-022A)
+delete a dividend  → replay without the credit; refused if it underflows cash (DIV-041)
 ```
-
----
-
-## UX Draft
-
-### Entry Point
-
-A "Dividend" item in the Account Details header's consolidated "Record" dropdown menu (DIV-012), which also hosts New position and Record free shares (cash Deposit/Withdraw live on the cash row, not this menu — DIV-012). Selecting it opens the dividend modal. (A per-holding-row dividend action is deferred — DIV-010.)
-
-### Main Component
-
-A small `FormModal` — `DividendTransactionModal`:
-
-- Asset selector — the account's active, non-cash holdings, then its closed positions (the paying asset).
-- Date (default today, `DateField`).
-- Net amount received (positive decimal, `AmountField` with the selected asset's currency suffix).
-- Exchange rate (shown only when asset currency ≠ account currency, mirroring the Buy/Sell exchange-rate input).
-- Note (optional `TextField`).
-- Submit / Cancel.
-
-### States
-
-- **Idle**: form with today's date, empty amount, submit disabled until valid.
-- **In-flight**: submit disabled + spinner (DIV-025).
-- **Validation / backend error**: inline error adjacent to the field; modal stays open (DIV-025).
-- **Success**: modal closes; snackbar "Dividend recorded"; Account Details re-fetches — Cash row + Global Value rise by the dividend (DIV-026).
-
-### User Flow
-
-1. User opens Account Details for an account holding 50 shares of an asset.
-2. User opens the header "Record" menu and chooses "Dividend".
-3. Modal opens; user picks the paying asset from the account's active holdings or closed positions, enters the net amount received (asset currency), adjusts the date if needed, supplies an exchange rate if the asset trades in another currency.
-4. User submits.
-5. Backend validates, credits the cash holding, leaves the position unchanged, persists the dividend, publishes `TransactionUpdated`.
-6. Modal closes, snackbar confirms; the Cash row balance and Global Value update; the holding row's Dividends-received and Total-return % update (DIV-072); the account header's Total dividends received updates (DIV-073); and the dividend now shows in the transaction list under that asset with Type "Dividend".
 
 ---
 

@@ -2471,6 +2471,20 @@ impl Account {
         }
     }
 
+    /// DIV-022A — a dividend of an asset in `asset_currency` takes a rate of one when the
+    /// account shares that currency: any other rate is refused, never replaced.
+    pub fn ensure_dividend_rate(
+        &self,
+        asset_currency: &str,
+        exchange_rate: i64,
+    ) -> StdResult<(), AccountError> {
+        const RATE_OF_ONE: i64 = 1_000_000;
+        if self.currency == asset_currency && exchange_rate != RATE_OF_ONE {
+            return Err(AccountError::DividendRateNotOne);
+        }
+        Ok(())
+    }
+
     /// The cash a transaction moves on the account's cash line: Deposit / Sell / Dividend
     /// bring in their total, Withdrawal / Purchase take out theirs, interest on the cash
     /// line brings in its quantity (INT-023); every other type moves no cash (SPL-010).
