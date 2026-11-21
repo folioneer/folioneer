@@ -117,3 +117,12 @@ test("shows the migration error screen for a failure that happened before it lis
     "migration 202611010002 failed",
   );
 });
+
+// #873's mock — the startup screen shows while the portfolio opens, before the window is drawn.
+test("shows the startup screen while the portfolio opens", () => {
+  vi.mocked(commands.getAssets).mockReturnValueOnce(new Promise(() => {}));
+  render(<App />);
+
+  expect(document.getElementById("startup-message")).not.toBeNull();
+  expect(document.getElementById("startup-brand")?.textContent).toBe("Folioneer");
+});

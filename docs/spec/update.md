@@ -58,8 +58,6 @@ The application is distributed as a desktop executable. When a new version is pu
 
 **UPD-016 (was R16) — Automatic schema migration (backend)**: If the new version introduces database schema changes, migrations are applied automatically at the first launch after the update, before the UI is accessible. If multiple versions have been skipped, all intermediate migrations are applied in order, without exception.
 
-**UPD-017 (was R17) — Loading screen during migrations (frontend)**: During the UPD-016 migration phase, a loading screen is displayed with a message indicating that the database update is in progress.
-
 **UPD-018 (was R18) — Migration failure (backend)**: If a migration fails at startup, or the copy before it cannot be made (UPD-032), the application refuses to start in order to protect data integrity; the error screen says so (UPD-035).
 
 **UPD-018A — The startup failure stays readable (backend)**: The failure that stopped the portfolio from opening stays readable for the rest of the launch, whenever a surface asks for it, besides being announced once when it happens; a later launch tries again (UPD-032).
@@ -149,7 +147,7 @@ The application is distributed as a desktop executable. When a new version is pu
                                                       ├─ Newer version at the re-check → the downloaded one is installed (UPD-013B)
                                                       ├─ Re-check refused → rejected as a refused access (UPD-013A, UPD-028)
                                                       → Data preserved (UPD-014)
-                                                      → DB migration if needed (UPD-016, UPD-017), a copy first (UPD-032, UPD-033)
+                                                      → DB migration if needed (UPD-016; the startup screen, #873's mock), a copy first (UPD-032, UPD-033)
                                                            ├─ Copy failed → no migration, critical error, app blocked (UPD-018, UPD-035)
                                                            ├─ Failure → copy put back, critical error, app blocked (UPD-018, UPD-034, UPD-035)
                                                            ├─ Put-back failed → critical error, app blocked (UPD-018, UPD-034, UPD-035)
@@ -181,7 +179,6 @@ Fixed banner integrated into the application shell (header or footer), visible a
 - **Ready to install**: "Ready to install" + "Restart now" button — non-dismissible (UPD-011, UPD-012)
 - **Download error**: error message + "Retry" button (UPD-023)
 - **Access refused**: message naming the refusal + "Dismiss" button, no "Retry" (#873's mock)
-- **Migration in progress**: loading screen outside the banner ("Updating database…") (UPD-017)
 - **Migration error**: critical error message, application blocked at startup, outside the banner; after the copy was put back, it says nothing was lost and names the `backups` folder (UPD-018, UPD-035)
 - **Up to date** / **Check failed**: contextual message on the "About" page, outside the banner (#873's mock)
 

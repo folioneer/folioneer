@@ -1,12 +1,11 @@
 import { RouterProvider } from "@tanstack/react-router";
-import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useTranslation } from "react-i18next";
 import type { MigrationFailure } from "@/bindings";
 import { accountGateway } from "@/features/accounts/gateway";
 import { refreshCurrencyRates } from "@/features/currency/gateway";
 import { shellGateway } from "@/features/shell/gateway";
 import { MigrationErrorScreen } from "@/features/shell/MigrationErrorScreen";
+import { StartupScreen } from "@/features/shell/StartupScreen";
 import { getAutoFetch } from "@/lib/autoFetchStorage";
 import { logger } from "@/lib/logger";
 import { useAppStore } from "@/lib/store";
@@ -55,7 +54,6 @@ function App() {
   const [dbError, setDbError] = useState<MigrationFailure | null>(null);
   const init = useAppStore((state) => state.init);
   const isInitialized = useAppStore((state) => state.isInitialized);
-  const { t } = useTranslation();
 
   useEffect(() => {
     logger.info("[App] mounted");
@@ -97,16 +95,9 @@ function App() {
     return <MigrationErrorScreen failure={dbError} />;
   }
 
-  // R17 — loading screen while migrations/init are running
+  // #873's mock — the startup screen while migrations/init are running
   if (!isInitialized) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-m3-surface">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-6 h-6 animate-spin text-m3-primary" />
-          <p className="text-m3-on-surface-variant text-sm">{t("app.migration_in_progress")}</p>
-        </div>
-      </div>
-    );
+    return <StartupScreen />;
   }
 
   return <RouterProvider router={router} />;
