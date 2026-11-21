@@ -117,7 +117,7 @@ A recurring rule that generates fee deductions for one (account, asset) holding 
 
 **FEE-052 — Per-holding Management Fees figure (frontend + backend)**: The application computes, per `(account, asset)`, a cumulative **Management Fees** value = the sum of every recorded deduction's fee value (FEE-051), in account currency; the Account Details holdings table displays it as a **Management Fees** column. The backend produces the aggregate and the frontend displays it, mirroring DIV-070.
 
-**FEE-053 — Account-level total Management Fees (backend)**: The account's details carry its **total Management Fees** — the sum of the per-holding Management Fees across the account, in account currency (`0` when none), as DIV-073 sums its dividends; the as-of view counts the deductions dated on or before the as-of date (FEE-072). The window does not show it (#864, the validated mock); an AI agent reads it with the account's figures (AGT-040).
+**FEE-053 — Account-level total Management Fees (backend)**: The account's details carry its **total Management Fees** — the sum of the per-holding Management Fees across the account, in account currency (`0` when none), as DIV-073 sums its dividends; the as-of view counts the deductions dated on or before the as-of date (FEE-072). The window does not show it (the validated mock on #864); an AI agent reads it with the account's figures (AGT-040).
 
 **FEE-054 — No price available (frontend + backend)**: If no market price is recorded on or before a deduction's date, that deduction contributes `0` to the Management Fees figure until a qualifying price exists (consistent with valuation degrading to 0, FXR-034). The quantity removal itself is unaffected.
 
