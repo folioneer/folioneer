@@ -69,7 +69,9 @@ The top-level response returned by the `get_account_details(account_id)` Tauri c
 | `total_cost_basis`         | Sum of `cost_basis` across all active holdings (per ACD-031).                                                                                   |
 | `total_realized_pnl`       | Sum of `total_realized_pnl` across **all** holdings (open + closed) in the account (per SEL-042/ACD-045).                                       |
 | `total_global_value`       | Cash + Σ(market value of non-cash active holdings); see CSH-094 for the formula and missing-price treatment. Account-currency micros (ADR-001). |
+| `total_net_cash_input`     | Deposits less withdrawals since inception, account-currency micros (ACD-053).                                                                   |
 | `total_capital_brought_in` | Net cash input plus every opening balance at its recorded cost, account-currency micros (ACD-058).                                              |
+| `total_management_fees`    | Sum of the account's management fee deductions, account-currency micros (FEE-053).                                                              |
 
 > **MKT extension**: `docs/spec/market-price.md` adds `total_unrealized_pnl: Option<i64>` to this response and six new fields to `HoldingDetail` (`asset_currency`, `current_price`, `current_price_date`, `unrealized_pnl`, `performance_pct`, `current_value`). See the MKT spec for definitions.
 
@@ -139,7 +141,7 @@ The top-level response returned by the `get_account_details(account_id)` Tauri c
 
 **ACD-036 — Add-transaction FAB (frontend)**: The view displays a single floating "+" action button (FAB, bottom-right) as the add-transaction entry point, present in every account state (empty, populated, all-closed). It opens the Add Transaction modal pre-filled with the `account_id` from the current route (ACD-011), per TRX-011. This is the entry point referenced by TRX-010, and it replaces the former contextual "Add Transaction" header / empty-state buttons.
 
-**ACD-037 — Loading state (frontend)**: While the backend call is in progress, the view displays skeleton screens for the header (account name, total cost basis) and for the holdings table. The loading state is entered on initial mount and on each re-fetch triggered by ACD-039 or ACD-040.
+**ACD-037 — Loading state (frontend)**: While the backend call is in progress, the view displays skeleton screens for the header and for the holdings table. The loading state is entered on initial mount and on each re-fetch triggered by ACD-039 or ACD-040.
 
 **ACD-038 — Error state (frontend)**: If the backend call fails (network error, not-found per ACD-012, or unexpected error), the view displays a generic error message and a "Retry" button. Pressing "Retry" re-triggers the backend call.
 

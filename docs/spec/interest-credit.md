@@ -16,11 +16,6 @@ and the entry form accepts either a rate or a direct amount.
 
 ## Rules
 
-**INT-010 — Entry point (frontend)**: the account-details header's Record action
-row gains a "Record interest" square icon button (`id="add-menu-interest"`),
-opening the interest modal. Hidden in the read-only as-of view. Not gated by the
-management-fees account parameter (INT-050).
-
 **INT-011 — Preconditions (backend)**: the account must exist
 (`AccountNotFound`); the target asset must exist (`AssetNotFound`) and be either
 currently held (`quantity > 0`) or the account's own Cash Asset (INT-023). A

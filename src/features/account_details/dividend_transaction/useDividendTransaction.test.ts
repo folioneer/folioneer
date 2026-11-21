@@ -146,7 +146,7 @@ describe("useDividendTransaction (#734's mock, DIV-021/022)", () => {
     expect(BASE_PROPS.onSubmitSuccess).toHaveBeenCalled();
   });
 
-  // DIV-010 — "add another" records, refreshes via onRecorded (not onSubmitSuccess),
+  // #734's mock — "add another" records, refreshes via onRecorded (not onSubmitSuccess),
   // and clears amount + note while keeping the asset + date for the next entry.
   it("handleAddAnother records, calls onRecorded, and clears amount + note", async () => {
     mockRecordDividend.mockResolvedValue({ status: "ok", data: { id: "tx-div-1" } });

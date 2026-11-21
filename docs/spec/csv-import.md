@@ -174,7 +174,7 @@ One row of the file that is not blank — one line, or several when a quoted fie
 
 ### The window (060–069)
 
-**IMP-060 — The window opens from the account (frontend)**: The live view of an account's details, even one holding nothing, has an Import action among its record actions (DIV-012), absent from the as-of view. Each opening starts from picking a file, nothing of the last opening kept; a dialog closed unpicked changes nothing.
+**IMP-060 — The window opens from the account (frontend)**: The live view of an account's details, even one holding nothing, has an Import action in its header (the validated mock on #864, its as-of view included). Each opening starts from picking a file, nothing of the last opening kept; a dialog closed unpicked changes nothing.
 
 **IMP-061 — A new mapper is filled in the window (frontend)**: With no mapper preselected, the window shows the file's format as read, each to change (IMP-018); a select per field of IMP-021, listing the file's columns; once the operation column is chosen, each label of the file with its count and a select of operation types (IMP-022, IMP-022A), and no list before; no column is guessed; and the provider, to save the mapper with (IMP-024). A saved mapper says so; a refused one says why. A date format not detected says so (IMP-014). A file that cannot be read, at first or after a change, shows why and only its format, so that it can be changed.
 
@@ -244,7 +244,6 @@ Pick a file → the mapper → Preview.
 - SYN-038 adds version 11: a transaction carries the added-deposit mark (IMP-051).
 - SYN-023: the import mapper each imported file's folder remembers stays on the device (IMP-020C).
 - SYN-038 adds version 12: the column mappings of version 10 are no longer a kind of synced record; no device ever held one, since no window offered it. A mapper's file is not synced for now (#715).
-- DIV-012: the account header's record actions gain Import, after New position (TRX-055) (IMP-060).
 - CSH: a deposit may be an added deposit, marked as such (IMP-051).
 - TXL-060: a journal row carries the added-deposit mark (IMP-051). TXL-061: its Recorded by column shows the chip (IMP-054). AGT-045: that chip is not an AI agent's mark; an added deposit has no session.
 

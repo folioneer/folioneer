@@ -5,7 +5,7 @@
  * Contract: docs/contracts/account-contract.md § Management Fee
  *
  * Spec rules covered by this file:
- *   FEE-010 — "Management Fee" item in the header action row opens the modal
+ *   Design: #864's mock — "Management Fee" item in the header action row opens the modal
  *   FEE-011 — fee-schedule modal opened via the holding row's manage-fee action button
  *   FEE-021 — form fields: asset selector, date, percentage
  *   FEE-022 — recording reduces the holding quantity; no cash movement
@@ -101,7 +101,7 @@ describe("management_fee", () => {
     await navigateToAccountDetails(accId);
 
     // -------------------------------------------------------------------
-    // Step 1 — Click the "Management Fee" header action (FEE-010).
+    // Step 1 — Click the "Management Fee" header action (#864's mock).
     // -------------------------------------------------------------------
     await clickHeaderAction("add-menu-management-fee");
 

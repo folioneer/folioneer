@@ -3,7 +3,7 @@
  *
  * Contract: docs/contracts/account-contract.md (open_holding command)
  * Spec rules covered:
- *   TRX-055 — modal accessible from the Account Details header "Add" menu (DIV-012, #add-menu-open-balance)
+ *   Design: #864's mock — the modal opens from the Account Details header (#add-menu-open-balance)
  *   TRX-042 — form exposes date, quantity, total-cost only (no fees/exchange-rate/unit-price)
  *   TRX-043 — happy path: fill all fields + select asset → submit → transaction created, modal closes
  *   TRX-046 — future date keeps submit button disabled (frontend guard in useOpenBalance.isFormValid)
@@ -69,9 +69,9 @@ describe("open_balance", () => {
   });
 
   // -------------------------------------------------------------------------
-  // TRX-055 — open-balance trigger in Account Details header opens the modal
+  // #864's mock — open-balance trigger in Account Details header opens the modal
   // -------------------------------------------------------------------------
-  it("TRX-055: clicking the open-balance trigger opens ob-form modal", async () => {
+  it("the header open-balance trigger opens the ob-form modal (#864)", async () => {
     await clickHeaderAction("add-menu-open-balance");
 
     const form = await $("form#ob-form");
@@ -79,7 +79,7 @@ describe("open_balance", () => {
     await captureScreen("open-balance-form");
     assert.ok(
       await form.isExisting(),
-      "form#ob-form must be present after selecting Add → open balance (DIV-012)",
+      "form#ob-form must be present after clicking the open-balance action (#864's mock)",
     );
   });
 

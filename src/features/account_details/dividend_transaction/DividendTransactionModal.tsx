@@ -18,7 +18,7 @@ interface DividendTransactionModalProps {
   /** Open, then closed, non-cash positions the dividend can be attributed to (DIV-011, #734's mock). */
   heldAssets: DividendPayingAsset[];
   onSubmitSuccess: () => void;
-  /** Refresh-only callback for "Record & add another" — keeps the modal open (DIV-010). */
+  /** Refresh-only callback for "Record & add another" — keeps the modal open (#734's mock). */
   onRecorded: () => void;
 }
 

@@ -35,8 +35,6 @@ A quantity-only corporate event: shares of a held asset received for free, recor
 
 ### Eligibility and Initiation (010–019)
 
-**FSD-010 — Entry point (frontend)**: The free-shares recording flow is initiated from the Account Details header's consolidated "Record" menu (DIV-012), via a "Free shares" item that opens the free-shares modal (FSD-020). The distributing asset is chosen inside the modal, not derived from a holding row. v1 does **not** add a per-holding-row action (deferred — see Open Questions / Deferred).
-
 **FSD-011 — Eligibility (backend)**: A free-share distribution may be recorded only for an `(account, asset)` pair where the account currently holds the asset with `quantity > 0` and the asset is not a Cash Asset. The action is rejected with a specific error when the account is unknown, the asset is unknown, the asset is not currently held in that account (no active holding), or the asset is a Cash Asset.
 
 ### Recording a Distribution (020–029)
@@ -80,7 +78,7 @@ A quantity-only corporate event: shares of a held asset received for free, recor
 ## Workflow
 
 ```
-Account Details header → "Record" menu → "Free shares" (FSD-010, DIV-012)
+Account Details header → "Record free shares" (the validated mock on #864)
   → modal: asset selector (active non-cash holdings), date (today),
            quantity of free shares, note (FSD-020)
   → submit
@@ -102,40 +100,6 @@ Transaction list (filtered by the distributing asset)
 
 ---
 
-## UX Draft
-
-### Entry Point
-
-A "Free shares" item in the Account Details header's consolidated "Record" dropdown menu (DIV-012), alongside New position and Dividend (cash Deposit/Withdraw live on the cash row, not this menu — DIV-012). Selecting it opens the free-shares modal. (A per-holding-row action is deferred — FSD-010.)
-
-### Main Component
-
-A small `FormModal` — the free-shares modal:
-
-- Asset selector — the account's active, non-cash holdings (the distributing asset).
-- Date (default today, `DateField`).
-- Quantity of free shares (strictly positive decimal).
-- Note (optional `TextField`).
-- Submit / Cancel.
-
-### States
-
-- **Idle**: form with today's date, empty quantity, submit disabled until valid.
-- **In-flight**: submit disabled + spinner (FSD-025).
-- **Validation / backend error**: inline error adjacent to the field; modal stays open (FSD-025).
-- **Success**: modal closes; snackbar "Free shares recorded"; Account Details re-fetches — quantity rises, average price dilutes, performance recomputes (FSD-026/051).
-
-### User Flow
-
-1. User opens Account Details for an account holding 50 shares of an asset.
-2. User opens the header "Record" menu and chooses "Free shares".
-3. Modal opens; user picks the distributing asset from their active holdings, enters the number of free shares received (e.g. 5), adjusts the date if needed.
-4. User submits.
-5. Backend validates, increases the holding quantity to 55, leaves the cost basis unchanged (average price dilutes), moves no cash, persists the distribution, publishes `TransactionUpdated`.
-6. Modal closes, snackbar confirms; the holding row shows 55 shares at the diluted average price; the transaction list shows the distribution under that asset with Type "Free shares".
-
----
-
 ## Open Questions / Deferred
 
 **Deferred to future specs** (explicitly out of v1 scope, agreed with the user):
@@ -143,7 +107,7 @@ A small `FormModal` — the free-shares modal:
 - **Stock splits / reverse splits** — ratio-based quantity changes (×2, ÷10) affecting the whole position; share most of this feature's mechanics but need ratio semantics and historical-price presentation decisions.
 - **User-declared attribution value** — an optional per-share reference value (e.g. the fiscal acquisition value of an _attribution gratuite_) that would increase the cost basis instead of diluting it. v1 is strictly zero-cost (user-confirmed).
 - **Distributions on closed positions** — recording a distribution declared while held but settled after the position was fully sold (v1 requires an active holding, `quantity > 0` — FSD-011; a dividend, by contrast, is judged on its date or before it, DIV-011).
-- **Per-holding-row action** — a contextual "Record free shares" action directly on a holding row (asset pre-selected). v1 initiates from the header "Record" menu with an in-modal asset picker (FSD-010).
+- **Per-holding-row action** — a contextual "Record free shares" action directly on a holding row (asset pre-selected). v1 initiates from the account's header (the validated mock on #864) with an in-modal asset picker.
 - **Merger / acquisition asset substitution** — roadmap Phase 4 item; unrelated mechanics (asset swap), out of scope.
 
 None — all questions have been resolved.
