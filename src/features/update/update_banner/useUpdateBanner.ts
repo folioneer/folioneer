@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { logger } from "@/lib/logger";
-import type { UpdateError } from "@/lib/updateGateway";
-import { updateGateway } from "@/lib/updateGateway";
+import type { UpdateError } from "../gateway";
+import { updateGateway } from "../gateway";
 import { isRetryable, presentUpdateError } from "../shared/presenter";
 
 const GENERIC_ERROR_KEY = "update.error";
@@ -125,17 +125,24 @@ export function useUpdateBanner(): UpdateBannerData {
     });
   }, [showError]);
 
-  // R13 — install and restart; guard against double-click
+  // R13 — install and restart; guard against double-click. UPD-013A — a refused install
+  // shows the error state of UPD-023 and gives the button back.
   const handleRestart = useCallback(async () => {
     if (isRestarting) return;
     setIsRestarting(true);
     try {
-      await updateGateway.installUpdate();
+      const result = await updateGateway.installUpdate();
+      if (result.status === "error") {
+        logger.error("[UpdateBanner] installUpdate refused", { error: result.error });
+        setIsRestarting(false);
+        showError(result.error);
+      }
     } catch (e) {
       logger.error("[UpdateBanner] installUpdate failed", e);
       setIsRestarting(false);
+      showError(null);
     }
-  }, [isRestarting]);
+  }, [isRestarting, showError]);
 
   return {
     state,

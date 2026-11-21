@@ -1,12 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mockCheckForUpdate = vi.hoisted(() => vi.fn());
+const { mockCheckForUpdate, mockInstallUpdate } = vi.hoisted(() => ({
+  mockCheckForUpdate: vi.fn(),
+  mockInstallUpdate: vi.fn(),
+}));
 
-vi.mock("@/bindings", () => ({ commands: { checkForUpdate: mockCheckForUpdate } }));
+vi.mock("@/bindings", () => ({
+  commands: { checkForUpdate: mockCheckForUpdate, installUpdate: mockInstallUpdate },
+}));
 vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn() }));
 vi.mock("@/lib/logger", () => ({ logger: { info: vi.fn(), error: vi.fn() } }));
 
-import { updateGateway } from "./updateGateway";
+import { updateGateway } from "./gateway";
 
 describe("updateGateway.checkForUpdate", () => {
   beforeEach(() => {
@@ -27,5 +32,15 @@ describe("updateGateway.checkForUpdate", () => {
     mockCheckForUpdate.mockResolvedValue(result);
 
     await expect(updateGateway.checkForUpdate()).resolves.toBe(result);
+  });
+});
+
+describe("updateGateway.installUpdate", () => {
+  // UPD-013A (#698) — the install's refusal reaches the banner instead of being dropped.
+  it("hands the typed error through", async () => {
+    const result = { status: "error", error: { code: "NoDownloadedUpdate" } };
+    mockInstallUpdate.mockResolvedValue(result);
+
+    await expect(updateGateway.installUpdate()).resolves.toBe(result);
   });
 });

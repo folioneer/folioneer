@@ -44,6 +44,8 @@ The application is distributed as a desktop executable. When a new version is pu
 
 **UPD-013 (was R13) — Restart and installation (frontend + backend)**: When the user clicks "Restart now", the update is installed and the application restarts automatically.
 
+**UPD-013A — An installation that fails (backend)**: An installation restarts nothing and is rejected with a specific error when nothing was downloaded, when the update is not found again, or when the installation itself fails. The attempt uses the downloaded file up: trying again downloads it anew (UPD-024).
+
 **UPD-014 (was R14) — User data preservation (backend)**: The update only replaces the application executable. All user data (assets, accounts, categories, prices, operations) is preserved intact after restart.
 
 **UPD-015 (was R15) — Backward compatibility (backend)**: Each new version guarantees compatibility with data produced by any earlier version. No update may introduce a change incompatible with an existing schema or data. UPD-016 migrations may only extend or adapt the schema, never destructively remove or modify data.
@@ -131,7 +133,7 @@ The application is distributed as a desktop executable. When a new version is pu
                                                 │
                                                 ├─ [App closed] → re-offered at next launch (UPD-019)
                                                 │
-                                                └─ [Restart now] (UPD-013)
+                                                └─ [Restart now] (UPD-013) — fails → nothing restarts, error (UPD-013A)
                                                       → Data preserved (UPD-014)
                                                       → DB migration if needed (UPD-016, UPD-017), a copy first (UPD-032, UPD-033)
                                                            ├─ Copy failed → no migration, critical error, app blocked (UPD-018, UPD-035)

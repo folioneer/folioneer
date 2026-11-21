@@ -6,7 +6,7 @@ import type { UpdateError } from "@/bindings";
 
 const mockCheckForUpdate = vi.fn().mockResolvedValue({ status: "ok", data: null });
 const mockDownloadUpdate = vi.fn().mockResolvedValue(undefined);
-const mockInstallUpdate = vi.fn().mockResolvedValue(undefined);
+const mockInstallUpdate = vi.fn().mockResolvedValue({ status: "ok", data: null });
 
 type AvailableCallback = (info: { version: string }) => void;
 type CompleteCallback = () => void;
@@ -16,7 +16,7 @@ let onAvailableCb: AvailableCallback | null = null;
 let onCompleteCb: CompleteCallback | null = null;
 let onErrorCb: ErrorCallback | null = null;
 
-vi.mock("@/lib/updateGateway", () => ({
+vi.mock("../gateway", () => ({
   updateGateway: {
     checkForUpdate: () => mockCheckForUpdate(),
     downloadUpdate: () => mockDownloadUpdate(),
@@ -223,5 +223,30 @@ describe("useUpdateBanner", () => {
     });
 
     expect(result.current.state).toBe("ready");
+  });
+
+  // UPD-013A (#698) — an install the core refuses shows its error and gives the button back,
+  // instead of spinning forever.
+  it("shows the error and stops restarting when the install is refused", async () => {
+    mockInstallUpdate.mockResolvedValue({ status: "error", error: { code: "OperationFailed" } });
+    const { result } = renderHook(() => useUpdateBanner());
+    await act(async () => {
+      onAvailableCb?.({ version: "1.2.3" });
+    });
+    act(() => {
+      result.current.handleInstall();
+    });
+    act(() => {
+      onCompleteCb?.();
+    });
+
+    await act(async () => {
+      await result.current.handleRestart();
+    });
+
+    expect(result.current.isRestarting).toBe(false);
+    expect(result.current.state).toBe("error");
+    expect(result.current.errorKey).toBe("update.error");
+    expect(result.current.canRetry).toBe(true);
   });
 });

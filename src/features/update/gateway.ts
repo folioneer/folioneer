@@ -12,8 +12,9 @@ export const updateGateway = {
     await commands.downloadUpdate();
   },
 
-  async installUpdate(): Promise<void> {
-    await commands.installUpdate();
+  /** UPD-013A — the install's refusal is handed through; on success the app restarts (UPD-013). */
+  async installUpdate(): Promise<Result<null, UpdateError>> {
+    return await commands.installUpdate();
   },
 
   onUpdateAvailable(cb: (info: UpdateInfo) => void): Promise<UnlistenFn> {
