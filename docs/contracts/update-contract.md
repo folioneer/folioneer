@@ -11,11 +11,11 @@
 
 ## Commands
 
-| Command            | Args | Return               | Errors                                                                                                                                                                                                                                 |
-| ------------------ | ---- | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `check_for_update` | —    | `Option<UpdateInfo>` | `AccessRefused` _(UPD-028 — the update server refuses this build's access; also emitted as `update:error`. Other network/server errors are silent per UPD-021: the command returns None)_                                              |
-| `download_update`  | —    | `()`                 | _(none — returns immediately (UPD-006, UPD-007); failures are emitted as `update:error` with `OperationFailed` (UPD-023) or `AccessRefused` (UPD-028); re-invoke to retry per UPD-024; concurrent calls silently ignored per UPD-010)_ |
-| `install_update`   | —    | `()`                 | `NoDownloadedUpdate` _(precondition guard — UPD-013: install requires a completed download)_, `OperationFailed` _(updater initialisation, the release is no longer found, or the installation itself fails)_                           |
+| Command            | Args | Return               | Errors                                                                                                                                                                                                                                          |
+| ------------------ | ---- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `check_for_update` | —    | `Option<UpdateInfo>` | `AccessRefused` _(UPD-028 — the update server refuses this build's access; also emitted as `update:error`. Other network/server errors are silent per UPD-021: the command returns None)_                                                       |
+| `download_update`  | —    | `()`                 | _(none — returns immediately (UPD-006, UPD-007); failures are emitted as `update:error` with `OperationFailed` (UPD-023) or `AccessRefused` (UPD-028); re-invoke to retry per UPD-024; concurrent calls silently ignored per UPD-010)_          |
+| `install_update`   | —    | `()`                 | `NoDownloadedUpdate` _(precondition guard — UPD-013A: install requires a completed download)_, `OperationFailed` _(updater initialisation, the release is no longer found or cannot be asked for, or the installation itself fails — UPD-013A)_ |
 
 ---
 

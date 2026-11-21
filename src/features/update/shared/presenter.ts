@@ -1,4 +1,4 @@
-import type { UpdateError } from "@/lib/updateGateway";
+import type { UpdateError } from "../gateway";
 
 /** Maps an update error to the i18n key of the message the banner shows. */
 export function presentUpdateError(error: UpdateError): string {

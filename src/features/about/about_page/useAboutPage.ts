@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { logger } from "@/lib/logger";
-import { updateGateway } from "@/lib/updateGateway";
+import { aboutGateway } from "../gateway";
 
 export type CheckStatus = "idle" | "checking" | "up_to_date" | "error";
 
@@ -23,7 +23,7 @@ export function useAboutPage(): AboutPageData {
     if (checkStatus === "checking") return;
     setCheckStatus("checking");
     try {
-      const result = await updateGateway.checkForUpdate();
+      const result = await aboutGateway.checkForUpdate();
       if (result.status === "error") {
         // UPD-027 — a refused access is a failed check; the banner names it (UPD-029)
         logger.error("[AboutPage] Manual check refused", result.error);

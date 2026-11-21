@@ -289,7 +289,11 @@ async fn do_download(app_handle: &AppHandle, state: &UpdateState) -> Result<(), 
 ///
 /// Re-checks for the update to obtain a fresh handle for the install call.
 /// Requires that `download` has been called successfully beforehand.
-pub async fn install(app_handle: AppHandle, state: Arc<UpdateState>) -> Result<(), UpdateError> {
+pub async fn install<R: Runtime>(
+    app_handle: AppHandle<R>,
+    state: Arc<UpdateState>,
+) -> Result<(), UpdateError> {
+    // UPD-013A — the attempt uses the download up; trying again downloads anew (UPD-024).
     let bytes = state.take_bytes().ok_or(UpdateError::NoDownloadedUpdate)?;
 
     let updater = channel_updater(&app_handle, &managed_channel(&app_handle)).map_err(|e| {
@@ -406,6 +410,40 @@ mod tests {
             app.handle().manage(channel);
         }
         app
+    }
+
+    // UPD-013A (#698) — installing with nothing downloaded restarts nothing and says so.
+    #[tokio::test]
+    async fn upd_013a_installing_with_nothing_downloaded_is_refused() {
+        let app = app_with(None);
+        let state = Arc::new(UpdateState::new());
+
+        let refused = install(app.handle().clone(), Arc::clone(&state)).await;
+
+        assert!(
+            matches!(refused, Err(UpdateError::NoDownloadedUpdate)),
+            "{refused:?}"
+        );
+    }
+
+    // UPD-013A (#698) — an installation whose update the server no longer offers, or whose
+    // check fails, restarts nothing and uses the download up: trying again downloads anew.
+    #[tokio::test]
+    async fn upd_013a_an_update_no_longer_offered_or_a_failed_check_uses_the_download_up() {
+        for answer in ["204 No Content", "500 Internal Server Error"] {
+            let (endpoint, _served) = serve_once(answer).await;
+            let app = app_with(Some(channel(endpoint, &[])));
+            let state = Arc::new(UpdateState::new());
+            state.set_bytes(vec![1, 2, 3]);
+
+            let refused = install(app.handle().clone(), Arc::clone(&state)).await;
+
+            assert!(
+                matches!(refused, Err(UpdateError::OperationFailed)),
+                "{answer}: {refused:?}"
+            );
+            assert_eq!(state.take_bytes(), None, "{answer}");
+        }
     }
 
     // TODO-037 — a build that manages no channel updates from the configured endpoint.
