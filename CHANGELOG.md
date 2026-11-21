@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.21.0] - 2026-11-21
+
+### Added
+
+- the startup screen shows the Folioneer brand over a faint watermark of its name
+- [account] an account's header shows only its Global Value, so it fits on one line with its actions
+
+### Fixed
+
+- [sync): after a computer leaves sync, a new computer can join, and the others still get its last changes
+  An area without a manifest — a device that left, or one whose manifest has not arrived — is
+  replayed by a join and read by every sync (SYN-036A] its changes from 1 without a gap, each
+- [update] a manual update check that fails now says so, and a version you dismissed shows again when found
+- [update] a migration that fails while the window loads now shows its error screen instead of loading forever
+- [update] when installing an update fails, Restart now stops spinning and the banner shows the error
+- [holding] a holding row's action buttons show their name on hover and on focus, and none is cut off
+- [dividend] a dividend in the account's currency takes a rate of 1, never one left over from another asset
+- [dividend] a dividend too small to count in the account's currency, or too large, is refused with the reason
+- [agent] an AI agent cannot merge entries into a transfer that puts a dividend before the asset was held
+
 ## [0.20.0] - 2026-11-15
 
 ### Added
