@@ -223,7 +223,7 @@ describe("AccountDetailsView — header actions (DIV-012)", () => {
     expect(handlers.handleFreeSharesOpen).toHaveBeenCalledTimes(1);
   });
 
-  it("mounts the dividend modal only when dividendOpen is true (DIV-010/020)", () => {
+  it("mounts the dividend modal only when dividendOpen is true (DIV-010, #734's mock)", () => {
     const { rerender } = render(<AccountDetailsView />);
     expect(screen.queryByTestId("dividend-modal-mounted")).toBeNull();
 

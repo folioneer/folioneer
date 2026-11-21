@@ -9,7 +9,7 @@ import { accountDetailsGateway } from "../gateway";
 import { dividendErrorToI18n } from "../shared/presenter";
 import { validateAmount, validateDate } from "../shared/validateCashForm";
 
-/** A holding the dividend can be attributed to — active, non-cash (DIV-011/020). */
+/** A holding the dividend can be attributed to — active, non-cash (DIV-011, #734's mock). */
 export interface DividendPayingAsset {
   assetId: string;
   assetName: string;

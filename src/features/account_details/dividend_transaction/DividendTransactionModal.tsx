@@ -15,7 +15,7 @@ interface DividendTransactionModalProps {
   onClose: () => void;
   accountId: string;
   accountCurrency: string;
-  /** Open, then closed, non-cash positions the dividend can be attributed to (DIV-011/020). */
+  /** Open, then closed, non-cash positions the dividend can be attributed to (DIV-011, #734's mock). */
   heldAssets: DividendPayingAsset[];
   onSubmitSuccess: () => void;
   /** Refresh-only callback for "Record & add another" — keeps the modal open (DIV-010). */
@@ -138,7 +138,7 @@ export function DividendTransactionModal({
           </label>
         )}
 
-        {/* DIV-021/028 — amount in the selected entry currency */}
+        {/* #734's mock — amount in the selected entry currency */}
         <CalcField
           id="dividend-trx-amount"
           data-testid="dividend-trx-amount"

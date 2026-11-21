@@ -381,7 +381,7 @@ describe("useAccountDetailsView — fee-schedule modal target (FEE-011)", () => 
 });
 
 // ---------------------------------------------------------------------------
-// DIV-011/020 — activeNonCashHoldings exposes only active, non-cash holdings
+// DIV-011 / #734's mock — activeNonCashHoldings exposes only active, non-cash holdings
 // (quantity > 0) as candidates for the dividend modal's asset selector.
 // ---------------------------------------------------------------------------
 const makeHoldingDetail = (overrides: Record<string, unknown> = {}) => ({
@@ -417,7 +417,7 @@ const makeHoldingDetail = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
-describe("useAccountDetailsView — activeNonCashHoldings filter (DIV-011/020)", () => {
+describe("useAccountDetailsView — activeNonCashHoldings filter (DIV-011, #734's mock)", () => {
   beforeEach(() => {
     useAppStore.setState({
       assets: [],

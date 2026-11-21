@@ -418,7 +418,7 @@ export function useAccountDetailsView(accountId: string) {
   const hasNonCashActiveHoldings = data.holdings.some((row) => !row.isCash);
   const hasClosedHoldings = data.summary?.hasClosedHoldings ?? false;
   // Active, non-cash holdings (quantity > 0) — the candidate assets for the
-  // dividend, free-shares, and management-fee modals (DIV-011/020, FSD-011, FEE-011/012).
+  // dividend, free-shares, and management-fee modals (DIV-011, #734's mock, FSD-011, FEE-011/012).
   // Memoized so the stable reference does not invalidate each modal's `assetOptions`
   // memo on every parent render.
   const activeNonCashHoldings = useMemo(

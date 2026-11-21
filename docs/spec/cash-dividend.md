@@ -24,7 +24,7 @@ A cash income event paid by a held asset, recorded against that asset and credit
 | `account_id`       | The account receiving the dividend.                                                                                                                          |
 | `asset_id`         | The **paying asset** — the holding the dividend is attributed to. **Not** the Cash Asset. This is what makes the dividend appear under that asset (DIV-050). |
 | `date`             | Business date the dividend was received (must not be in the future, must not be older than the existing TRX lower bound).                                    |
-| `exchange_rate`    | Conversion rate from the asset's native currency to the account currency. Exactly `1` when the asset and account currencies match (DIV-022).                 |
+| `exchange_rate`    | Conversion rate from the asset's native currency to the account currency. Exactly `1` when the asset and account currencies match (DIV-022A).                |
 | `dividend_amount`  | The net amount, in the currency it was entered in (DIV-022, DIV-029); absent on every other type (DIV-023).                                                  |
 | `total_amount`     | The cash credited to the account's Cash Holding, in **account currency** (i64 micros) — the net dividend converted at `exchange_rate`.                       |
 | `note`             | Optional free-text note.                                                                                                                                     |
