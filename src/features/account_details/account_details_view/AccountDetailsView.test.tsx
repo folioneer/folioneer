@@ -115,9 +115,6 @@ const makeView = (overrides: Record<string, unknown> = {}) => ({
   summary: {
     accountName: "Main",
     totalGlobalValue: "1.100,00",
-    totalManagementFees: "0,00",
-    totalNetCashInput: "500,00",
-    totalCapitalBroughtIn: "50.500,00",
     outdatedPriceCount: 0,
     isEmpty: false,
     isAllClosed: false,
@@ -539,32 +536,25 @@ describe("AccountDetailsView — performance period selector (ACD-054)", () => {
   });
 });
 
-describe("AccountDetailsView — management fees (FEE-010/011/053)", () => {
+describe("AccountDetailsView — header totals (#864)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUseRefreshAccountPrices.mockReturnValue({ isPending: false, refresh: vi.fn() });
     mockUseAccountDetailsView.mockReturnValue(makeView());
   });
 
-  it("shows the total management fees figure (FEE-053)", () => {
+  // #864 (the validated mock) — the header keeps the Global Value only: no net cash input,
+  // no capital brought in, no total management fees.
+  it("shows the Global Value and no other total in the header (#864)", () => {
     render(<AccountDetailsView />);
-    const total = document.querySelector("#account-details-total-management-fees");
-    expect(total).toHaveTextContent("0,00");
-  });
-
-  // ACD-053 — net cash input since inception in the header
-  it("shows the net cash input figure (ACD-053)", () => {
-    render(<AccountDetailsView />);
-    const total = document.querySelector("#account-details-total-net-cash-input");
-    expect(total).toHaveTextContent("500,00");
-  });
-
-  // ACD-058 — the capital brought in follows the net cash input, its definition on hover
-  it("shows the capital brought in, with its definition (ACD-058)", () => {
-    render(<AccountDetailsView />);
-    const figure = document.querySelector("#account-details-total-capital-brought-in");
-    expect(figure).toHaveTextContent("50.500,00");
-    expect(figure).toHaveAttribute("title", "account_details.total_capital_brought_in_hint");
+    expect(screen.getByText("account_details.total_global_value", { exact: false })).toBeTruthy();
+    for (const id of [
+      "#account-details-total-net-cash-input",
+      "#account-details-total-capital-brought-in",
+      "#account-details-total-management-fees",
+    ]) {
+      expect(document.querySelector(id)).toBeNull();
+    }
   });
 
   // MKT-208 — the header counts the account's outdated prices, and says nothing at zero
@@ -580,6 +570,14 @@ describe("AccountDetailsView — management fees (FEE-010/011/053)", () => {
       "mkt.outdated.count",
     );
   });
+});
+
+describe("AccountDetailsView — management fees (FEE-010/011)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUseRefreshAccountPrices.mockReturnValue({ isPending: false, refresh: vi.fn() });
+    mockUseAccountDetailsView.mockReturnValue(makeView());
+  });
 
   it("routes the Management fee button to its handler (FEE-010)", () => {
     render(<AccountDetailsView />);
@@ -588,11 +586,10 @@ describe("AccountDetailsView — management fees (FEE-010/011/053)", () => {
   });
 
   // FEE-076 — a disabled account hides every % fee surface
-  it("hides the fee button, header total and column when the account has fees disabled (FEE-076)", () => {
+  it("hides the fee button and column when the account has fees disabled (FEE-076)", () => {
     mockUseAccountDetailsView.mockReturnValue(makeView({ managementFeesEnabled: false }));
     render(<AccountDetailsView />);
     expect(document.querySelector("#add-menu-management-fee")).toBeNull();
-    expect(document.querySelector("#account-details-total-management-fees")).toBeNull();
     expect(screen.queryByText("account_details.column_management_fees")).toBeNull();
   });
 

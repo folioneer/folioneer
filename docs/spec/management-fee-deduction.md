@@ -117,7 +117,7 @@ A recurring rule that generates fee deductions for one (account, asset) holding 
 
 **FEE-052 — Per-holding Management Fees figure (frontend + backend)**: The application computes, per `(account, asset)`, a cumulative **Management Fees** value = the sum of every recorded deduction's fee value (FEE-051), in account currency; the Account Details holdings table displays it as a **Management Fees** column. The backend produces the aggregate and the frontend displays it, mirroring DIV-070.
 
-**FEE-053 — Account-level total Management Fees (frontend + backend)**: The application computes an account-level **total Management Fees** = the sum of the per-holding Management Fees across the account, in account currency, surfaced in the Account Details view header. Backend aggregates, frontend displays, mirroring DIV-073.
+**FEE-053 — Account-level total Management Fees (backend)**: The account's details carry its **total Management Fees** — the sum of the per-holding Management Fees across the account, in account currency (`0` when none), as DIV-073 sums its dividends; the as-of view counts the deductions dated on or before the as-of date (FEE-072). The window does not show it (the validated mock on #864); an AI agent reads it with the account's figures (AGT-040).
 
 **FEE-054 — No price available (frontend + backend)**: If no market price is recorded on or before a deduction's date, that deduction contributes `0` to the Management Fees figure until a qualifying price exists (consistent with valuation degrading to 0, FXR-034). The quantity removal itself is unaffected.
 
@@ -151,7 +151,7 @@ A recurring rule that generates fee deductions for one (account, asset) holding 
 
 **FEE-075 — Account-level management-fees parameter (frontend + backend)**: the `Account` aggregate carries `management_fees_enabled: bool`. New accounts are created with `false`; the schema migration backfills `true` for every account existing before the parameter (behavior-preserving). The parameter is editable both ways at any time from the account forms (creation and edit).
 
-**FEE-076 — Disabled-state UI (frontend)**: when an account's `management_fees_enabled` is `false`, the account-details view hides every % fee surface: the one-off management-fee header button (FEE-010), the per-row Manage-fee button (FEE-011), the Management Fees column (FEE-052) with its fee-rate indicator (FEE-074), and the header total (FEE-053).
+**FEE-076 — Disabled-state UI (frontend)**: when an account's `management_fees_enabled` is `false`, the account-details view hides every % fee surface: the one-off management-fee header button (FEE-010), the per-row Manage-fee button (FEE-011), and the Management Fees column (FEE-052) with its fee-rate indicator (FEE-074).
 
 **FEE-077 — Backend enforcement (backend)**: Recording a one-off management fee or creating a fee schedule is rejected with a specific error when the target account's management-fees parameter is off; the account itself owns that rule. Existing schedules remain readable, editable, and deletable regardless of the parameter — only the creation of new fee instruments is rejected, so disabling never traps data.
 
@@ -212,7 +212,7 @@ Two small `FormModal`s:
 - **One-off fee modal** — asset selector (active non-cash holdings), date (`DateField`, default as FEE-020 says), a two-way toggle (Percentage, the default / Resulting quantity), then either the percentage to remove (strictly positive, ≤ 100%) or the quantity held after the fee with its preview line under the field (held as of the date → removed quantity and the share it represents), optional note, Submit / Cancel.
 - **Fee schedule modal** — annual rate (% input), frequency selector, start date, optional end date, an active/pause toggle, and Save / Delete for an existing schedule.
 
-The Account Details holdings table gains a **Management Fees** column; the view header shows the **total Management Fees** figure.
+The Account Details holdings table gains a **Management Fees** column.
 
 ### States
 
@@ -227,7 +227,7 @@ The Account Details holdings table gains a **Management Fees** column; the view 
 1. User opens Account Details for an account holding 1000 shares of an ETF.
 2. User opens the holding row's "Manage fee" action and sets an annual rate of 0.20%, monthly cadence, starting today.
 3. Each month, on the next app open, a deduction removes ~0.0167% of the current quantity, dated at month end.
-4. The holding row shows the gradually shrinking quantity, a slowly rising average price, and a growing **Management Fees** figure; the account header shows the total Management Fees paid.
+4. The holding row shows the gradually shrinking quantity, a slowly rising average price, and a growing **Management Fees** figure.
 5. For an ad-hoc charge, the user instead presses "Management fee" in the header and records a single percentage removal (e.g. 1% of the holding) — or, to align the holding with the real position, switches to Resulting quantity and types what it should hold (25 held, 24.5 typed: the form shows that 0.5 will be removed).
 
 ---

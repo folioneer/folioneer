@@ -922,7 +922,7 @@ describe("holdingNoteErrorToI18n (HNO-011/020/021)", () => {
   });
 });
 
-describe("toHoldingRow / toAccountSummary — management fees (FEE-052/053)", () => {
+describe("toHoldingRow — management fees (FEE-052)", () => {
   it("formats a holding's cumulative management fees", () => {
     const row = toHoldingRow(makeHolding({ management_fees: 4_250_000 }));
     expect(row.managementFees).toBe("4,25");
@@ -931,12 +931,6 @@ describe("toHoldingRow / toAccountSummary — management fees (FEE-052/053)", ()
   it("leaves the cash row's management fees blank", () => {
     const row = toHoldingRow(makeHolding({ asset_id: "system-cash-EUR" }));
     expect(row.managementFees).toBe("");
-  });
-
-  it("formats the account total management fees", () => {
-    const summary = toAccountSummary(makeResponse({ total_management_fees: 12_500_000 }));
-    expect(summary.totalManagementFees).toBe("12,50");
-    expect(summary.totalManagementFeesRaw).toBe(12_500_000);
   });
 });
 
@@ -1017,25 +1011,9 @@ describe("toHoldingRow — weight % (ACD-052)", () => {
   });
 });
 
-describe("toAccountSummary — net cash input (ACD-053)", () => {
+describe("toAccountSummary — outdated prices (MKT-208)", () => {
   it("carries the account's count of outdated prices (MKT-208)", () => {
     expect(toAccountSummary(makeResponse({ outdated_price_count: 3 })).outdatedPriceCount).toBe(3);
-  });
-
-  it("formats the capital brought in from the response (ACD-058)", () => {
-    const summary = toAccountSummary(makeResponse({ total_capital_brought_in: 620_000_000 }));
-    expect(summary.totalCapitalBroughtIn).toBe("620,00");
-  });
-
-  it("formats totalNetCashInput from the response", () => {
-    const summary = toAccountSummary(makeResponse({ total_net_cash_input: 120_000_000 }));
-    expect(summary.totalNetCashInput).toBe("120,00");
-  });
-
-  it("formats a negative net cash input with its sign", () => {
-    const summary = toAccountSummary(makeResponse({ total_net_cash_input: -30_000_000 }));
-    expect(summary.totalNetCashInput).toContain("30,00");
-    expect(summary.totalNetCashInput).toMatch(/^-/);
   });
 });
 

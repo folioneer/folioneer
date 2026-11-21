@@ -117,9 +117,9 @@ The top-level response returned by the `get_account_details(account_id)` Tauri c
 
 **ACD-052B — A holding's market value (backend)**: Each holding of an account's details has a market value, in the account's currency — its contribution to the Global Value (CSH-094): the balance for the Cash Holding, price × quantity × FX for a priced non-cash holding, its cost basis for one with no recorded price (PRF-022A). A foreign holding with a recorded price and no usable rate has none (FXR-034), and then counts as 0 in the Global Value. Both the live and the as-of views carry it.
 
-**ACD-053 — Net cash input since inception**: `AccountDetailsResponse` exposes `total_net_cash_input: i64` — Σ `Deposit` amounts − Σ `Withdrawal` amounts across the account's whole transaction history, in account-currency micros; negative when withdrawals exceed deposits; `0` when no cash transactions exist. The as-of view counts only transactions dated on or before the as-of date. The frontend displays the figure in the summary header next to the Global Value.
+**ACD-053 — Net cash input since inception (backend)**: The account's details carry its net cash input — the deposits less the withdrawals across the account's whole transaction history, in account-currency micros; negative when withdrawals exceed deposits; `0` when no cash transactions exist. The as-of view counts only transactions dated on or before the as-of date. The window does not show it (the validated mock on #864); an AI agent reads it with the account's figures (AGT-040).
 
-**ACD-058 — Capital brought in (backend + frontend)**: `AccountDetailsResponse` exposes `total_capital_brought_in: i64` — the net cash input (ACD-053) plus every `OpeningBalance` at its recorded cost, in account-currency micros: what the owner brought into the account, cash and positions together. An account opened with positions costing 50 000 and a deposit of 500 brings in 50 500, of which 500 is net cash input. It equals the total net invested of PRF-035 at the view's date: the same deposits, withdrawals and opening balances at their recorded cost (PRF-086). The as-of view counts only transactions dated on or before the as-of date. The Account Details view shows it in the summary header after Net Cash Input as "Capital brought in" ("Capital apporté"), with its definition as a tooltip; an AI agent reads it with the account's figures (AGT-040).
+**ACD-058 — Capital brought in (backend)**: The account's details carry the capital brought in — the net cash input (ACD-053) plus every `OpeningBalance` at its recorded cost, in account-currency micros: what the owner brought into the account, cash and positions together. An account opened with positions costing 50 000 and a deposit of 500 brings in 50 500, of which 500 is net cash input. It equals the total net invested of PRF-035 at the view's date: the same deposits, withdrawals and opening balances at their recorded cost (PRF-086). The as-of view counts only transactions dated on or before the as-of date. The window does not show it (the validated mock on #864); an AI agent reads it with the account's figures (AGT-040).
 
 ### Windowed Position Performance
 
@@ -204,7 +204,7 @@ UPDATE holdings SET
           ├─ [use_cases/account_details/: Compute total_cost_basis (ACD-031)]
           ├─ [use_cases/account_details/: Compute total_realized_pnl = Σ holding.total_realized_pnl (ACD-045)]
           │
-          └─ [Frontend: Loading state → Header (Account name + Total Cost Basis + Total Realized P&L)]
+          └─ [Frontend: Loading state → Header (the validated mock on #864)]
              [Frontend: Active holdings table (one row per HoldingDetail)]
              [Frontend: Closed positions section (one row per ClosedHoldingDetail, ACD-047–ACD-049)]
              [Frontend: Empty / Error state as applicable]
@@ -222,7 +222,7 @@ UPDATE holdings SET
 
 **ManagerLayout** containing:
 
-- **Header**: Account name + Total Cost Basis + Total Realized P&L (large).
+- **Header**: the validated mock on #864 (folioneer/folioneer-design, `864/`).
 - **Active Positions Table**:
   - Asset (Name + Ticker)
   - Quantity

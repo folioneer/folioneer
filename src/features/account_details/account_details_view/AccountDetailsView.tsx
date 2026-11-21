@@ -132,47 +132,14 @@ export function AccountDetailsView() {
                     </select>
                   </div>
                 )}
-                {/* CSH-094 — Global Value (cash + priced holdings, account currency) */}
+                {/* CSH-094 / #864 — Global Value (cash + priced holdings, account currency), the
+                    header's only total (the validated mock) */}
                 <p className="text-sm text-m3-on-surface-variant whitespace-nowrap">
                   {t("account_details.total_global_value")}:{" "}
                   <span className="font-semibold text-m3-on-surface">
                     {view.summary.totalGlobalValue}
                   </span>
                 </p>
-                {/* ACD-053 — net cash input since inception (deposits − withdrawals) */}
-                <p
-                  id="account-details-total-net-cash-input"
-                  className="text-sm text-m3-on-surface-variant whitespace-nowrap"
-                >
-                  {t("account_details.total_net_cash_input")}:{" "}
-                  <span className="font-semibold text-m3-on-surface">
-                    {view.summary.totalNetCashInput}
-                  </span>
-                </p>
-                {/* ACD-058 — what was brought in, cash and opening balances at cost */}
-                <p
-                  id="account-details-total-capital-brought-in"
-                  title={t("account_details.total_capital_brought_in_hint")}
-                  className="text-sm text-m3-on-surface-variant whitespace-nowrap"
-                >
-                  {t("account_details.total_capital_brought_in")}:{" "}
-                  <span className="font-semibold text-m3-on-surface">
-                    {view.summary.totalCapitalBroughtIn}
-                  </span>
-                </p>
-                {/* FEE-053 — total management fees deducted across all holdings;
-                    hidden when the account has the mechanism disabled (FEE-076) */}
-                {view.managementFeesEnabled && (
-                  <p
-                    id="account-details-total-management-fees"
-                    className="text-sm text-m3-on-surface-variant whitespace-nowrap"
-                  >
-                    {t("account_details.total_management_fees")}:{" "}
-                    <span className="font-semibold text-m3-on-surface">
-                      {view.summary.totalManagementFees}
-                    </span>
-                  </p>
-                )}
                 {/* MKT-208 — the account counts its outdated prices; nothing at zero */}
                 {view.summary.outdatedPriceCount > 0 && (
                   <WarningChip

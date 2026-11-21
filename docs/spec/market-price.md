@@ -473,7 +473,7 @@ The header tells how recent the portfolio's prices are, and each holding whether
 
 **MKT-207 — An outdated price on its row (frontend)**: On a holding row whose price is outdated (MKT-206), the staleness label (MKT-140) reads "Outdated price · Nd", N being MKT-140's count of calendar days, in the warning colour with a warning icon, on one line; a current price keeps its staleness label as it is. In French "Prix ancien · N j"; both themes.
 
-**MKT-208 — The counts of outdated prices (frontend)**: The account's header shows its count (MKT-206) as a warning chip after its figures, and the accounts list's total row shows the portfolio's count the same way: "1 outdated price" / "N outdated prices" ("1 prix ancien" / "N prix anciens"). A count is of holdings, as MKT-206 counts them: an asset held in two accounts counts twice on the total. Neither shows anything at zero, nor in a read with a date. The count of each account in the account summaries is not shown on its row; an AI agent reads it (AGT-040).
+**MKT-208 — The counts of outdated prices (frontend)**: The account's header shows its count (MKT-206) as a warning chip after its Global Value, and the accounts list's total row shows the portfolio's count the same way: "1 outdated price" / "N outdated prices" ("1 prix ancien" / "N prix anciens"). A count is of holdings, as MKT-206 counts them: an asset held in two accounts counts twice on the total. Neither shows anything at zero, nor in a read with a date. The count of each account in the account summaries is not shown on its row; an AI agent reads it (AGT-040).
 
 ### Without an External provider (210–219)
 
@@ -989,7 +989,7 @@ A "Fill missing price history" icon button in the actions of each active, non-ca
 ### UX Draft — Outdated price (MKT-205+)
 
 - **Holding row**: next to the source badge, the staleness label of an outdated price turns into "⚠ Outdated price · 71d" in the warning colour (MKT-207); "Price typed by hand" (MKT-158) still follows under it when it applies.
-- **Account header**: after Global Value, Net Cash Input and the management fees, a warning chip "⚠ 2 outdated prices" (MKT-208); absent at zero and in a view with a date, today included.
+- **Account header**: after the Global Value, a warning chip "⚠ 2 outdated prices" (MKT-208); absent at zero and in a view with a date, today included.
 - **Accounts list**: the total row carries the same chip with the portfolio's count (MKT-208); absent at zero, and with the row itself while a search filters the list (ACC-032).
 - **Why not updated**: under the price, or under "No price available", "Not updated: …" in the warning colour; its tooltip gives the date of the failed fetch (MKT-222).
 
