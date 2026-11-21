@@ -2767,3 +2767,172 @@ async fn syn_073_resuming_into_a_folder_holding_another_beginning_is_the_reset()
         "nothing was published"
     );
 }
+
+async fn deposits_on(ctx: &Ctx, date: &str) -> i64 {
+    sqlx::query_scalar("SELECT COUNT(*) FROM transactions WHERE date = ?")
+        .bind(date)
+        .fetch_one(&ctx.pool)
+        .await
+        .unwrap()
+}
+
+// SYN-082 / SYN-060 (#730) — what a device published just before leaving reaches a device
+// that had not read it yet.
+#[tokio::test]
+async fn syn_082_a_remaining_device_receives_the_last_changes_of_one_that_left() {
+    let dir = tempfile::tempdir().unwrap();
+    let (desktop, laptop, account_id, _area) = two_devices_sharing(dir.path()).await;
+    laptop
+        .account_service
+        .record_deposit(&account_id, "2026-03-01".into(), 5_000_000, None)
+        .await
+        .unwrap();
+    laptop
+        .sync_service
+        .leave_sync()
+        .await
+        .expect("Laptop leaves");
+
+    let run = desktop.orchestrator.sync_now().await.unwrap();
+
+    assert!(run.applied_changes >= 1, "{run:?}");
+    assert_eq!(deposits_on(&desktop, "2026-03-01").await, 1);
+    assert!(
+        run.status
+            .roster
+            .iter()
+            .all(|entry| entry.device_name != "Laptop"),
+        "the device that left is not in the roster"
+    );
+}
+
+// SYN-036 / SYN-082 (#730) — a fresh installation joins after a device left, and rebuilds
+// what that device published.
+#[tokio::test]
+async fn syn_036_a_device_joins_after_another_left() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_desktop, laptop, account_id, _area) = two_devices_sharing(dir.path()).await;
+    laptop
+        .account_service
+        .record_deposit(&account_id, "2026-03-02".into(), 5_000_000, None)
+        .await
+        .unwrap();
+    laptop
+        .sync_service
+        .leave_sync()
+        .await
+        .expect("Laptop leaves");
+
+    let tablet = build_ctx(dir.path()).await;
+    tablet
+        .orchestrator
+        .enable_sync(
+            dir.path().to_string_lossy().to_string(),
+            PASSPHRASE.into(),
+            "Tablet".into(),
+        )
+        .await
+        .expect("Tablet joins after Laptop left");
+
+    assert_eq!(deposits_on(&tablet, "2026-03-02").await, 1);
+}
+
+/// Laptop publishes two segments, then leaves; returns Desktop and the area Laptop left.
+async fn leave_after_two_segments(dir: &std::path::Path) -> (Ctx, std::path::PathBuf) {
+    let (desktop, laptop, account_id, desktop_area) = two_devices_sharing(dir).await;
+    let laptop_area = other_area(dir, &desktop_area);
+    laptop
+        .account_service
+        .record_deposit(&account_id, "2026-03-03".into(), 5_000_000, None)
+        .await
+        .unwrap();
+    laptop.orchestrator.sync_now().await.unwrap();
+    laptop
+        .account_service
+        .record_deposit(&account_id, "2026-03-04".into(), 5_000_000, None)
+        .await
+        .unwrap();
+    laptop
+        .sync_service
+        .leave_sync()
+        .await
+        .expect("Laptop leaves");
+    assert_eq!(
+        segment_names(&laptop_area).len(),
+        2,
+        "two segments published"
+    );
+    (desktop, laptop_area)
+}
+
+async fn join_as_tablet(dir: &std::path::Path) -> (Ctx, Result<(), String>) {
+    let tablet = build_ctx(dir).await;
+    let joined = tablet
+        .orchestrator
+        .enable_sync(
+            dir.to_string_lossy().to_string(),
+            PASSPHRASE.into(),
+            "Tablet".into(),
+        )
+        .await
+        .map(|_| ())
+        .map_err(|error| format!("{error:?}"));
+    (tablet, joined)
+}
+
+// SYN-036A (#730) — the area of a device that left is complete only when its segments
+// follow each other from the first: a gap refuses the join.
+#[tokio::test]
+async fn syn_036a_a_gap_in_the_area_of_a_device_that_left_refuses_the_join() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_desktop, laptop_area) = leave_after_two_segments(dir.path()).await;
+    let first = segment_names(&laptop_area).into_iter().next().unwrap();
+    std::fs::remove_file(laptop_area.join("segments").join(first)).unwrap();
+
+    let (_tablet, joined) = join_as_tablet(dir.path()).await;
+
+    let refused = joined.expect_err("a gap refuses the join");
+    assert!(refused.contains("HistoryIncomplete"), "{refused}");
+}
+
+// SYN-036A (#730) — a last segment of a device that left, reaching the folder
+// after the join, is applied by the next sync.
+#[tokio::test]
+async fn syn_036a_a_segment_arriving_after_the_join_is_applied_by_the_next_sync() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_desktop, laptop_area) = leave_after_two_segments(dir.path()).await;
+    let last = segment_names(&laptop_area).into_iter().next_back().unwrap();
+    let on_its_way = dir.path().join("on-its-way");
+    std::fs::rename(laptop_area.join("segments").join(&last), &on_its_way).unwrap();
+
+    let (tablet, joined) = join_as_tablet(dir.path()).await;
+    joined.expect("Tablet joins with the segments present");
+    assert_eq!(deposits_on(&tablet, "2026-03-04").await, 0);
+
+    std::fs::rename(&on_its_way, laptop_area.join("segments").join(&last)).unwrap();
+    tablet.orchestrator.sync_now().await.unwrap();
+
+    assert_eq!(deposits_on(&tablet, "2026-03-03").await, 1);
+    assert_eq!(deposits_on(&tablet, "2026-03-04").await, 1);
+}
+
+// SYN-036A (#730) — without a manifest, an area's name is all that vouches for its
+// segments: one copied from another device's area refuses the join.
+#[tokio::test]
+async fn syn_036a_a_segment_copied_into_another_area_refuses_the_join() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_desktop, laptop_area) = leave_after_two_segments(dir.path()).await;
+    let stray = dir.path().join("devices").join("stray-device");
+    std::fs::create_dir_all(stray.join("segments")).unwrap();
+    let first = segment_names(&laptop_area).into_iter().next().unwrap();
+    std::fs::copy(
+        laptop_area.join("segments").join(&first),
+        stray.join("segments").join(&first),
+    )
+    .unwrap();
+
+    let (_tablet, joined) = join_as_tablet(dir.path()).await;
+
+    let refused = joined.expect_err("a segment out of its area refuses the join");
+    assert!(refused.contains("HistoryIncomplete"), "{refused}");
+}

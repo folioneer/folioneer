@@ -55,10 +55,12 @@ fn segment_changes(segment: Segment, after: i64) -> Result<Vec<IncomingChange>, 
 
 /// Reads every other device's manifest and the segments past this device's cursor for
 /// it (SYN-033/037), naming each readable manifest's device in the roster with when its
-/// changes were last applied here (SYN-063). A manifest or segment that cannot be
-/// decoded is skipped and counted (SYN-034); a segment this device has not yet received
-/// in full (a gap before it) stops the read of that area until the next run; a newer
-/// data format is reported (SYN-035). A folder failure aborts the read (`Err`).
+/// changes were last applied here (SYN-063); an area without a manifest — a device that
+/// left (SYN-082) or whose manifest has not arrived — is read all the same, out of the
+/// roster (SYN-036A). A manifest or segment that cannot be decoded is skipped and
+/// counted (SYN-034); a segment this device has not yet received in full (a gap before
+/// it) stops the read of that area until the next run; a newer data format is reported
+/// (SYN-035). A folder failure aborts the read (`Err`).
 pub(super) async fn read_other_devices(
     folder_store: &dyn FolderStore,
     state_repo: &dyn SyncStateRepository,
@@ -71,6 +73,21 @@ pub(super) async fn read_other_devices(
             continue;
         }
         let Some(bytes) = folder_store.read_manifest_bytes(&other).await? else {
+            // SYN-036A — an area without a manifest is out of the roster, but what it
+            // published is still applied here.
+            let applied_through = state_repo
+                .get_cursor(&other)
+                .await?
+                .map_or(0, |cursor| cursor.applied_through);
+            let reached =
+                read_segments(folder_store, &other, key, applied_through, &mut intake).await?;
+            if reached > applied_through {
+                intake.cursors.push(SyncCursor {
+                    device_id: other,
+                    applied_through: reached,
+                    last_applied_at: Some(chrono::Utc::now().to_rfc3339()),
+                });
+            }
             continue;
         };
         let manifest = match decode_manifest(key, &bytes) {
