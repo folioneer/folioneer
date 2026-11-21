@@ -12,4 +12,4 @@ pub mod service;
 #[cfg(feature = "app")]
 pub use api::*;
 pub use error::UpdateError;
-pub use service::{UpdateChannel, UpdateInfo, UpdateState};
+pub use service::{StartupFailure, UpdateChannel, UpdateInfo, UpdateState};

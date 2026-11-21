@@ -1292,6 +1292,13 @@ async installUpdate() : Promise<Result<null, UpdateError>> {
 }
 },
 /**
+ * UPD-018A / UPD-035 — the failure that stopped the portfolio from opening at startup, if any:
+ * the window asks for it once it is ready, as the event was sent before it listened.
+ */
+async getStartupFailure() : Promise<MigrationFailure | null> {
+    return await TAURI_INVOKE("get_startup_failure");
+},
+/**
  * Applies a configuration change to the daily price download (SPF-010–013,
  * SPF-019). Registers/removes the OS schedule before persisting so the
  * configuration never contradicts the OS schedule.
@@ -1642,7 +1649,8 @@ total_global_value: number;
  */
 total_dividends_received: number; 
 /**
- * Sum of `management_fees` across all active holdings, in account-currency micros (FEE-072/073).
+ * Sum of every management fee deduction's value across the account, closed holdings
+ * included, in account-currency micros (FEE-053, FEE-072/073).
  * 0 when no management fee transactions have been recorded.
  */
 total_management_fees: number; 

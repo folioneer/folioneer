@@ -132,6 +132,12 @@ export const shellGateway = {
     return listen<MigrationFailure>("db:migration_error", (event) => cb(event.payload));
   },
 
+  // UPD-018A — the same failure, read once the window is ready: the core opens the portfolio
+  // before the window listens, so the event alone can be lost.
+  getStartupFailure(): Promise<MigrationFailure | null> {
+    return commands.getStartupFailure();
+  },
+
   // FEE-040 — apply every due recurring fee deduction (lazy catch-up on app start).
   applyDueFeeDeductions(): Promise<Result<null, FeeGenerationError>> {
     return commands.applyDueFeeDeductions();

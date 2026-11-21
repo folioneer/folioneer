@@ -264,6 +264,7 @@ pub fn create_specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             update_checker::check_for_update,
             update_checker::download_update,
             update_checker::install_update,
+            update_checker::get_startup_failure,
             scheduled_fetch::configure_scheduled_fetch,
             scheduled_fetch::get_scheduled_fetch_status,
             rate_history_backfill::backfill_currency_rate_history,

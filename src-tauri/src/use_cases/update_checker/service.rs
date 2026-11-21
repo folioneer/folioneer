@@ -64,6 +64,29 @@ impl UpdateState {
     }
 }
 
+/// UPD-018A / UPD-035 — the failure that stopped the portfolio from opening at startup, kept
+/// for the window: the setup fails before the window listens, so the event alone is lost.
+#[derive(Debug, Default)]
+pub struct StartupFailure {
+    failure: std::sync::Mutex<Option<crate::core::MigrationFailure>>,
+}
+
+impl StartupFailure {
+    /// Keeps `failure` for the window to read.
+    pub fn record(&self, failure: crate::core::MigrationFailure) {
+        // A poisoned lock still holds a usable value: losing the failure would hide it.
+        *self.failure.lock().unwrap_or_else(|e| e.into_inner()) = Some(failure);
+    }
+
+    /// The failure kept, if the portfolio could not be opened.
+    pub fn read(&self) -> Option<crate::core::MigrationFailure> {
+        self.failure
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
+    }
+}
+
 /// R8 — the share of the download done once `chunk` more bytes have arrived, as a
 /// percentage from 0 to 100; 0 while the total size is not known.
 fn progress_after(
@@ -410,6 +433,28 @@ mod tests {
             app.handle().manage(channel);
         }
         app
+    }
+
+    // UPD-018A (#732) — a startup failure stays readable for the rest of the launch.
+    #[test]
+    fn upd_018a_a_startup_failure_stays_readable() {
+        let kept = StartupFailure::default();
+        assert!(kept.read().is_none());
+
+        kept.record(crate::core::MigrationFailure {
+            detail: "migration failed".to_string(),
+            backups_dir: Some("/data/backups".to_string()),
+        });
+
+        let read = kept.read();
+        assert_eq!(
+            read.as_ref().map(|f| f.detail.as_str()),
+            Some("migration failed")
+        );
+        assert_eq!(
+            read.and_then(|f| f.backups_dir).as_deref(),
+            Some("/data/backups")
+        );
     }
 
     // UPD-013A (#698) — installing with nothing downloaded restarts nothing and says so.
