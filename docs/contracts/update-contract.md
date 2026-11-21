@@ -48,7 +48,7 @@ struct MigrationFailure {         // UPD-018, UPD-035
 | `update:available`   | `UpdateInfo`           | UPD-001, UPD-025                                                                   |
 | `update:progress`    | `u64` — percent, 0–100 | UPD-008                                                                            |
 | `update:complete`    | —                      | UPD-011                                                                            |
-| `update:error`       | `UpdateError`          | UPD-009, UPD-023, UPD-028, #873's mock                                             |
+| `update:error`       | `UpdateError`          | UPD-009, UPD-023, UPD-028, UPD-029                                                 |
 | `db:migration_error` | `MigrationFailure`     | UPD-018, UPD-035 — sent once, during startup; `get_startup_failure` reads it again |
 
 ---
