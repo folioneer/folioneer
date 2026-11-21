@@ -1300,6 +1300,14 @@ async fn agt_060_a_session_records_cash_and_a_dividend() {
     .await
     .expect_err("one currency, a rate of 0.5");
     assert_eq!(off_par.code, "DividendRateNotOne");
+    // AGT-073 — the preview of that correction is refused as the correction is.
+    let previewed_off_par = call(
+        "preview_recording",
+        json!({ "tool": "correct_recording", "arguments": { "transaction": recorded_id(&dividend), "rate": 0.5 } }),
+    )
+    .await
+    .expect_err("previewed as the correction would refuse it");
+    assert_eq!(previewed_off_par.code, "DividendRateNotOne");
     let at_par = call(
         "correct_recording",
         json!({ "transaction": recorded_id(&dividend), "rate": 1 }),
@@ -6887,6 +6895,17 @@ mod owner {
     pub fn withdraw(account: &str, date: &str, amount: i64) -> Recording {
         Recording::Withdrawal(cash(account, date, amount))
     }
+
+    pub fn dividend(account: &str, date: &str, amount: i64) -> Recording {
+        Recording::Dividend(crate::use_cases::holding_transaction::DividendAmount {
+            account: account.to_string(),
+            asset: "CW8".to_string(),
+            date: Some(date.to_string()),
+            amount: amount * M,
+            rate: None,
+            note: None,
+        })
+    }
 }
 
 /// An account's figures as the owner reads them, whatever ids its transactions carry: each
@@ -7289,6 +7308,32 @@ async fn agt_090_a_replacement_leaving_a_dividend_before_any_holding_is_refused(
         bench.connections.replacements().is_empty(),
         "nothing was asked"
     );
+}
+
+// AGT-087 / DIV-022A (#734) — a change asked to a dividend the owner typed in the account's own
+// currency, at a rate other than one, is refused before the owner is asked.
+#[tokio::test]
+async fn agt_087_a_change_to_a_rate_other_than_one_within_one_currency_is_refused() {
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let granted = session(&bench.connections).await;
+    euro_account(&bench, "A1").await;
+    typed(&bench, owner::deposit("A1", "2019-01-15", 2000)).await;
+    typed(&bench, owner::buy("A1", "2019-01-20", 10, 100)).await;
+    let paid = typed(&bench, owner::dividend("A1", "2019-03-01", 4)).await;
+
+    let refused = tokio::time::timeout(
+        Duration::from_secs(10),
+        bench.tools.call(
+            &granted,
+            "request_change",
+            &json!({ "transaction": paid.id, "rate": 0.5 }),
+        ),
+    )
+    .await
+    .expect("refused before asking")
+    .expect_err("one currency, a rate of 0.5");
+    assert_eq!(refused.code, "DividendRateNotOne");
 }
 
 // AGT-091 — a refusal replaces nothing; a yes on four that changed since the owner was shown

@@ -817,8 +817,9 @@ impl HoldingTransactionUseCase {
 
     /// Records a cash Dividend attributed to the paying asset (DIV-023).
     ///
-    /// Cross-BC guards (DIV-011): rejects if account is unknown, asset is unknown,
-    /// asset is not currently held (quantity = 0), or asset is a Cash Asset.
+    /// Cross-BC guards (DIV-011): rejects if account is unknown, asset is unknown, asset
+    /// was not held on the dividend's date or before it, or asset is a Cash Asset; and a rate
+    /// other than one between the same currency (DIV-022A).
     /// Seeds the system Cash Asset (CSH-010) before delegating; the aggregate
     /// credits the Cash Holding by `total_amount = amount_micros × exchange_rate`
     /// (account currency), lazy-creating it if absent (CSH-012/CSH-050).
@@ -1197,7 +1198,7 @@ impl HoldingTransactionUseCase {
 
     /// DIV-022A — a corrected dividend's rate, checked against its asset's and its account's
     /// currencies. A transaction that is not a dividend is not this check's.
-    async fn ensure_corrected_dividend_rate(
+    pub(super) async fn ensure_corrected_dividend_rate(
         &self,
         transaction_id: &str,
         exchange_rate: i64,
@@ -2056,6 +2057,49 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(stored.total_amount, micro(200), "nothing was written");
+    }
+
+    // DIV-029 (#734) — between two currencies a rate of exactly one is the account-currency
+    // mode: accepted, the net amount credited as it is.
+    #[tokio::test]
+    async fn div_029_a_rate_of_one_between_two_currencies_credits_the_amount_as_it_is() {
+        let pool = setup_pool().await;
+        let (account_svc, asset_svc) = make_services(&pool);
+        let asset = asset_svc.create_asset(base_asset_dto()).await.unwrap();
+        let account = account_svc
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
+            .await
+            .unwrap();
+        let uc = HoldingTransactionUseCase::new(account_svc.clone(), asset_svc);
+        uc.record_deposit(&account.id, "2024-01-01".to_string(), micro(1_000), None)
+            .await
+            .unwrap();
+        uc.buy_holding(
+            &account.id,
+            asset.id.clone(),
+            "2024-01-15".to_string(),
+            from_surface(micro(10)),
+            micro(50),
+            micro(1),
+            0,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+
+        let tx = uc
+            .record_dividend(
+                &account.id,
+                asset.id,
+                "2024-06-15".to_string(),
+                micro(185),
+                micro(1),
+                None,
+            )
+            .await
+            .expect("a rate of one between two currencies");
+        assert_eq!(tx.total_amount, micro(185));
     }
 
     // DIV-011 — AccountNotFound: unknown account is rejected before any asset check.
@@ -4269,8 +4313,6 @@ mod draft_tests {
         );
     }
 
-    // TRX-062 / DIV-040 — a corrected dividend totals its amount at the exchange rate,
-    // rounded down, whatever its unit price and fees.
     // DIV-022A (#734) — the draft of a dividend whose asset and account share a currency
     // reports a rate other than one as the correction would refuse it, and takes a rate of one.
     #[tokio::test]
@@ -4303,6 +4345,8 @@ mod draft_tests {
         );
     }
 
+    // TRX-062 / DIV-040 — a corrected dividend totals its amount at the exchange rate,
+    // rounded down, whatever its unit price and fees.
     #[tokio::test]
     async fn div_040_a_dividend_correction_draft_totals_amount_times_rate() {
         let dividend = |quantity: i64, unit_price: i64, exchange_rate: i64, fees: i64| {
