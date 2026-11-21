@@ -44,7 +44,7 @@ The application is distributed as a desktop executable. When a new version is pu
 
 **UPD-013 (was R13) — Restart and installation (frontend + backend)**: When the user clicks "Restart now", the update is installed and the application restarts automatically.
 
-**UPD-013A — An installation that fails (backend)**: An installation restarts nothing and is rejected with a specific error when nothing was downloaded, when the update is not found again, or when the installation itself fails. The attempt uses the downloaded file up: trying again downloads it anew (UPD-024).
+**UPD-013A — An installation that fails (backend)**: An installation restarts nothing and is rejected with an error when nothing was downloaded, when the update server no longer offers the update or cannot be asked, or when the installation itself fails. The attempt uses the downloaded file up: trying again downloads it anew (UPD-024).
 
 **UPD-014 (was R14) — User data preservation (backend)**: The update only replaces the application executable. All user data (assets, accounts, categories, prices, operations) is preserved intact after restart.
 
@@ -76,7 +76,7 @@ The application is distributed as a desktop executable. When a new version is pu
 
 **UPD-022 (was R22) — Logging check failures (backend)**: Any error during the startup check is logged in the application logs.
 
-**UPD-023 (was R23) — Download error display (frontend)**: If the download fails (network error, insufficient disk space, or any other cause), or if the UPD-009 checksum fails, the banner displays an error message and a "Retry" button — except a refused access (UPD-029).
+**UPD-023 (was R23) — Download error display (frontend)**: If the download fails (network error, insufficient disk space, or any other cause), if the UPD-009 checksum fails, or if the installation fails (UPD-013A), the banner displays an error message and a "Retry" button — except a refused access (UPD-029).
 
 **UPD-024 (was R24) — Retry action (frontend + backend)**: Clicking "Retry" restarts the download from the beginning.
 

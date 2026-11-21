@@ -125,8 +125,8 @@ export function useUpdateBanner(): UpdateBannerData {
     });
   }, [showError]);
 
-  // R13 — install and restart; guard against double-click. UPD-013A — a refused install
-  // shows the error state of UPD-023 and gives the button back.
+  // R13 — install and restart; guard against double-click. UPD-013A / UPD-023 — a refused
+  // install shows the error state and gives the button back.
   const handleRestart = useCallback(async () => {
     if (isRestarting) return;
     setIsRestarting(true);

@@ -289,7 +289,7 @@ async fn do_download(app_handle: &AppHandle, state: &UpdateState) -> Result<(), 
 ///
 /// Re-checks for the update to obtain a fresh handle for the install call.
 /// Requires that `download` has been called successfully beforehand.
-pub async fn install<R: tauri::Runtime>(
+pub async fn install<R: Runtime>(
     app_handle: AppHandle<R>,
     state: Arc<UpdateState>,
 ) -> Result<(), UpdateError> {
@@ -424,6 +424,26 @@ mod tests {
             matches!(refused, Err(UpdateError::NoDownloadedUpdate)),
             "{refused:?}"
         );
+    }
+
+    // UPD-013A (#698) — an installation whose update the server no longer offers, or whose
+    // check fails, restarts nothing and uses the download up: trying again downloads anew.
+    #[tokio::test]
+    async fn upd_013a_an_update_no_longer_offered_or_a_failed_check_uses_the_download_up() {
+        for answer in ["204 No Content", "500 Internal Server Error"] {
+            let (endpoint, _served) = serve_once(answer).await;
+            let app = app_with(Some(channel(endpoint, &[])));
+            let state = Arc::new(UpdateState::new());
+            state.set_bytes(vec![1, 2, 3]);
+
+            let refused = install(app.handle().clone(), Arc::clone(&state)).await;
+
+            assert!(
+                matches!(refused, Err(UpdateError::OperationFailed)),
+                "{answer}: {refused:?}"
+            );
+            assert_eq!(state.take_bytes(), None, "{answer}");
+        }
     }
 
     // TODO-037 — a build that manages no channel updates from the configured endpoint.
