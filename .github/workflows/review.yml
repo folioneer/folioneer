@@ -184,6 +184,9 @@ jobs:
           git branch -f main "origin/$BASE"
           echo ".daneel/" >> .git/info/exclude
           git worktree add --detach /home/runner/work/_temp/branch HEAD
+          # The report's folder exists before the session starts, so its first write
+          # needs no directory the session would have to create.
+          mkdir -p .review
           # The branch's own skills and agents never load into the session: its diff
           # still shows them (`branch.sh diff`, `git show HEAD:<path>`).
           rm -rf /home/runner/work/_temp/branch/.claude/skills /home/runner/work/_temp/branch/.claude/agents
@@ -226,7 +229,8 @@ jobs:
             (the pull request's merge commit; `bash .daneel/plugins/app/scripts/branch.sh
             files` and `bash .daneel/plugins/app/scripts/branch.sh diff <path> [<path> ...]`
             give the changed set and the whole diff in one call).
-            `${CLAUDE_PLUGIN_ROOT}` in it is `.daneel/plugins/app`.
+            `${CLAUDE_PLUGIN_ROOT}` in it is `.daneel/plugins/app`, relative to the working
+            directory: run the helpers exactly as `bash .daneel/plugins/app/scripts/<helper> …`.
             The working directory's `CLAUDE.md` and `.claude/` are the base branch's,
             `.daneel/` is the pinned release: your instructions, not what you review.
             Read, grep and glob the pull request's files, and the documents you check
@@ -246,7 +250,7 @@ jobs:
             --model claude-sonnet-5
             --max-turns 80
             --add-dir /home/runner/work/_temp/branch
-            --allowedTools "Read" "Grep" "Glob" "Write(.review/**)" "Edit(.review/**)" "Bash(bash .daneel/plugins/app/scripts/branch.sh *)" "Bash(bash .daneel/plugins/app/scripts/review-path.sh *)" "Bash(git diff *)" "Bash(git log *)" "Bash(git show *)" "Bash(git status *)" "Bash(git rev-parse *)" "Bash(git merge-base *)" "Bash(git cat-file *)" "Bash(git ls-remote --tags https://github.com/*)" "Bash(grep *)" "Bash(head *)" "Bash(tail *)" "Bash(cat *)" "Bash(ls *)" "Bash(wc *)" "Bash(sort *)" "Bash(uniq *)" "Bash(cut *)" "Bash(tr *)" "Bash(sed -n *)" "Bash(echo *)" "Bash(test *)" "Bash(shellcheck *)"
+            --allowedTools "Read" "Grep" "Glob" "Write(.review/**)" "Edit(.review/**)" "Bash(bash .daneel/plugins/app/scripts/branch.sh *)" "Bash(bash .daneel/plugins/app/scripts/review-path.sh *)" "Bash(bash ${{ github.workspace }}/.daneel/plugins/app/scripts/branch.sh *)" "Bash(bash ${{ github.workspace }}/.daneel/plugins/app/scripts/review-path.sh *)" "Bash(git diff *)" "Bash(git log *)" "Bash(git show *)" "Bash(git status *)" "Bash(git rev-parse *)" "Bash(git merge-base *)" "Bash(git cat-file *)" "Bash(git ls-remote --tags https://github.com/*)" "Bash(grep *)" "Bash(head *)" "Bash(tail *)" "Bash(cat *)" "Bash(ls *)" "Bash(wc *)" "Bash(sort *)" "Bash(uniq *)" "Bash(cut *)" "Bash(tr *)" "Bash(sed -n *)" "Bash(echo *)" "Bash(test *)" "Bash(shellcheck *)"
 
       - name: Redact secret-shaped strings from what leaves the runner
         # The session's shell inherits the job environment; a prompt injection

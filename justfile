@@ -82,7 +82,7 @@ _used RECIPE:
 
 # Run a recipe and print one line: its verdict by exit code, with the whole output kept in
 # tmp/<recipe>.log and its end shown on failure (just quiet harness, just quiet test src/lib).
-# Not for a recipe that asks or stays up (release, merge, dev): it would read nothing.
+# Not for a recipe that asks or stays up (dev, run-entry): it would read nothing.
 quiet RECIPE *ARGS:
     @bash scripts/verdict.sh "$1" just "$@"
 

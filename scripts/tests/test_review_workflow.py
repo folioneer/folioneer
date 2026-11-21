@@ -134,6 +134,8 @@ class NamedCommands(unittest.TestCase):
         from_the_pinned_release = {
             "bash .daneel/plugins/app/scripts/branch.sh *",
             "bash .daneel/plugins/app/scripts/review-path.sh *",
+            "bash ${{ github.workspace }}/.daneel/plugins/app/scripts/branch.sh *",
+            "bash ${{ github.workspace }}/.daneel/plugins/app/scripts/review-path.sh *",
         }
         runners = ("bash", "sh", "python", "python3", "node", "npx", "npm", "cargo", "just", "make")
         for grant in self.shell_grants():

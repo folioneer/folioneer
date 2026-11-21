@@ -30,16 +30,8 @@
     "setup": "docs/agentic-setup.md",
     "glossary": "docs/ubiquitous-language.md",
     "rules": {
-      "arch": [
-        "docs/backend-rules.md",
-        "docs/frontend-rules.md",
-        "docs/ddd-reference.md"
-      ],
-      "backend": [
-        "docs/backend-rules.md",
-        "docs/error-model.md",
-        "docs/test-rules.md"
-      ],
+      "arch": ["docs/backend-rules.md", "docs/frontend-rules.md", "docs/ddd-reference.md"],
+      "backend": ["docs/backend-rules.md", "docs/error-model.md", "docs/test-rules.md"],
       "frontend": ["docs/frontend-rules.md", "docs/i18n-rules.md"],
       "sql": ["docs/backend-rules.md"],
       "e2e": ["docs/e2e-rules.md", "docs/test-rules.md"],
