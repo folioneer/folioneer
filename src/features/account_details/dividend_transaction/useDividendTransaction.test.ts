@@ -329,7 +329,7 @@ describe("useDividendTransaction (#734's mock, DIV-021/022)", () => {
       await result.current.handleAddAnother();
     });
     expect(mockRecordDividend).not.toHaveBeenCalled();
-    expect(result.current.error).not.toBeNull();
+    expect(result.current.error).toEqual({ key: "currency.error.rate_not_positive" });
   });
 
   it("isFormValid ignores a rate the form does not show", () => {

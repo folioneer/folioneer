@@ -101,7 +101,10 @@ export function useDividendTransaction({
     const amountErr = validateAmount(formData.amount);
     const dateErr = validateDate(formData.date);
     // DIV-021 — the rate shown is checked here too, for every path that records.
-    const rateErr = showExchangeRate ? validateAmount(formData.exchangeRate) : null;
+    const rateErr =
+      showExchangeRate && validateAmount(formData.exchangeRate) !== null
+        ? { key: "currency.error.rate_not_positive" }
+        : null;
     const validationError =
       formData.assetId === "" ? { key: "error.AssetNotHeld" } : (amountErr ?? dateErr ?? rateErr);
     if (validationError) {
