@@ -1,5 +1,5 @@
 import { useNavigate, useRouterState } from "@tanstack/react-router";
-import { Info, Menu, Settings, TrendingUp, X } from "lucide-react";
+import { Info, Menu, Settings, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
@@ -8,6 +8,7 @@ import { SettingsDialog } from "@/features/settings";
 import { logger } from "@/lib/logger";
 import { useAppStore } from "@/lib/store";
 import { IconButton } from "@/ui/components";
+import { BrandMark } from "./BrandMark";
 import { NAV_ITEMS, PROFILES_NAV_ITEM } from "./navItems";
 import { SidebarVersion } from "./SidebarVersion";
 import { useProfileList } from "./useProfileList";
@@ -54,12 +55,8 @@ export function Sidebar({ isOpen, toggleDrawer }: SidebarProps) {
           className={!isOpen ? "mx-auto" : undefined}
         />
         {isOpen && (
-          <div className="flex items-center gap-3 ml-2">
-            <div className="w-8 h-8 bg-m3-primary rounded-lg flex items-center justify-center text-m3-on-primary">
-              <TrendingUp size={20} />
-            </div>
-            {/* "Folioneer" is the fixed product brand name — intentionally not i18n'd */}
-            <span className="text-lg font-bold text-m3-on-surface tracking-tight">Folioneer</span>
+          <div className="ml-2">
+            <BrandMark size="md" />
           </div>
         )}
       </div>

@@ -546,7 +546,7 @@
     "migration_error": "Bei der Migration der Datenbank ist ein Fehler aufgetreten. Bitte wenden Sie sich an den Support.",
     "migration_restored": "Diese Version konnte Ihr Portfolio nicht aktualisieren. Nichts ging verloren: Es ist wieder so wie vor dem Update. Installieren Sie die vorherige Version erneut und melden Sie das Problem.",
     "migration_backups": "Die vor jedem Update angelegten Kopien befinden sich in diesem Ordner:",
-    "migration_in_progress": "Wird initialisiert…"
+    "starting": "Wird initialisiert…"
   },
   "transaction": {
     "error_over_held_on": "Mehr als die am {{date}} gehaltenen {{held}} {{reference}}.",
