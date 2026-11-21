@@ -134,7 +134,7 @@ describe("ClosedHoldingRow", () => {
       actionsCell?.querySelector("#action-view-closed-transactions-asset-1"),
     ).toBeInTheDocument();
     expect(actionsCell).toHaveClass("sticky", "left-0", "bg-m3-surface-container-low");
-    expect(assetCell).toHaveClass("sticky", "left-[224px]", "bg-m3-surface-container-low");
+    expect(assetCell).toHaveClass("sticky", "left-[260px]", "bg-m3-surface-container-low");
     expect(document.querySelector("tr > td:nth-child(3)")).not.toHaveClass("sticky");
   });
 });
@@ -159,5 +159,14 @@ describe("ClosedHoldingRow — price history backfill (MKT-190)", () => {
   it("renders no button without a handler (read-only as-of view)", () => {
     renderInTable(baseRow);
     expect(document.querySelector("#action-backfill-closed-price-history-asset-1")).toBeNull();
+  });
+});
+
+// #712 (the validated mock) — a closed position's actions show their name as an open one's do.
+describe("ClosedHoldingRow — action labels (#712)", () => {
+  it("shows an action's name while it is hovered", () => {
+    renderInTable(baseRow);
+    fireEvent.mouseEnter(document.querySelector("#action-view-closed-transactions-asset-1")!);
+    expect(screen.getByTestId("icon-button-label")).toHaveTextContent("transaction.list_title");
   });
 });

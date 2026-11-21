@@ -245,6 +245,7 @@ export function HoldingRow({
                   icon={<ArrowDownToLine size={16} />}
                   variant="success"
                   size="sm"
+                  tooltip
                   id={`action-record-deposit-${row.assetId}`}
                   aria-label={t("cash.action_record_deposit")}
                   onClick={onDeposit}
@@ -253,6 +254,7 @@ export function HoldingRow({
                   icon={<ArrowUpFromLine size={16} />}
                   variant="error"
                   size="sm"
+                  tooltip
                   id={`action-record-withdrawal-${row.assetId}`}
                   aria-label={t("cash.action_record_withdrawal")}
                   onClick={onWithdraw}
@@ -264,6 +266,7 @@ export function HoldingRow({
             <IconButton
               icon={<ScrollText size={16} />}
               size="sm"
+              tooltip
               id={`action-view-transactions-${row.assetId}`}
               aria-label={t("transaction.list_title")}
               onClick={handleViewTransactions}
@@ -326,6 +329,7 @@ export function HoldingRow({
                 icon={<Plus size={16} />}
                 variant="success"
                 size="sm"
+                tooltip
                 id={`action-buy-${row.assetId}`}
                 aria-label={t("transaction.action_buy")}
                 onClick={handleBuy}
@@ -335,6 +339,7 @@ export function HoldingRow({
                 icon={<Minus size={16} />}
                 variant="error"
                 size="sm"
+                tooltip
                 id={`action-sell-${row.assetId}`}
                 aria-label={t("transaction.action_sell")}
                 onClick={handleSell}
@@ -345,6 +350,7 @@ export function HoldingRow({
                 <IconButton
                   icon={<PackageMinus size={16} />}
                   size="sm"
+                  tooltip
                   id={`action-write-off-${row.assetId}`}
                   aria-label={t("transaction.action_write_off")}
                   onClick={handleWriteOff}
@@ -355,6 +361,7 @@ export function HoldingRow({
                 <IconButton
                   icon={<ArrowRightLeft size={16} />}
                   size="sm"
+                  tooltip
                   id={`action-transfer-${row.assetId}`}
                   aria-label={t("transaction.action_transfer")}
                   onClick={handleTransfer}
@@ -365,6 +372,7 @@ export function HoldingRow({
                 <IconButton
                   icon={<Scissors size={16} />}
                   size="sm"
+                  tooltip
                   id={`action-split-${row.assetId}`}
                   aria-label={t("transaction.action_split")}
                   onClick={handleSplit}
@@ -375,6 +383,7 @@ export function HoldingRow({
                 <IconButton
                   icon={<StickyNote size={16} />}
                   size="sm"
+                  tooltip
                   id={`action-note-${row.assetId}`}
                   aria-label={t("account_details.action_note")}
                   onClick={handleNote}
@@ -385,6 +394,7 @@ export function HoldingRow({
                 <IconButton
                   icon={<Layers size={16} />}
                   size="sm"
+                  tooltip
                   id={`action-lots-${row.assetId}`}
                   aria-label={t("lots.action")}
                   onClick={() => onLots(row.assetId)}
@@ -395,6 +405,7 @@ export function HoldingRow({
                 <IconButton
                   icon={<History size={16} />}
                   size="sm"
+                  tooltip
                   id={`action-price-history-${row.assetId}`}
                   aria-label={t("account_details.action_price_history")}
                   onClick={handlePriceHistory}
@@ -405,6 +416,7 @@ export function HoldingRow({
                 <IconButton
                   icon={<CalendarSync size={16} />}
                   size="sm"
+                  tooltip
                   id={`action-backfill-price-history-${row.assetId}`}
                   aria-label={t("mkt.backfill.action")}
                   onClick={handleBackfillPriceHistory}
@@ -418,6 +430,7 @@ export function HoldingRow({
                 <IconButton
                   icon={isPriceRefreshBlocked ? <Hand size={16} /> : <RefreshCw size={16} />}
                   size="sm"
+                  tooltip
                   id={`action-toggle-price-refresh-${row.assetId}`}
                   aria-label={t(
                     isPriceRefreshBlocked
@@ -432,6 +445,7 @@ export function HoldingRow({
                 <IconButton
                   icon={<Percent size={16} />}
                   size="sm"
+                  tooltip
                   id={`action-manage-fee-${row.assetId}`}
                   aria-label={t("account_details.action_manage_fee")}
                   onClick={handleManageFee}
@@ -442,6 +456,7 @@ export function HoldingRow({
           <IconButton
             icon={<ScrollText size={16} />}
             size="sm"
+            tooltip
             id={`action-view-transactions-${row.assetId}`}
             aria-label={t("transaction.list_title")}
             onClick={handleViewTransactions}

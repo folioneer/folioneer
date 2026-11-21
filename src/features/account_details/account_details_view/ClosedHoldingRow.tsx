@@ -50,6 +50,7 @@ export function ClosedHoldingRow({
           <IconButton
             icon={<ScrollText size={16} />}
             size="sm"
+            tooltip
             id={`action-view-closed-transactions-${row.assetId}`}
             aria-label={t("transaction.list_title")}
             onClick={handleViewTransactions}
@@ -59,6 +60,7 @@ export function ClosedHoldingRow({
             <IconButton
               icon={<CalendarSync size={16} />}
               size="sm"
+              tooltip
               id={`action-backfill-closed-price-history-${row.assetId}`}
               aria-label={t("mkt.backfill.action")}
               onClick={handleBackfillPriceHistory}
