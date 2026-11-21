@@ -189,7 +189,7 @@ export function useAccountDetailsView(accountId: string) {
     data.retry();
   }, [data]);
 
-  // DIV-012 — dividend modal state (entered from the header "Add" menu)
+  // #864's mock — dividend modal state (entered from the header)
   const handleDividendOpen = useCallback(() => {
     if (isAsOf) return;
     setDividendOpen(true);
@@ -199,12 +199,12 @@ export function useAccountDetailsView(accountId: string) {
     setDividendOpen(false);
     data.retry();
   }, [data]);
-  // DIV-010 — "add another" refreshes the data but keeps the modal open.
+  // #734's mock — "add another" refreshes the data but keeps the modal open.
   const handleDividendRecorded = useCallback(() => {
     data.retry();
   }, [data]);
 
-  // FSD-010/012 — free-shares modal state (entered from the header "Record" menu).
+  // #864's mock — free-shares modal state (entered from the header).
   const handleFreeSharesOpen = useCallback(() => {
     if (isAsOf) return;
     setFreeSharesOpen(true);
@@ -215,7 +215,7 @@ export function useAccountDetailsView(accountId: string) {
     data.retry();
   }, [data]);
 
-  // FEE-010 — one-off management-fee modal state (entered from the header "Record" menu).
+  // #864's mock — one-off management-fee modal state (entered from the header).
   const handleManagementFeeOpen = useCallback(() => {
     if (isAsOf) return;
     setManagementFeeOpen(true);
@@ -226,7 +226,7 @@ export function useAccountDetailsView(accountId: string) {
     data.retry();
   }, [data]);
 
-  // INT-010 — interest modal state (entered from the header "Record" menu).
+  // #864's mock — interest modal state (entered from the header).
   const handleInterestOpen = useCallback(() => {
     if (isAsOf) return;
     setInterestOpen(true);

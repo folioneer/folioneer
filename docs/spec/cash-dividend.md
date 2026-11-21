@@ -54,11 +54,7 @@ The `AccountDetailsResponse` DTO (owned by ACD) gains one field.
 
 ### Eligibility and Initiation (010–019)
 
-**DIV-010 — Entry point (frontend)**: The dividend recording flow is initiated from the Account Details header's consolidated "Record" menu (DIV-012), via a "Dividend" item that opens the dividend modal (the validated mock on #734). The paying asset is chosen inside the modal, not derived from a holding row. v1 does **not** add a per-holding-row dividend action (deferred — see Open Questions / Deferred).
-
 **DIV-011 — Eligibility (backend)**: A dividend is recorded only for an `(account, asset)` pair where the account held the asset on the dividend's date or before it — a purchase, an opening balance or a transfer in of the asset is dated on or before it — and the asset is not a Cash Asset (owner, 2026-11-14, #774). A dividend is recorded on the day it was paid: everywhere the right to it is fixed at the ex-date and the cash comes later — two trading days in France, Italy and Spain, weeks in the United States, up to about three months in Poland — so one paid after the whole position was sold is recorded. The action is rejected with a specific error when the account is unknown, the asset is unknown, the asset was never held in that account on or before that date, or the asset is a Cash Asset. The rule is the same whatever records the dividend (TRX-012).
-
-**DIV-012 — Header "Record" menu consolidation (frontend)**: The Account Details header groups its "record an entry" actions under a single "Record" dropdown menu rather than separate buttons. The menu's items are: New position (the Opening-balance action, TRX-055), Import (IMP-060), Dividend (DIV-010), and Record free shares (FSD-010). Each item opens its existing dedicated modal. This **supersedes the standalone-button header placement** of TRX-055 (Add a position) — see the reciprocal back-reference in that rule. The menu carries **no** cash actions: Deposit and Withdrawal are reached exclusively from the Cash _row's_ inline actions (CSH-091 / CSH-019), since the cash row is always present (CSH-095). The Performance and Refresh-prices header actions, and the primary "Add transaction" (buy/sell) action, are unchanged and remain outside this menu.
 
 ### Recording a Dividend (020–029)
 
@@ -146,6 +142,6 @@ delete a dividend  → replay without the credit; refused if it underflows cash 
 - **Withholding-tax breakdown** — capturing gross dividend, withholding tax, and net separately (v1 records the net cash received only).
 - **Richer dividend reporting** — dividend **yield**, per-period income statements, and a dividend **timeline**. (v1 _does_ include a per-`(account, asset)` dividends-received total, a dividend-inclusive total-return % per holding, and a per-account dividends-received total — DIV-070–073.)
 - **Dividends-received on closed positions in the holdings view** — v1 sums _all_ the account's dividends into `total_dividends_received` (DIV-073), but the per-holding `dividends_received` row figure surfaces on active holdings only; showing it on closed-position rows is deferred.
-- **Per-holding-row dividend action** — a contextual "Record dividend" action directly on a holding row (asset pre-selected). v1 initiates the flow from the header "Record" menu with an in-modal asset picker (DIV-010/012); a row-level shortcut is to be designed later.
+- **Per-holding-row dividend action** — a contextual "Record dividend" action directly on a holding row (asset pre-selected). v1 initiates the flow from the account's header (the validated mock on #864) with an in-modal asset picker; a row-level shortcut is to be designed later.
 
 None — all questions have been resolved.

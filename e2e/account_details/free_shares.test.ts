@@ -5,7 +5,7 @@
  * Contract: docs/contracts/account-contract.md § record_free_shares
  *
  * Spec rules covered by this file:
- *   FSD-010 — "Free shares" item in the header "Add" menu opens the modal
+ *   Design: #864's mock — "Free shares" item in the header opens the modal
  *   FSD-020 — form fields: asset selector, date, quantity, note
  *   FSD-021 — frontend validation disables submit until quantity > 0 + date valid
  *   FSD-022 — recording increases the holding quantity (no cash movement)
@@ -89,7 +89,7 @@ describe("free_shares", () => {
     await navigateToAccountDetails(accId);
 
     // -------------------------------------------------------------------
-    // Step 1 — Click the "Free shares" header action (DIV-012 → FSD-010).
+    // Step 1 — Click the "Free shares" header action (#864's mock).
     // -------------------------------------------------------------------
     await clickHeaderAction("add-menu-free-shares");
 

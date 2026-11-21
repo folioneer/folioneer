@@ -47,8 +47,6 @@ A recurring rule that generates fee deductions for one (account, asset) holding 
 
 ### Eligibility and Initiation (010–019)
 
-**FEE-010 — One-off entry point (frontend)**: The one-off fee flow is initiated from a "Management fee" button of the Account Details header, one of the header's record actions (DIV-012 lists them), which opens the one-off fee modal (FEE-020). The charged asset is chosen inside the modal.
-
 **FEE-011 — Schedule entry point (frontend)**: A recurring Fee Schedule is created and managed from a per-holding-row "Manage fee" action on the Account Details holdings table, with the charged asset pre-selected from that row. The cash row does not offer it.
 
 **FEE-012 — Eligibility (backend)**: A fee deduction — one-off or generated — may apply only to an `(account, asset)` pair with an active holding (`quantity > 0`) that is not a Cash Asset. The action is rejected with a specific error when the account is unknown, the asset is unknown, the asset is not currently held in that account, or the asset is a Cash Asset.
@@ -117,7 +115,7 @@ A recurring rule that generates fee deductions for one (account, asset) holding 
 
 **FEE-052 — Per-holding Management Fees figure (frontend + backend)**: The application computes, per `(account, asset)`, a cumulative **Management Fees** value = the sum of every recorded deduction's fee value (FEE-051), in account currency; the Account Details holdings table displays it as a **Management Fees** column. The backend produces the aggregate and the frontend displays it, mirroring DIV-070.
 
-**FEE-053 — Account-level total Management Fees (backend)**: The account's details carry its **total Management Fees** — the sum of the per-holding Management Fees across the account, in account currency (`0` when none), as DIV-073 sums its dividends; the as-of view counts the deductions dated on or before the as-of date (FEE-072). The window does not show it (the validated mock on #864); an AI agent reads it with the account's figures (AGT-040).
+**FEE-053 — Account-level total Management Fees (backend)**: The account's details carry its **total Management Fees** — the sum of the per-holding Management Fees across the account, closed holdings included, in account currency (`0` when none), as DIV-073 sums its dividends; the as-of view counts only the deductions dated on or before the as-of date. The window does not show it (the validated mock on #864); an AI agent reads it with the account's figures (AGT-040).
 
 **FEE-054 — No price available (frontend + backend)**: If no market price is recorded on or before a deduction's date, that deduction contributes `0` to the Management Fees figure until a qualifying price exists (consistent with valuation degrading to 0, FXR-034). The quantity removal itself is unaffected.
 
@@ -151,7 +149,7 @@ A recurring rule that generates fee deductions for one (account, asset) holding 
 
 **FEE-075 — Account-level management-fees parameter (frontend + backend)**: the `Account` aggregate carries `management_fees_enabled: bool`. New accounts are created with `false`; the schema migration backfills `true` for every account existing before the parameter (behavior-preserving). The parameter is editable both ways at any time from the account forms (creation and edit).
 
-**FEE-076 — Disabled-state UI (frontend)**: when an account's `management_fees_enabled` is `false`, the account-details view hides every % fee surface: the one-off management-fee header button (FEE-010), the per-row Manage-fee button (FEE-011), and the Management Fees column (FEE-052) with its fee-rate indicator (FEE-074).
+**FEE-076 — Disabled-state UI (frontend)**: when an account's `management_fees_enabled` is `false`, the account-details view hides every % fee surface: the one-off management-fee header button (the validated mock on #864), the per-row Manage-fee button (FEE-011), and the Management Fees column (FEE-052) with its fee-rate indicator (FEE-074).
 
 **FEE-077 — Backend enforcement (backend)**: Recording a one-off management fee or creating a fee schedule is rejected with a specific error when the target account's management-fees parameter is off; the account itself owns that rule. Existing schedules remain readable, editable, and deletable regardless of the parameter — only the creation of new fee instruments is rejected, so disabling never traps data.
 
@@ -165,7 +163,7 @@ A recurring rule that generates fee deductions for one (account, asset) holding 
 
 ```
 One-off fee:
-Account Details header → "Management fee" button (FEE-010)
+Account Details header → "Management fee" button (the validated mock on #864)
   → modal: asset selector (active non-cash holdings), date (the one last used),
            mode toggle: percentage to remove | resulting quantity, note (FEE-020)
       resulting-quantity mode: each valid entry → backend preview
@@ -202,7 +200,7 @@ App open → for each active schedule (FEE-040):
 
 ### Entry Point
 
-- **One-off**: a "Management fee" button of the Account Details header (FEE-010), in its row of record actions with New position, Dividend, and Free shares.
+- **One-off**: a "Management fee" button of the Account Details header (the validated mock on #864).
 - **Schedule**: a "Manage fee" action on each non-cash holding row (FEE-011), opening the schedule modal with the asset pre-selected.
 
 ### Main Component

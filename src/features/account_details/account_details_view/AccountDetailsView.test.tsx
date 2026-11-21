@@ -175,7 +175,7 @@ const makeView = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
-describe("AccountDetailsView — header actions (DIV-012)", () => {
+describe("AccountDetailsView — header actions (#864's mock)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUseRefreshAccountPrices.mockReturnValue({ isPending: false, refresh: vi.fn() });
@@ -192,7 +192,7 @@ describe("AccountDetailsView — header actions (DIV-012)", () => {
     expect(document.querySelector("#add-menu-free-shares")).toBeInTheDocument();
   });
 
-  it("shows Open balance / Dividend / Free shares, with NO cash actions (DIV-012/CSH-019)", () => {
+  it("shows Open balance / Dividend / Free shares, with NO cash actions (#864's mock / CSH-019)", () => {
     render(<AccountDetailsView />);
     // CSH-019 — cash Deposit/Withdraw live on the cash row, not the header.
     expect(document.querySelector("#add-menu-deposit")).toBeNull();
@@ -202,7 +202,7 @@ describe("AccountDetailsView — header actions (DIV-012)", () => {
     expect(document.querySelector("#add-menu-free-shares")).toBeInTheDocument();
   });
 
-  it("invokes the dividend handler when the Dividend button is clicked (DIV-010)", () => {
+  it("invokes the dividend handler when the Dividend button is clicked (#864's mock)", () => {
     render(<AccountDetailsView />);
     fireEvent.click(document.querySelector("#add-menu-dividend")!);
     expect(handlers.handleDividendOpen).toHaveBeenCalledTimes(1);
@@ -214,13 +214,13 @@ describe("AccountDetailsView — header actions (DIV-012)", () => {
     expect(handlers.handleOpenBalanceOpen).toHaveBeenCalledTimes(1);
   });
 
-  it("routes the Free shares button to its handler (FSD-010)", () => {
+  it("routes the Free shares button to its handler (#864's mock)", () => {
     render(<AccountDetailsView />);
     fireEvent.click(document.querySelector("#add-menu-free-shares")!);
     expect(handlers.handleFreeSharesOpen).toHaveBeenCalledTimes(1);
   });
 
-  it("mounts the dividend modal only when dividendOpen is true (DIV-010, #734's mock)", () => {
+  it("mounts the dividend modal only when dividendOpen is true (#864's mock, #734's mock)", () => {
     const { rerender } = render(<AccountDetailsView />);
     expect(screen.queryByTestId("dividend-modal-mounted")).toBeNull();
 
@@ -572,14 +572,14 @@ describe("AccountDetailsView — header totals (#864)", () => {
   });
 });
 
-describe("AccountDetailsView — management fees (FEE-010/011)", () => {
+describe("AccountDetailsView — management fees (#864's mock, FEE-011)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUseRefreshAccountPrices.mockReturnValue({ isPending: false, refresh: vi.fn() });
     mockUseAccountDetailsView.mockReturnValue(makeView());
   });
 
-  it("routes the Management fee button to its handler (FEE-010)", () => {
+  it("routes the Management fee button to its handler (#864's mock)", () => {
     render(<AccountDetailsView />);
     fireEvent.click(document.querySelector("#add-menu-management-fee")!);
     expect(handlers.handleManagementFeeOpen).toHaveBeenCalledTimes(1);
@@ -615,7 +615,7 @@ describe("AccountDetailsView — management fees (FEE-010/011)", () => {
     expect(screen.getByText("account_details.column_management_fees")).toBeInTheDocument();
   });
 
-  it("mounts the management-fee modal when managementFeeOpen is true (FEE-010)", () => {
+  it("mounts the management-fee modal when managementFeeOpen is true (#864's mock)", () => {
     mockUseAccountDetailsView.mockReturnValue(makeView({ managementFeeOpen: true }));
     render(<AccountDetailsView />);
     expect(screen.getByTestId("management-fee-modal-mounted")).toBeInTheDocument();
@@ -636,14 +636,14 @@ describe("AccountDetailsView — management fees (FEE-010/011)", () => {
   });
 });
 
-describe("AccountDetailsView — interest (INT-010/050)", () => {
+describe("AccountDetailsView — interest (#864's mock, INT-050)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUseRefreshAccountPrices.mockReturnValue({ isPending: false, refresh: vi.fn() });
     mockUseAccountDetailsView.mockReturnValue(makeView());
   });
 
-  it("routes the Interest button to its handler (INT-010)", () => {
+  it("routes the Interest button to its handler (#864's mock)", () => {
     render(<AccountDetailsView />);
     fireEvent.click(document.querySelector("#add-menu-interest")!);
     expect(handlers.handleInterestOpen).toHaveBeenCalledTimes(1);
@@ -656,13 +656,13 @@ describe("AccountDetailsView — interest (INT-010/050)", () => {
     expect(document.querySelector("#add-menu-interest")).toBeInTheDocument();
   });
 
-  it("mounts the interest modal when interestOpen is true (INT-010)", () => {
+  it("mounts the interest modal when interestOpen is true (#864's mock)", () => {
     mockUseAccountDetailsView.mockReturnValue(makeView({ interestOpen: true }));
     render(<AccountDetailsView />);
     expect(screen.getByTestId("interest-modal-mounted")).toBeInTheDocument();
   });
 
-  it("hides the Interest button in the read-only as-of view (INT-010)", () => {
+  it("hides the Interest button in the read-only as-of view (ACD-059)", () => {
     mockUseAccountDetailsView.mockReturnValue(makeView({ isAsOf: true, asOfDate: "2024-06-01" }));
     render(<AccountDetailsView />);
     expect(document.querySelector("#add-menu-interest")).toBeNull();

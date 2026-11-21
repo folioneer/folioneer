@@ -148,7 +148,7 @@ export function AccountDetailsView() {
                   />
                 )}
               </div>
-              {/* TRX-055 — open balance always accessible (migration tool for any account state) */}
+              {/* #864's mock — open balance always accessible (migration tool for any account state) */}
               {/* ACD-036 — header actions: big square icon buttons, name shown as tooltip */}
               <div className="flex items-center gap-2 flex-wrap">
                 {/* PRF-010 — per-account "Performance" entry point (navigates via router path) */}
@@ -200,12 +200,12 @@ export function AccountDetailsView() {
                     title={t("account_details.action_refresh_prices")}
                   />
                 )}
-                {/* DIV-012 — Record actions, flattened from the former dropdown into
-                    big square buttons. Cash Deposit/Withdraw are NOT here — they live
-                    on the always-present cash row (CSH-019). Hidden in read-only as-of. */}
+                {/* #864's mock — Record actions, big square buttons. Cash Deposit/Withdraw
+                    are NOT here — they live on the always-present cash row (CSH-019).
+                    Hidden in read-only as-of (ACD-059). */}
                 {!view.isAsOf && (
                   <>
-                    {/* TRX-055 — Open balance ("Add a position") */}
+                    {/* #864's mock — Open balance ("Add a position") */}
                     <IconButton
                       id="add-menu-open-balance"
                       shape="square"
@@ -227,7 +227,7 @@ export function AccountDetailsView() {
                       aria-label={t("account_details.action_import")}
                       title={t("account_details.action_import")}
                     />
-                    {/* DIV-010 — Record dividend */}
+                    {/* #864's mock — Record dividend */}
                     <IconButton
                       id="add-menu-dividend"
                       shape="square"
@@ -238,7 +238,7 @@ export function AccountDetailsView() {
                       aria-label={t("account_details.action_record_dividend")}
                       title={t("account_details.action_record_dividend")}
                     />
-                    {/* FSD-010 — Record free shares */}
+                    {/* #864's mock — Record free shares */}
                     <IconButton
                       id="add-menu-free-shares"
                       shape="square"
@@ -249,7 +249,7 @@ export function AccountDetailsView() {
                       aria-label={t("account_details.action_record_free_shares")}
                       title={t("account_details.action_record_free_shares")}
                     />
-                    {/* FEE-010 — Record one-off management fee; hidden when the
+                    {/* #864's mock — Record one-off management fee; hidden when the
                         account has the mechanism disabled (FEE-076) */}
                     {view.managementFeesEnabled && (
                       <IconButton
@@ -263,7 +263,7 @@ export function AccountDetailsView() {
                         title={t("account_details.action_record_management_fee")}
                       />
                     )}
-                    {/* INT-010 — Record interest; NOT gated by the management-fees
+                    {/* #864's mock — Record interest; NOT gated by the management-fees
                         account parameter (INT-050) */}
                     <IconButton
                       id="add-menu-interest"
@@ -579,7 +579,7 @@ export function AccountDetailsView() {
         />
       )}
 
-      {/* TRX-055 — Open balance modal (account pre-filled, user picks asset inside) */}
+      {/* #864's mock — Open balance modal (account pre-filled, user picks asset inside) */}
       <OpenBalanceModal
         isOpen={view.openBalanceOpen}
         onClose={view.handleOpenBalanceClose}
@@ -616,7 +616,7 @@ export function AccountDetailsView() {
         />
       )}
 
-      {/* DIV-010, #734's mock — Dividend modal (paying asset chosen inside) */}
+      {/* #864's mock, #734's mock — Dividend modal (paying asset chosen inside) */}
       {view.dividendOpen && (
         <DividendTransactionModal
           isOpen
@@ -629,7 +629,7 @@ export function AccountDetailsView() {
         />
       )}
 
-      {/* FSD-010/020 — Free-shares modal (distributing asset chosen inside) */}
+      {/* #864's mock, FSD-020 — Free-shares modal (distributing asset chosen inside) */}
       {view.freeSharesOpen && (
         <FreeSharesModal
           isOpen
@@ -640,7 +640,7 @@ export function AccountDetailsView() {
         />
       )}
 
-      {/* FEE-010/011 — one-off management-fee modal (charged asset chosen inside) */}
+      {/* #864's mock, FEE-011 — one-off management-fee modal (charged asset chosen inside) */}
       {view.managementFeeOpen && (
         <ManagementFeeModal
           isOpen
@@ -651,7 +651,7 @@ export function AccountDetailsView() {
         />
       )}
 
-      {/* INT-010/020 — interest modal (credited asset chosen inside, cash line included) */}
+      {/* #864's mock, INT-020 — interest modal (credited asset chosen inside, cash line included) */}
       {view.interestOpen && (
         <InterestModal
           isOpen

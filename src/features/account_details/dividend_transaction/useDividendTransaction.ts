@@ -96,7 +96,7 @@ export function useDividendTransaction({
 
   // Records the dividend; returns true on success, false on validation/backend
   // error (the error is set on state). Shared by both the primary submit and the
-  // "add another" flow (DIV-010).
+  // "add another" flow (#734's mock).
   const record = useCallback(async (): Promise<boolean> => {
     const amountErr = validateAmount(formData.amount);
     const dateErr = validateDate(formData.date);
@@ -148,7 +148,7 @@ export function useDividendTransaction({
     [record, onSubmitSuccess],
   );
 
-  // DIV-010 — record and keep the modal open for the next dividend: refresh the
+  // #734's mock — record and keep the modal open for the next dividend: refresh the
   // background data, then clear the per-dividend fields (amount + note) while
   // keeping the asset, date and rate for quick repeat entry.
   const handleAddAnother = useCallback(async () => {

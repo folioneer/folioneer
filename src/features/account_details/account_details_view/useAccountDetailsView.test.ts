@@ -197,14 +197,14 @@ describe("useAccountDetailsView — price typed by hand toggle (MKT-156/157)", (
 });
 
 // ---------------------------------------------------------------------------
-// DIV-012 — Header "Record" menu: dividend modal state in useAccountDetailsView.
+// #864's mock — the header's Record dividend action: dividend modal state in useAccountDetailsView.
 // The AccountDetailsView component replaces three standalone header buttons
 // with a consolidated "Record" dropdown; the dividend modal open/close/success
 // state is managed here. The view-level menu composition (button ids, item
 // routing) is a render concern covered in AccountDetailsView.test.tsx.
 // ---------------------------------------------------------------------------
 
-describe("useAccountDetailsView — dividend modal state (DIV-012)", () => {
+describe("useAccountDetailsView — dividend modal state (#864's mock)", () => {
   beforeEach(() => {
     mockBlock.mockReset();
     mockUnblock.mockReset();
@@ -216,29 +216,29 @@ describe("useAccountDetailsView — dividend modal state (DIV-012)", () => {
     } as never);
   });
 
-  // DIV-012 — dividendOpen is initially false
+  // #864's mock — dividendOpen is initially false
   it("dividendOpen starts as false", () => {
     const { result } = renderHook(() => useAccountDetailsView("acc-1"));
     expect(result.current.dividendOpen).toBe(false);
   });
 
-  // DIV-012 — handleDividendOpen sets dividendOpen to true
-  it("handleDividendOpen sets dividendOpen to true (DIV-012)", () => {
+  // #864's mock — handleDividendOpen sets dividendOpen to true
+  it("handleDividendOpen sets dividendOpen to true (#864's mock)", () => {
     const { result } = renderHook(() => useAccountDetailsView("acc-1"));
     act(() => result.current.handleDividendOpen());
     expect(result.current.dividendOpen).toBe(true);
   });
 
-  // DIV-012 — handleDividendClose resets dividendOpen to false
-  it("handleDividendClose resets dividendOpen to false (DIV-012)", () => {
+  // #864's mock — handleDividendClose resets dividendOpen to false
+  it("handleDividendClose resets dividendOpen to false (#864's mock)", () => {
     const { result } = renderHook(() => useAccountDetailsView("acc-1"));
     act(() => result.current.handleDividendOpen());
     act(() => result.current.handleDividendClose());
     expect(result.current.dividendOpen).toBe(false);
   });
 
-  // DIV-012 — handleDividendSuccess closes the modal and triggers a data re-fetch
-  it("handleDividendSuccess closes modal and calls retry (DIV-012)", () => {
+  // #864's mock — handleDividendSuccess closes the modal and triggers a data re-fetch
+  it("handleDividendSuccess closes modal and calls retry (#864's mock)", () => {
     const { result } = renderHook(() => useAccountDetailsView("acc-1"));
     act(() => result.current.handleDividendOpen());
 
@@ -249,12 +249,12 @@ describe("useAccountDetailsView — dividend modal state (DIV-012)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// FSD-012 — Header "Record" menu: free-shares modal state in useAccountDetailsView.
-// Mirrors the DIV-012 dividend pattern: freeSharesOpen starts false, flips
+// #864's mock — the header's Record free shares action: free-shares modal state in useAccountDetailsView.
+// Mirrors the dividend pattern: freeSharesOpen starts false, flips
 // true on handleFreeSharesOpen, resets to false on close/success.
 // ---------------------------------------------------------------------------
 
-describe("useAccountDetailsView — free-shares modal state (FSD-012)", () => {
+describe("useAccountDetailsView — free-shares modal state (#864's mock)", () => {
   beforeEach(() => {
     mockBlock.mockReset();
     mockUnblock.mockReset();
@@ -266,29 +266,29 @@ describe("useAccountDetailsView — free-shares modal state (FSD-012)", () => {
     } as never);
   });
 
-  // FSD-012 — freeSharesOpen starts as false
-  it("freeSharesOpen starts as false (FSD-012)", () => {
+  // #864's mock — freeSharesOpen starts as false
+  it("freeSharesOpen starts as false (#864's mock)", () => {
     const { result } = renderHook(() => useAccountDetailsView("acc-1"));
     expect(result.current.freeSharesOpen).toBe(false);
   });
 
-  // FSD-012 — handleFreeSharesOpen sets freeSharesOpen to true
-  it("handleFreeSharesOpen sets freeSharesOpen to true (FSD-012)", () => {
+  // #864's mock — handleFreeSharesOpen sets freeSharesOpen to true
+  it("handleFreeSharesOpen sets freeSharesOpen to true (#864's mock)", () => {
     const { result } = renderHook(() => useAccountDetailsView("acc-1"));
     act(() => result.current.handleFreeSharesOpen());
     expect(result.current.freeSharesOpen).toBe(true);
   });
 
-  // FSD-012 — handleFreeSharesClose resets freeSharesOpen to false
-  it("handleFreeSharesClose resets freeSharesOpen to false (FSD-012)", () => {
+  // #864's mock — handleFreeSharesClose resets freeSharesOpen to false
+  it("handleFreeSharesClose resets freeSharesOpen to false (#864's mock)", () => {
     const { result } = renderHook(() => useAccountDetailsView("acc-1"));
     act(() => result.current.handleFreeSharesOpen());
     act(() => result.current.handleFreeSharesClose());
     expect(result.current.freeSharesOpen).toBe(false);
   });
 
-  // FSD-012 — handleFreeSharesSuccess closes the modal
-  it("handleFreeSharesSuccess closes the modal (FSD-012)", () => {
+  // #864's mock — handleFreeSharesSuccess closes the modal
+  it("handleFreeSharesSuccess closes the modal (#864's mock)", () => {
     const { result } = renderHook(() => useAccountDetailsView("acc-1"));
     act(() => result.current.handleFreeSharesOpen());
     act(() => result.current.handleFreeSharesSuccess());
@@ -296,7 +296,7 @@ describe("useAccountDetailsView — free-shares modal state (FSD-012)", () => {
   });
 });
 
-describe("useAccountDetailsView — management-fee modal state (FEE-010)", () => {
+describe("useAccountDetailsView — management-fee modal state (#864's mock)", () => {
   beforeEach(() => {
     useAppStore.setState({
       assets: [],
@@ -323,7 +323,7 @@ describe("useAccountDetailsView — management-fee modal state (FEE-010)", () =>
   });
 });
 
-describe("useAccountDetailsView — interest modal state (INT-010)", () => {
+describe("useAccountDetailsView — interest modal state (#864's mock)", () => {
   beforeEach(() => {
     useAppStore.setState({
       assets: [],

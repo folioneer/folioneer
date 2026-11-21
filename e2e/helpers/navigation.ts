@@ -86,7 +86,7 @@ export async function navigateToSync(): Promise<void> {
 /**
  * Clicks an Account Details header record action by its stable id
  * (`add-menu-open-balance`, `add-menu-dividend`, `add-menu-free-shares`). These are
- * direct big square buttons (DIV-012; the former dropdown was flattened). Cash
+ * direct big square buttons (#864's mock). Cash
  * Deposit/Withdraw are NOT here — they live on the always-present cash row's inline
  * actions (CSH-019).
  */
