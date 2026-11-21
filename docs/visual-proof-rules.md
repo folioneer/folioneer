@@ -4,13 +4,13 @@
 
 Any change that touches a `.tsx`, `.css`, or visual asset file **MUST** include committed
 screenshots in `screenshots/` before merging. Screenshots must always cover both **light and
-dark mode**. Use `/visual-proof` to automate the full capture workflow.
+dark mode**. Use `/app:visual-proof` to automate the full capture workflow.
 
 ---
 
 ## When visual proof is not required
 
-State it explicitly in the task's record (`docs/workflow.md` § 3, step 9) or the commit message:
+State it explicitly in the pull request body (`loop.md` § 1, step 8) or the commit message:
 
 > No visual impact — internal refactor / Rust-only change.
 
@@ -35,17 +35,9 @@ Then screenshot at least one screen that _consumes_ the modified code as a non-r
 
 ## Project config
 
-On first run, `/visual-proof` discovers and writes `.claude/visual-proof.json` — owned by the
-downstream project and never overridden by the kit:
-
-```json
-{
-  "vite_preview_port": 1422,
-  "vite_preview_host": "127.0.0.1",
-  "global_css_import": "src/styles/index.css",
-  "i18n_import": "src/infra/i18n/index.ts"
-}
-```
+`/app:visual-proof` reads its settings from the `visual-proof` key of `.claude/daneel.json`,
+owned by this project: `vite_preview_port`, `vite_preview_host`, `global_css_import` and
+`i18n_import`.
 
 - **`vite_preview_port`**: must not conflict with the Tauri dev port (1420). Default: `1422`.
 - **`vite_preview_host`**: default `127.0.0.1`. Set to `0.0.0.0` for WSL2 / VM access.
@@ -202,7 +194,7 @@ page.on("console", (msg) => {
 ```
 
 If errors are found, write them to `screenshots/.console-errors.json` and report them. This makes
-`/visual-proof` useful as a **bug discovery tool** even on unmodified components — run it on any
+`/app:visual-proof` useful as a **bug discovery tool** even on unmodified components — run it on any
 component you suspect has render errors, missing translations, or broken data shapes.
 
 ### 4 — Commit the artefacts
@@ -251,4 +243,4 @@ it in the commit message.
 - Merge a frontend change without committed screenshots (light + dark)
 - Call `invoke()` directly in preview components — use hardcoded props or mocked stores
 - Leave `preview.html` or `src/__preview__/` committed on the branch
-- Hardcode the Vite port or import paths — read them from `.claude/visual-proof.json`
+- Hardcode the Vite port or import paths — read them from `.claude/daneel.json`

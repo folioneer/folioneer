@@ -30,11 +30,6 @@ if [ "$CURRENT_BRANCH" = "main" ]; then
     exit 1
 fi
 
-if [ ! -f "$CHECK_SCRIPT" ] || [ ! -f "$SCOPE_SCRIPT" ]; then
-    echo -e "${YELLOW}⚠  scripts/check.py or scripts/changed-scope.sh missing. Skipping validation.${NC}"
-    exit 0
-fi
-
 STAGED=$(git diff --cached --name-only --diff-filter=ACMRD)
 SCOPE=$(printf '%s\n' "$STAGED" | bash "$SCOPE_SCRIPT")
 

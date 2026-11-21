@@ -1,9 +1,12 @@
 name: Review
 
-# The reviewer prompts under .claude/agents/ run on every pull request, one job
-# per lane the diff touches. Each posts its report as a sticky comment and
-# fails the check on any 🔴 critical. The same prompts run locally before the
-# PR; this is the record. Runs on the owner's Claude subscription through the
+# The reviewers of `app@daneel`, checked out at the pinned tag (DANEEL_REF), run on
+# every pull request, one job per lane the diff touches (the plugin's
+# review-lanes.sh, with the base branch's .claude/daneel.json). A lane reviews a
+# pull request once (daneel's loop.md § 5): its report is a lane comment and fails
+# the check on any 🔴 critical; on a later push the job passes once every 🔴 and 🟡
+# is graded in a newer comment. The `adr` and `guides` lanes run locally only
+# (docs/workflow.md § The loop here). Runs on the owner's Claude subscription through the
 # CLAUDE_CODE_OAUTH_TOKEN repository secret (minted with `claude setup-token`),
 # never on API billing; the check fails closed without it rather than
 # reporting a review that did not happen.
@@ -26,6 +29,11 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  # The daneel release the reviewers, their protocol and helpers come from. A pull
+  # request moves it; the prompts of that pull request's own review are then the new ones.
+  DANEEL_REF: app--v0.11.3
+
 jobs:
   lanes:
     name: Lanes touched by the diff
@@ -41,36 +49,27 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          repository: phileggel/daneel
+          ref: ${{ env.DANEEL_REF }}
+          path: .daneel
+          persist-credentials: false
       - name: Map changed files to reviewer lanes
+        # The lane map is the pinned release's and its settings the base branch's, so a
+        # pull request cannot switch its own reviewers off. A base branch without the
+        # settings (the pull request that adds them) runs the plugin's defaults.
         id: detect
         shell: bash
         env:
           BASE: ${{ github.base_ref || 'main' }}
         run: |
           set -euo pipefail
-          files=$(git diff --name-only "origin/$BASE...HEAD")
-          has() { grep -Eq "$1" <<<"$files" && echo true || echo false; }
-          # Each pattern mirrors the reviewer's own `## Files in scope` so a lane
-          # never fires on a file the agent would refuse (an empty-result halt
-          # writes no report, and no report fails the check).
-          backend=$(has '^src-tauri/.*\.rs$')
-          frontend=$(has '^src/.*\.(ts|tsx)$')
-          sql=$(has '^src-tauri/migrations/')
-          # reviewer-infra FP: the .mjs and the two gate files are in
-          # the agent's own `## Files in scope` list.
-          infra=$(has '^(scripts/[^/]*\.(sh|bat|py|mjs)$|\.githooks/|\.github/workflows/.*\.ya?ml$|justfile$|package\.json$|src-tauri/Cargo\.toml$|src-tauri/tauri\.conf\.json$|src-tauri/capabilities/.*\.json$|coverage-gates\.json$|arch-allowlist\.json$|contract-gaps\.json$|required-checks\.json$)')
-          security=$(has '^(src-tauri/src/.*/api\.rs$|src-tauri/capabilities/|src-tauri/src/core/specta_builder\.rs$|src-tauri/src/context/sync/)')
-          e2e=$(has '^e2e/.*\.test\.ts$')
-          # The two documents the code reviewers read as the truth get a reviewer
-          # of their own when they change (FLOW-016).
-          spec=$(has '^docs/spec/.*\.md$')
-          contract=$(has '^docs/contracts/.*\.md$')
-          arch=false
-          if [[ "$backend" == true || "$frontend" == true ]]; then arch=true; fi
-          lanes=$(jq -cn --argjson b "$backend" --argjson f "$frontend" --argjson s "$sql" --argjson i "$infra" \
-            --argjson sec "$security" --argjson e "$e2e" --argjson a "$arch" \
-            --argjson sp "$spec" --argjson c "$contract" \
-            '{backend:$b, frontend:$f, sql:$s, infra:$i, security:$sec, e2e:$e, arch:$a, spec:$sp, contract:$c}')
+          rm -f .claude/daneel.json
+          if git cat-file -e "origin/$BASE:.claude/daneel.json" 2>/dev/null; then
+            git show "origin/$BASE:.claude/daneel.json" > .claude/daneel.json
+          fi
+          lanes=$(git diff --name-only "origin/$BASE...HEAD" | bash .daneel/plugins/app/scripts/review-lanes.sh --json)
           echo "lanes=$lanes" >> "$GITHUB_OUTPUT"
           echo "$lanes"
 
@@ -81,7 +80,7 @@ jobs:
     timeout-minutes: 25
     permissions:
       contents: read
-      # The report is a sticky comment on the pull request; the lanes job
+      # The report is a lane comment on the pull request; the lanes job
       # only reads the diff.
       pull-requests: write
     env:
@@ -136,16 +135,68 @@ jobs:
           # The session gets a broad shell over the pull request's content.
           persist-credentials: false
 
-      - name: Give the branch helper a local main and trusted helper scripts
-        # scripts/branch.sh resolves the diff base as merge-base(HEAD, main).
-        # The two helpers the reviewer executes come from the base branch, not
-        # from the pull request, so a PR cannot change what the reviewer runs;
-        # a PR that edits them still has that edit in its diff.
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        if: steps.gate.outputs.run == 'true'
+        with:
+          repository: phileggel/daneel
+          ref: ${{ env.DANEEL_REF }}
+          path: .daneel
+          persist-credentials: false
+
+      - name: Review a pull request once
+        # In CI a lane reviews a pull request once (daneel's loop.md § 5, the plugin's
+        # README § One review per PR). On a later push it starts no session: it passes
+        # when every 🔴 and 🟡 of its report has a grade in a newer comment, and fails
+        # while one has none. A lane with no report yet (new to the pull request, or
+        # stopped by the usage limit) reviews. The tests validate a fix.
+        id: once
         if: steps.gate.outputs.run == 'true'
         shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.inputs.pr }}
+          REVIEWER: ${{ matrix.reviewer }}
         run: |
-          git branch -f main "origin/${{ github.base_ref || 'main' }}"
-          git checkout "origin/${{ github.base_ref || 'main' }}" -- scripts/branch.sh scripts/review-path.sh
+          set -euo pipefail
+          code=0
+          python3 .daneel/plugins/app/scripts/lane-reviewed.py "$PR_NUMBER" "$REVIEWER" || code=$?
+          case "$code" in
+            3) echo "review=true" >> "$GITHUB_OUTPUT" ;;
+            0) echo "review=false" >> "$GITHUB_OUTPUT" ;;
+            *) exit 1 ;;
+          esac
+
+      - name: Give the branch helper a local main, the base branch's settings, and the branch's tree
+        # The plugin's branch.sh resolves the diff base as merge-base(HEAD, main) and
+        # lists untracked files: `.daneel/` is kept out of what it reports. The prompts
+        # and helpers come from the pinned release and their settings from the base
+        # branch, so a pull request can neither soften the criteria that grade it nor
+        # change what the reviewer runs; one that edits them still has that edit in its
+        # diff. The branch's tree as pushed is a worktree the session reads.
+        id: trusted
+        if: steps.gate.outputs.run == 'true' && steps.once.outputs.review == 'true'
+        shell: bash
+        env:
+          BASE: ${{ github.base_ref || 'main' }}
+        run: |
+          set -euo pipefail
+          git branch -f main "origin/$BASE"
+          echo ".daneel/" >> .git/info/exclude
+          git worktree add --detach /home/runner/work/_temp/branch HEAD
+          # The report's folder exists before the session starts, so its first write
+          # needs no directory the session would have to create.
+          mkdir -p .review
+          # The branch's own skills and agents never load into the session: its diff
+          # still shows them (`branch.sh diff`, `git show HEAD:<path>`).
+          rm -rf /home/runner/work/_temp/branch/.claude/skills /home/runner/work/_temp/branch/.claude/agents
+          for path in CLAUDE.md .claude/settings.json .claude/daneel.json .claude/agents .claude/skills .claude/rules; do
+            rm -rf "$path"
+            if git cat-file -e "origin/$BASE:$path" 2>/dev/null; then
+              git checkout "origin/$BASE" -- "$path"
+            fi
+          done
+          git status --short CLAUDE.md .claude
 
       - name: Run the reviewer prompt
         # The session is granted the commands the reviewers run, by name, and
@@ -154,7 +205,7 @@ jobs:
         # names come from the session logs of the lanes — the two helpers,
         # the reading commands of git, and the text tools they pipe into.
         # None runs code the pull request brings: the two helpers come from
-        # the base branch (the step above), and no interpreter, test runner or
+        # the pinned release in `.daneel/`, and no interpreter, test runner or
         # build tool is granted — once one starts, this list constrains nothing.
         # One reaches out of the runner, and only to read the tags of an action
         # on github.com: the infra lane judges a pin against them. The shell can
@@ -163,7 +214,7 @@ jobs:
         # the PR comment.
         # (`--allowedTools` takes space- or comma-separated `Tool(pattern)`
         # entries; `Bash(git diff *)` is the CLI's own documented shape.)
-        if: steps.gate.outputs.run == 'true'
+        if: steps.gate.outputs.run == 'true' && steps.trusted.outcome == 'success'
         uses: anthropics/claude-code-action@9cdae7f0d995e3ba7c33f226087fdf82a59cd520  # v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -172,16 +223,24 @@ jobs:
           # action mints one through OIDC, which needs the Claude GitHub App.
           github_token: ${{ secrets.GITHUB_TOKEN }}
           prompt: |
-            You are the `${{ steps.gate.outputs.agent }}` agent of this repository.
-            Read `.claude/agents/${{ steps.gate.outputs.agent }}.md` and follow it
+            You are the `${{ steps.gate.outputs.agent }}` reviewer of this repository.
+            Read `.daneel/plugins/app/agents/${{ steps.gate.outputs.agent }}.md` and follow it
             exactly, ${{ steps.gate.outputs.target }}, against the current branch
-            (the pull request's merge commit; `bash scripts/branch.sh files` and
-            `bash scripts/branch.sh diff <path> [<path> ...]` give the changed set and
-            the whole diff in one call).
+            (the pull request's merge commit; `bash .daneel/plugins/app/scripts/branch.sh
+            files` and `bash .daneel/plugins/app/scripts/branch.sh diff <path> [<path> ...]`
+            give the changed set and the whole diff in one call).
+            `${CLAUDE_PLUGIN_ROOT}` in it is `.daneel/plugins/app`, relative to the working
+            directory: run the helpers exactly as `bash .daneel/plugins/app/scripts/<helper> …`.
+            The working directory's `CLAUDE.md` and `.claude/` are the base branch's,
+            `.daneel/` is the pinned release: your instructions, not what you review.
+            Read, grep and glob the pull request's files, and the documents you check
+            them against, in `/home/runner/work/_temp/branch/`: the branch's tree as
+            pushed, the same paths; where a prompt says `git show HEAD:<path>`, read the
+            file there. Nobody answers a question here.
             Include `docs/ubiquitous-language.md` in your term checks. Save the
             full report with the Write tool at the path printed by `bash
-            scripts/review-path.sh reviewer-${{ matrix.reviewer }}`, whatever the
-            agent file says about where its output goes, and begin it with one
+            .daneel/plugins/app/scripts/review-path.sh reviewer-${{ matrix.reviewer }}`,
+            whatever the agent file says about where its output goes, and begin it with one
             headline: `🔴 N critical, 🟡 N warning(s), 🔵 N suggestion(s)`, or
             `✅ No issues found.` when there is none. Do not post comments or reviews
             on GitHub yourself; the workflow does that from the saved file.
@@ -190,14 +249,15 @@ jobs:
           claude_args: |
             --model claude-sonnet-5
             --max-turns 80
-            --allowedTools "Read" "Grep" "Glob" "Write(.review/**)" "Edit(.review/**)" "Bash(bash scripts/branch.sh *)" "Bash(bash scripts/review-path.sh *)" "Bash(git diff *)" "Bash(git log *)" "Bash(git show *)" "Bash(git status *)" "Bash(git rev-parse *)" "Bash(git merge-base *)" "Bash(git cat-file *)" "Bash(git ls-remote --tags https://github.com/*)" "Bash(grep *)" "Bash(head *)" "Bash(tail *)" "Bash(cat *)" "Bash(ls *)" "Bash(wc *)" "Bash(sort *)" "Bash(uniq *)" "Bash(cut *)" "Bash(tr *)" "Bash(sed -n *)" "Bash(echo *)" "Bash(test *)" "Bash(shellcheck *)"
+            --add-dir /home/runner/work/_temp/branch
+            --allowedTools "Read" "Grep" "Glob" "Write(.review/**)" "Edit(.review/**)" "Bash(bash .daneel/plugins/app/scripts/branch.sh *)" "Bash(bash .daneel/plugins/app/scripts/review-path.sh *)" "Bash(bash ${{ github.workspace }}/.daneel/plugins/app/scripts/branch.sh *)" "Bash(bash ${{ github.workspace }}/.daneel/plugins/app/scripts/review-path.sh *)" "Bash(git diff *)" "Bash(git log *)" "Bash(git show *)" "Bash(git status *)" "Bash(git rev-parse *)" "Bash(git merge-base *)" "Bash(git cat-file *)" "Bash(git ls-remote --tags https://github.com/*)" "Bash(grep *)" "Bash(head *)" "Bash(tail *)" "Bash(cat *)" "Bash(ls *)" "Bash(wc *)" "Bash(sort *)" "Bash(uniq *)" "Bash(cut *)" "Bash(tr *)" "Bash(sed -n *)" "Bash(echo *)" "Bash(test *)" "Bash(shellcheck *)"
 
       - name: Redact secret-shaped strings from what leaves the runner
         # The session's shell inherits the job environment; a prompt injection
         # in a reviewed diff could steer it into echoing a token into the
         # report. The report becomes a public comment and the log an artifact,
         # so both are scrubbed of token shapes first.
-        if: ${{ steps.gate.outputs.run == 'true' && !cancelled() }}
+        if: ${{ steps.gate.outputs.run == 'true' && steps.once.outputs.review == 'true' && !cancelled() }}
         shell: bash
         run: |
           set -euo pipefail
@@ -209,7 +269,7 @@ jobs:
       - name: Keep the session log for diagnosis
         # Every turn, tool call and denial of the review session; the only
         # way to see why a lane produced no report.
-        if: ${{ steps.gate.outputs.run == 'true' && !cancelled() }}
+        if: ${{ steps.gate.outputs.run == 'true' && steps.once.outputs.review == 'true' && !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: review-session-${{ matrix.reviewer }}
@@ -218,9 +278,9 @@ jobs:
           retention-days: 7
 
       - name: Post the report and fail on criticals
-        # Runs even when the reviewer step failed, so the sticky comment never
-        # shows a stale verdict next to a red check.
-        if: ${{ steps.gate.outputs.run == 'true' && !cancelled() }}
+        # Runs even when the reviewer step failed, so a failed round still leaves
+        # its report beside the red check.
+        if: ${{ steps.gate.outputs.run == 'true' && steps.once.outputs.review == 'true' && !cancelled() }}
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -283,13 +343,9 @@ jobs:
             # GitHub caps a comment at 65 536 characters; keep the head of a long report.
             body=$(printf '%s\n%s\n\n[run](%s)\n' "$MARKER" "$(head -c 60000 "$report")" "$RUN_URL")
           fi
-          existing=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" --paginate \
-            --jq ".[] | select(.body | startswith(\"$MARKER\")) | .id" | head -n 1)
-          if [[ -n "$existing" ]]; then
-            gh api --method PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${existing}" -f body="$body" > /dev/null
-          else
-            gh pr comment "$PR_NUMBER" --body "$body"
-          fi
+          # One comment per round, never an edit of the last: the grades that follow a
+          # report are read against it (lane-reviewed.py, merge.py).
+          gh pr comment "$PR_NUMBER" --body "$body"
           if [[ "$criticals" != "0" ]]; then
             echo "::error::reviewer-$REVIEWER reported $criticals critical finding(s) — see the PR comment."
             exit 1

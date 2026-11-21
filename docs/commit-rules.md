@@ -64,7 +64,7 @@ A scope is optional. When given, it names the part of Folioneer the change is ab
 
 - **A title is the user-visible outcome in plain words, for a reader who knows neither the code nor Folioneer's vocabulary.** `feat` / `fix` titles are copied into `CHANGELOG.md` (titles only; bodies stay in git history) and shown by the What's-new dialog: what the reader can now do or what changed for them, without shorthand from the work ("replace four with a transfer" says nothing to that reader; "an AI agent can offer to merge the four entries of a past move into one transfer" does); no layer tags (`(FE)`, "backend"), no rule IDs or trigrams, no code identifiers, no abbreviations. The scope says where; the sentence need not repeat it. The technical why stays in the body, two lines at most.
 - **One changelog line per user-visible change.** A `feat` / `fix` commit adds user-visible value of its own. A commit that does not (a review fix of an unreleased feature, the second layer of a feature another commit announced) is folded into its feature commit or typed `refactor` / `chore` / `test` / `docs`. Two near-identical `feat` / `fix` titles in one release are the tell.
-- **One entry, one commit.** An entry — or a run of record and documentation updates that follow one another — lands on `main` as one commit: review fixes, coverage fix-ups and closure edits belong inside it. Before the first push run what CI will judge (`just harness --coverage`) and fold locally with `git commit --amend`; after a push, a fix is a `git commit --fixup <sha>` that `just merge` folds. Never force-push to squash.
+- **One entry, one commit.** An entry — or a run of record and documentation updates that follow one another — lands on `main` as one commit: review fixes, coverage fix-ups and closure edits belong inside it. Before the first push run what CI will judge (`just harness --coverage`) and fold locally with `git commit --amend`; after a push, a fix is a `git commit --fixup <sha>` that the plugin's `merge.py` folds. Never force-push to squash.
 
 ### Choosing the type
 
@@ -129,7 +129,7 @@ Commit types automatically determine version bumps following SemVer:
 - **MINOR**: New features added (backwards compatible)
 - **PATCH**: Bug fixes and patches (backwards compatible)
 
-**Note:** MAJOR version bumps are handled manually when introducing incompatible API changes.
+**Note:** a breaking commit — a `!` before the colon (`feat!:`) or a `BREAKING CHANGE` line in its body — makes the release bump MAJOR.
 
 #### Good Examples
 
@@ -197,7 +197,7 @@ Never commit files containing:
 
 Each commit should represent a single logical change. If you're tempted to say "and" in your commit message, you might need multiple commits.
 
-The reverse holds too: one piece of work lands as **one** commit. A correction to a commit of the same pull request is not a commit of its own — amend it before the first push, and after it use `git commit --fixup <sha>`. The hook and the pull-request check accept a `fixup!` title; `just merge` folds it into the commit it names before landing, and refuses one that names nothing, as well as `squash!` and `amend!` commits, whose message no check has read.
+The reverse holds too: one piece of work lands as **one** commit. A correction to a commit of the same pull request is not a commit of its own — amend it before the first push, and after it use `git commit --fixup <sha>`. The hook and the pull-request check accept a `fixup!` title; the plugin's `merge.py` folds it into the commit it names before landing, and refuses one that names nothing, as well as `squash!` and `amend!` commits, whose message no check has read.
 
 ## Approval Requirement ✅
 
@@ -283,61 +283,31 @@ npm run lint
 
 ## Breaking Changes
 
-Breaking changes that require a MAJOR version bump should be handled through a manual release process. Document incompatible API changes in the commit body for reference:
+A breaking change is marked with a `!` before the colon, or a `BREAKING CHANGE` line in the body; the release then bumps MAJOR. The body says what is incompatible:
 
 ```
-feat: redesign holding data model
+feat!: redesign holding data model
 
-This change modifies the holding API response format.
-Requires manual version bump to next major version.
+BREAKING CHANGE: the holding API response format changes.
 ```
 
 ## Release Process
 
-### Automated Releases
+### Releases
 
-Releases are automated using the release script that analyzes commits since the last tag:
-
-```bash
-just release
-```
-
-Or dry-run mode to preview changes:
-
-```bash
-just release-dry
-```
-
-The script will:
-
-1. Run all tests (React + Rust)
-2. Analyze commit history since last tag
-3. Calculate version bump using SemVer rules
-4. Update version files (`package.json`, `Cargo.toml`, `tauri.conf.json`)
-5. Generate CHANGELOG entry
-6. Commit them on `chore/release-vX.Y.Z` and open its pull request: `main` takes a commit only through a pull request whose checks passed
-7. Wait for its checks, have GitHub merge it, then tag the commit `main` holds — the tag starts the release workflow
+The agent cuts a release with `/app:run-batch` (`docs/workflow.md` § Ending a batch). Its
+`release.py`, configured under the `run-batch` key of `.claude/daneel.json`, reads the
+commits since the last tag, computes the SemVer bump, writes the version files
+(`run-batch.version_files`) and the `CHANGELOG.md` section, lands
+them through a pull request whose checks passed, and pushes the `v*` tag that starts the
+release workflow; the owner publishes its draft. `release.py --preview` prints the next
+version and changes nothing.
 
 **Example flow:**
 
 - 2 `feat` commits, 3 `fix` commits since v1.0.0 → releases v1.1.0
 - Only `docs`, `chore` commits → no automatic release
-- Breaking changes → manual MAJOR version bump
-
-### Manual Release (if needed)
-
-```bash
-# 1. Update version in files following SemVer
-# 2. Commit on a branch and open its pull request
-git switch -c chore/release-v1.1.0
-git commit -m "chore: release v1.1.0"
-git push -u origin chore/release-v1.1.0 && gh pr create --fill
-
-# 3. Once its checks are green and it is merged, tag what main holds
-git switch main && git pull --ff-only
-git tag -a v1.1.0 -m "Version 1.1.0" main
-git push origin refs/tags/v1.1.0
-```
+- A breaking commit → MAJOR
 
 ## Related Documentation
 

@@ -16,7 +16,7 @@ fi
 # Extract title (first non-comment line)
 TITLE=$(grep -v '^#' "$COMMIT_MSG_FILE" | head -n 1)
 
-# A fix pushed after the first push is a `fixup!` commit, which `just merge`
+# A fix pushed after the first push is a `fixup!` commit, which the plugin's `merge.py`
 # folds into the commit it names; the rules apply to the title it carries.
 TITLE=${TITLE#fixup! }
 

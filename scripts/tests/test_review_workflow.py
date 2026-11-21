@@ -117,8 +117,8 @@ class NamedCommands(unittest.TestCase):
     def test_the_helpers_and_the_reading_commands_of_git_are_granted(self):
         grants = self.shell_grants()
         for needed in (
-            "bash scripts/branch.sh *",
-            "bash scripts/review-path.sh *",
+            "bash .daneel/plugins/app/scripts/branch.sh *",
+            "bash .daneel/plugins/app/scripts/review-path.sh *",
             "git diff *",
             "git log *",
             "git show *",
@@ -131,24 +131,32 @@ class NamedCommands(unittest.TestCase):
     def test_nothing_granted_runs_code_the_pull_request_brings(self):
         """An interpreter, a test runner or a build tool runs files of the checkout with
         everything the runner can do: once it starts, the list constrains nothing."""
-        from_the_base_branch = {
-            "bash scripts/branch.sh *",
-            "bash scripts/review-path.sh *",
+        from_the_pinned_release = {
+            "bash .daneel/plugins/app/scripts/branch.sh *",
+            "bash .daneel/plugins/app/scripts/review-path.sh *",
+            "bash ${{ github.workspace }}/.daneel/plugins/app/scripts/branch.sh *",
+            "bash ${{ github.workspace }}/.daneel/plugins/app/scripts/review-path.sh *",
         }
         runners = ("bash", "sh", "python", "python3", "node", "npx", "npm", "cargo", "just", "make")
         for grant in self.shell_grants():
-            if grant in from_the_base_branch:
+            if grant in from_the_pinned_release:
                 continue
             self.assertNotIn(grant.split()[0], runners, grant)
 
-    def test_the_two_helpers_granted_are_the_ones_checked_out_from_the_base_branch(self):
+    # #704 — the prompts and helpers come from daneel at a pinned tag, their settings and the
+    # project's top-level rules from the base branch: a pull request changes neither.
+    def test_the_helpers_granted_come_from_daneel_at_its_pinned_tag(self):
         workflow = WORKFLOW.read_text()
-        checked_out = re.search(r"git checkout \"origin/[^\n]*-- (.+)$", workflow, re.M)
-        self.assertIsNotNone(checked_out)
-        self.assertEqual(
-            sorted(checked_out.group(1).split()),
-            ["scripts/branch.sh", "scripts/review-path.sh"],
-        )
+        self.assertRegex(workflow, r"(?m)^  DANEEL_REF: app--v\d+\.\d+\.\d+$")
+        checkouts = re.findall(r"repository: phileggel/daneel\n\s+ref: (.+)\n\s+path: \.daneel", workflow)
+        self.assertEqual(checkouts, ["${{ env.DANEEL_REF }}"] * 2)
+
+    def test_the_session_s_settings_and_rules_are_the_base_branch_s(self):
+        workflow = WORKFLOW.read_text()
+        restored = re.search(r"for path in (.+); do\n\s+rm -rf \"\$path\"", workflow)
+        self.assertIsNotNone(restored)
+        for path in ("CLAUDE.md", ".claude/settings.json", ".claude/daneel.json", ".claude/agents", ".claude/skills"):
+            self.assertIn(path, restored.group(1).split())
 
     def test_the_web_tools_are_not_granted(self):
         for tool in granted_tools():
