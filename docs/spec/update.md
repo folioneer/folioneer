@@ -90,7 +90,7 @@ The application is distributed as a desktop executable. When a new version is pu
 
 **UPD-028 — Refused access is recognised (backend)**: An update channel may identify itself to the update server with credentials, and the server may refuse them (missing, expired or revoked). When a check, a download or the re-check (UPD-013C) fails on such a channel, the application asks the update server again (UPD-028A) to tell a refused access from any other failure, and logs a refusal. The answer UPD-028A reaches is the one classified: "unauthorised", "forbidden" and "not found" are a refusal, since a server that hides what the credentials cannot reach answers "not found" to a refused access. On a channel that sends credentials, a missing update file or installer is therefore reported as a refused access — a misreport accepted in exchange for recognising those servers. A channel that sends no credentials cannot be refused: its failures are never classified as a refusal and cost no extra request.
 
-**UPD-028A — The addresses asked (backend)**: An update channel (ADR-020) lists one or more addresses of its update server. After a failed check or re-check, the application asks them in their order until one answers, an address that cannot be reached passed over; after a failed download, it asks the installer's address. The first answer is the one classified; when no address answers, the failure is not a refusal, since nothing shows the credentials were refused.
+**UPD-028A — The endpoints asked (backend)**: An update channel lists the endpoints of its update server (ADR-020). After a failed check or re-check, the application asks them in their order until one answers, an endpoint that cannot be reached passed over; after a failed download, it asks the installer's address. The first answer is the one classified; when no endpoint answers, the failure is not a refusal, since nothing shows the credentials were refused.
 
 **UPD-029 — A refusal is not lifted by trying again (backend)**: A refused access (UPD-028) stays refused until the credentials are fixed and the application restarted: trying again within the launch cannot succeed, and each launch's check asks again. How the window shows it is #873's mock.
 
@@ -106,7 +106,7 @@ The application is distributed as a desktop executable. When a new version is pu
 
 **UPD-026 (was R26) — Manual check loading state (frontend)**: During the check triggered by UPD-025, the "Check for updates" button is disabled and shows a loading indicator to prevent multiple triggers.
 
-**UPD-027A — A check that fails is an error (backend)**: A check that fails, at startup (UPD-001) or by the manual check (UPD-025), is rejected with an error, never reported as no update; a refused access is told apart (UPD-028). Staying silent at startup is UPD-021's.
+**UPD-036 — A check that fails is an error (backend)**: A check that fails, at startup (UPD-001) or by the manual check (UPD-025), is rejected with an error, never reported as no update; a refused access is told apart (UPD-028). Staying silent at startup is UPD-021's.
 
 ---
 
@@ -118,9 +118,9 @@ The application is distributed as a desktop executable. When a new version is pu
         │                                                   │ (same flow as UPD-001)
         ├─ No update → nothing displayed (UPD-002) ────────┤
         │                                             └─ Up to date → confirmation message (#873's mock)
-        ├─ Network/server error → silent log, nothing displayed (UPD-021, UPD-022)
+        ├─ Startup: network/server error → silent log, nothing displayed (UPD-021, UPD-022)
         ├─ Access refused → banner names the refusal + [Dismiss] (UPD-028, #873's mock); About page: "check failed" (#873's mock)
-        ├─ Manual check, other failure → rejected with an error (UPD-027A)
+        ├─ Manual check, other failure → rejected with an error (UPD-036)
         │
         └─ New version available
               → Banner: "Version X.Y.Z available" + [Install] [Dismiss] (UPD-003, UPD-004)

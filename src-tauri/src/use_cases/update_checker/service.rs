@@ -194,7 +194,7 @@ fn failure_of(refused: bool) -> UpdateError {
 
 /// Checks whether a new application version is available.
 ///
-/// A failed check is returned, never read as "up to date" (UPD-027A): `AccessRefused`, also
+/// A failed check is returned, never read as "up to date" (UPD-036): `AccessRefused`, also
 /// announced on `"update:error"` (UPD-028), or `OperationFailed`, logged for diagnostics
 /// (UPD-022) — the startup check's silence is the window's (UPD-021). Emits
 /// `"update:available"` on the app handle if an update is found, so that all listeners
@@ -549,11 +549,11 @@ mod tests {
         assert!(matches!(outcome, Err(UpdateError::AccessRefused)));
     }
 
-    // UPD-027A — a check that fails is reported as a failure, never as "up to date";
+    // UPD-036 — a check that fails is reported as a failure, never as "up to date";
     // the startup check's silence is the window's (UPD-021). A channel that sends nothing
     // is not probed, so the failure is no refusal.
     #[tokio::test]
-    async fn upd_027a_a_failed_check_is_reported_as_a_failure() {
+    async fn upd_036_a_failed_check_is_reported_as_a_failure() {
         let (endpoint, _served) = serve_once("500 Internal Server Error").await;
         let app = app_with(Some(UpdateChannel {
             endpoints: vec![endpoint],

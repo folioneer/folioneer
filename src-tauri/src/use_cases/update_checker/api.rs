@@ -12,7 +12,7 @@ use super::service::{self, StartupFailure, UpdateInfo, UpdateState};
 ///
 /// Returns `None` if the application is up to date; `AccessRefused` when the update
 /// server refuses this build's access (UPD-028), `OperationFailed` for any other failure
-/// (UPD-027A) — staying silent at startup is the window's (UPD-021). Emits
+/// (UPD-036) — staying silent at startup is the window's (UPD-021). Emits
 /// `"update:available"` on the app handle if an update is found.
 #[tauri::command]
 #[specta::specta]
