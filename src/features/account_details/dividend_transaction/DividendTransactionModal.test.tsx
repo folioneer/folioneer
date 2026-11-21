@@ -88,34 +88,34 @@ const BASE_PROPS = {
   onRecorded: vi.fn(),
 };
 
-describe("DividendTransactionModal (DIV-020/021/022/025)", () => {
+describe("DividendTransactionModal (#734's mock, DIV-021/022)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUseDividendTransaction.mockReturnValue(makeHookReturn());
   });
 
-  // DIV-020 — asset selector receives all held assets (F25 stable id)
-  it("renders the asset selector with all held assets (DIV-020)", () => {
+  // #734's mock — asset selector receives all held assets (F25 stable id)
+  it("renders the asset selector with all held assets (#734's mock)", () => {
     render(<DividendTransactionModal {...BASE_PROPS} />);
     const combobox = screen.getByTestId("combobox-dividend-trx-asset");
     expect(combobox).toBeInTheDocument();
     expect(combobox.getAttribute("data-item-ids")).toBe("asset-eur-1,asset-usd-1");
   });
 
-  // DIV-020 — date field present (F25 stable id)
-  it("renders a date field with stable id (DIV-020)", () => {
+  // #734's mock — date field present (F25 stable id)
+  it("renders a date field with stable id (#734's mock)", () => {
     render(<DividendTransactionModal {...BASE_PROPS} />);
     expect(screen.getByTestId("dividend-trx-date")).toBeInTheDocument();
   });
 
-  // DIV-020 — amount field present (F25 stable id)
-  it("renders an amount field with stable id (DIV-020)", () => {
+  // #734's mock — amount field present (F25 stable id)
+  it("renders an amount field with stable id (#734's mock)", () => {
     render(<DividendTransactionModal {...BASE_PROPS} />);
     expect(screen.getByTestId("dividend-trx-amount")).toBeInTheDocument();
   });
 
-  // DIV-020 — note field present (F25 stable id)
-  it("renders a note field with stable id (DIV-020)", () => {
+  // #734's mock — note field present (F25 stable id)
+  it("renders a note field with stable id (#734's mock)", () => {
     render(<DividendTransactionModal {...BASE_PROPS} />);
     expect(screen.getByTestId("dividend-trx-note")).toBeInTheDocument();
   });
@@ -165,8 +165,8 @@ describe("DividendTransactionModal (DIV-020/021/022/025)", () => {
     expect(submitButton).not.toBeDisabled();
   });
 
-  // DIV-025 — inline error rendered as role="alert" when error is set (F27)
-  it("renders an alert with the error message when error is set (DIV-025)", () => {
+  // #734's mock — inline error rendered as role="alert" when error is set (F27)
+  it("renders an alert with the error message when error is set (#734's mock)", () => {
     mockUseDividendTransaction.mockReturnValue(
       makeHookReturn({ error: { key: "error.AssetNotHeld" } }),
     );
@@ -176,15 +176,15 @@ describe("DividendTransactionModal (DIV-020/021/022/025)", () => {
     expect(alert).toHaveTextContent("error.AssetNotHeld");
   });
 
-  // DIV-025 — no alert when error is null
-  it("does not render an alert when error is null (DIV-025)", () => {
+  // #734's mock — no alert when error is null
+  it("does not render an alert when error is null (#734's mock)", () => {
     mockUseDividendTransaction.mockReturnValue(makeHookReturn({ error: null }));
     render(<DividendTransactionModal {...BASE_PROPS} />);
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
-  // DIV-025 — submit disabled and spinner shown while isSubmitting
-  it("submit button is disabled while isSubmitting is true (DIV-025)", () => {
+  // #734's mock — submit disabled and spinner shown while isSubmitting
+  it("submit button is disabled while isSubmitting is true (#734's mock)", () => {
     mockUseDividendTransaction.mockReturnValue(
       makeHookReturn({ isSubmitting: true, isFormValid: true }),
     );
@@ -273,9 +273,9 @@ describe("DividendTransactionModal (DIV-020/021/022/025)", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  // DIV-028 — the account-currency switch renders for a foreign asset and
+  // #734's mock — the account-currency switch renders for a foreign asset and
   // drives the hook's mode setter.
-  it("toggles the account-currency entry mode from its checkbox (DIV-028)", () => {
+  it("toggles the account-currency entry mode from its checkbox (#734's mock)", () => {
     const setAmountInAccountCurrency = vi.fn();
     mockUseDividendTransaction.mockReturnValue(
       makeHookReturn({ showCurrencyModeSwitch: true, setAmountInAccountCurrency }),
@@ -286,8 +286,8 @@ describe("DividendTransactionModal (DIV-020/021/022/025)", () => {
     expect(setAmountInAccountCurrency).toHaveBeenCalledWith(true);
   });
 
-  // DIV-028 — no switch for a same-currency asset.
-  it("hides the account-currency switch when the currencies match (DIV-028)", () => {
+  // #734's mock — no switch for a same-currency asset.
+  it("hides the account-currency switch when the currencies match (#734's mock)", () => {
     mockUseDividendTransaction.mockReturnValue(makeHookReturn({ showCurrencyModeSwitch: false }));
     render(<DividendTransactionModal {...BASE_PROPS} />);
 

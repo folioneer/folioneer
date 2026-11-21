@@ -47,7 +47,7 @@ const BASE_PROPS = {
   onSubmitSuccess: vi.fn(),
 };
 
-describe("useDividendTransaction (DIV-020/021/022/025)", () => {
+describe("useDividendTransaction (#734's mock, DIV-021/022)", () => {
   beforeEach(() => {
     mockRecordDividend.mockReset();
     mockShowSnackbar.mockReset();
@@ -55,7 +55,7 @@ describe("useDividendTransaction (DIV-020/021/022/025)", () => {
     BASE_PROPS.onSubmitSuccess.mockClear();
   });
 
-  // DIV-020 — initial form has today's date, empty asset, empty amount, rate "1.000000"
+  // #734's mock — initial form has today's date, empty asset, empty amount, rate "1.000000"
   it("initial state has today's date, no asset selected, blank amount, and default exchange rate", () => {
     const { result } = renderHook(() => useDividendTransaction(BASE_PROPS));
     expect(result.current.formData.date).toBe(TODAY);
@@ -128,7 +128,7 @@ describe("useDividendTransaction (DIV-020/021/022/025)", () => {
     );
   });
 
-  // DIV-025 — success: snackbar shown, onSubmitSuccess called
+  // #734's mock — success: snackbar shown, onSubmitSuccess called
   it("shows success snackbar and calls onSubmitSuccess on ok result", async () => {
     mockRecordDividend.mockResolvedValue({ status: "ok", data: { id: "tx-div-1" } });
     const { result } = renderHook(() => useDividendTransaction(BASE_PROPS));
@@ -173,7 +173,7 @@ describe("useDividendTransaction (DIV-020/021/022/025)", () => {
     expect(result.current.formData.assetId).toBe("asset-eur-1"); // kept for repeat entry
   });
 
-  // DIV-025 — error result sets inline error via presenter
+  // #734's mock — error result sets inline error via presenter
   it("surfaces backend error code as inline error on error result", async () => {
     mockRecordDividend.mockResolvedValue({
       status: "error",
@@ -219,7 +219,7 @@ describe("useDividendTransaction (DIV-020/021/022/025)", () => {
     expect(mockShowSnackbar).not.toHaveBeenCalled();
   });
 
-  // DIV-025 — isSubmitting toggles during the request
+  // #734's mock — isSubmitting toggles during the request
   it("isSubmitting is true during submit and false after", async () => {
     let resolvePromise!: (value: unknown) => void;
     mockRecordDividend.mockReturnValue(
@@ -283,7 +283,67 @@ describe("useDividendTransaction (DIV-020/021/022/025)", () => {
     );
   });
 
-  // DIV-028 — the entry-mode switch exists only for a foreign-currency asset,
+  // DIV-022A (#734) — a rate typed for a foreign asset is never sent once a same-currency
+  // asset is picked: the rate there is 1.
+  it("sends a rate of 1 for a same-currency asset, whatever rate was typed before", async () => {
+    mockRecordDividend.mockResolvedValue({ status: "ok", data: { id: "tx-div-3" } });
+    const { result } = renderHook(() => useDividendTransaction(BASE_PROPS));
+
+    act(() => {
+      result.current.handleChange("assetId", "asset-usd-1");
+      result.current.handleChange("exchangeRate", "1.085");
+    });
+    act(() => {
+      result.current.handleChange("assetId", "asset-eur-1");
+      result.current.handleChange("amount", "50");
+    });
+    await act(async () => {
+      await result.current.handleSubmit(fakeSubmit);
+    });
+
+    expect(mockRecordDividend).toHaveBeenCalledWith(
+      expect.objectContaining({ asset_id: "asset-eur-1", exchange_rate: 1_000_000 }),
+    );
+  });
+
+  // DIV-021 (#734) — a rate the form asks for is checked inline: submit stays disabled until
+  // it is strictly positive.
+  it.each(["", "0", "-1", "abc"])("isFormValid false while the rate shown is %j", (rate) => {
+    const { result } = renderHook(() => useDividendTransaction(BASE_PROPS));
+    act(() => {
+      result.current.handleChange("assetId", "asset-usd-1");
+      result.current.handleChange("amount", "50");
+      result.current.handleChange("exchangeRate", rate);
+    });
+    expect(result.current.isFormValid).toBe(false);
+  });
+
+  it("records nothing through add-another while the rate shown is not positive", async () => {
+    const { result } = renderHook(() => useDividendTransaction(BASE_PROPS));
+    act(() => {
+      result.current.handleChange("assetId", "asset-usd-1");
+      result.current.handleChange("amount", "50");
+      result.current.handleChange("exchangeRate", "0");
+    });
+    await act(async () => {
+      await result.current.handleAddAnother();
+    });
+    expect(mockRecordDividend).not.toHaveBeenCalled();
+    expect(result.current.error).toEqual({ key: "currency.error.rate_not_positive" });
+  });
+
+  it("isFormValid ignores a rate the form does not show", () => {
+    const { result } = renderHook(() => useDividendTransaction(BASE_PROPS));
+    act(() => {
+      result.current.handleChange("assetId", "asset-usd-1");
+      result.current.handleChange("amount", "50");
+      result.current.handleChange("exchangeRate", "0");
+      result.current.setAmountInAccountCurrency(true);
+    });
+    expect(result.current.isFormValid).toBe(true);
+  });
+
+  // #734's mock — the entry-mode switch exists only for a foreign-currency asset,
   // and switching to account-currency mode hides the exchange rate.
   it("offers the account-currency mode only for a foreign asset and hides the rate in it", () => {
     const { result } = renderHook(() => useDividendTransaction(BASE_PROPS));

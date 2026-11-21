@@ -1382,6 +1382,7 @@
     "FeesNegative": "Les frais ne peuvent pas être négatifs.",
     "ExchangeRateNotPositive": "Le taux de change doit être strictement positif.",
     "TotalAmountNotPositive": "Le montant total doit être strictement positif.",
+    "DividendRateNotOne": "L'actif et le compte partagent une devise : le taux est un.",
     "TotalAmountBelowFees": "Le montant total ne peut pas être inférieur aux frais qu'il inclut.",
     "UnitPriceOutOfRange": "Le prix unitaire dérivé est hors limites — vérifiez la quantité et le total.",
     "QuantityOutOfRange": "Cette quantité est trop grande.",

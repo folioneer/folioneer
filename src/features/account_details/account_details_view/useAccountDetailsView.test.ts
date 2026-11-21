@@ -381,7 +381,7 @@ describe("useAccountDetailsView — fee-schedule modal target (FEE-011)", () => 
 });
 
 // ---------------------------------------------------------------------------
-// DIV-011/020 — activeNonCashHoldings exposes only active, non-cash holdings
+// DIV-011 / #734's mock — activeNonCashHoldings exposes only active, non-cash holdings
 // (quantity > 0) as candidates for the dividend modal's asset selector.
 // ---------------------------------------------------------------------------
 const makeHoldingDetail = (overrides: Record<string, unknown> = {}) => ({
@@ -417,7 +417,7 @@ const makeHoldingDetail = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
-describe("useAccountDetailsView — activeNonCashHoldings filter (DIV-011/020)", () => {
+describe("useAccountDetailsView — activeNonCashHoldings filter (DIV-011, #734's mock)", () => {
   beforeEach(() => {
     useAppStore.setState({
       assets: [],
@@ -463,7 +463,7 @@ describe("useAccountDetailsView — activeNonCashHoldings filter (DIV-011/020)",
     ]);
   });
 
-  // DIV-020 / DIV-011 — the dividend candidates are the open positions, then the closed
+  // #734's mock / DIV-011 — the dividend candidates are the open positions, then the closed
   // ones, so a dividend dated while a position sold since was held can be recorded; a closed
   // position takes its currency from the asset catalog.
   it("dividendPayingAssets lists the open positions, then the closed ones", async () => {

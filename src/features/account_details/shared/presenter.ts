@@ -140,8 +140,10 @@ export function dividendErrorToI18n(err: DividendError): I18nMessage {
     case "InvalidDate":
     // DIV-040 — a correction that dates the dividend before its asset was first held.
     case "DividendBeforeHolding":
-    // DIV-022 — an amount that converts to nothing in the account's currency.
+    // DIV-022 / DIV-022A — an amount that converts to nothing in the account's currency, and
+    // a rate other than one between the same currency.
     case "TotalAmountNotPositive":
+    case "DividendRateNotOne":
       return { key: `error.${err.code}` };
     // DIV-021 / TRX-020 — a dividend's quantity is its amount: past a trillion, either code
     // says the figure is too large.

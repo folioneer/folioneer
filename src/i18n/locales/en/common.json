@@ -1382,6 +1382,7 @@
     "FeesNegative": "Fees cannot be negative.",
     "ExchangeRateNotPositive": "Exchange rate must be strictly positive.",
     "TotalAmountNotPositive": "Total amount must be strictly positive.",
+    "DividendRateNotOne": "The asset and the account share a currency: the rate is one.",
     "TotalAmountBelowFees": "Total amount cannot be lower than the fees it includes.",
     "UnitPriceOutOfRange": "The derived unit price is out of range — check quantity and total.",
     "QuantityOutOfRange": "This quantity is too large.",

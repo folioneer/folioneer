@@ -292,10 +292,10 @@ pub async fn record_withdrawal(
 }
 
 // =============================================================================
-// Dividend — DTO + command (DIV-020/023)
+// Dividend — DTO + command (DIV-011/023)
 // =============================================================================
 
-/// Parameters for recording a cash dividend attributed to a held asset (DIV-020).
+/// Parameters for recording a cash dividend attributed to a held asset (DIV-011, DIV-023).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, specta::Type)]
 pub struct DividendDTO {
     /// Account receiving the dividend.

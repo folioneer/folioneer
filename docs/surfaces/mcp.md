@@ -60,7 +60,7 @@ AGT-060. Input: `account`, its name, and `amount`, in the account's currency; `d
 AGT-060. Input: `account` and `asset`, named as AGT-044 says, and `amount`, the total net
 amount received in the asset's currency; `rate`, the exchange rate to the account's
 currency, `date` and `note`, each optional. The refusals are the recording's, among them
-`AssetNotHeld` (DIV-011). Answer: as a
+`AssetNotHeld` (DIV-011), and `DividendRateNotOne` (DIV-022A) for a rate other than 1 while the asset and the account share a currency. Answer: as a
 recording's (AGT-044). `correct_recording` and `cancel_recording` answer
 `DividendBeforeHolding` for the refusals of DIV-040 and DIV-045.
 

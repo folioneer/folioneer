@@ -1524,9 +1524,9 @@ event: "event"
 
 /** user-defined constants **/
 
-export const SYSTEM_CATEGORY_IDS = ["default-uncategorized","system-cash-category"] as const;
 export const DEFAULT_PROFILE_ID = "default-profile" as const;
 export const ASSET_CREATION_DEFAULTS = {"category_id":"default-uncategorized","class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"DigitalAsset","default_risk":5},{"class":"Derivatives","default_risk":5}],"kind":"Listed","kinds":[{"class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":true,"has_isin":true,"has_lookup":true,"kind":"Listed","may_bear_interest":true,"proposes_reference":false},{"class":"DigitalAsset","classes":[{"class":"DigitalAsset","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Crypto","may_bear_interest":false,"proposes_reference":false},{"class":"RealEstate","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Custom","may_bear_interest":true,"proposes_reference":true}],"risk_level":4,"risk_levels":[1,2,3,4,5]} as const;
+export const SYSTEM_CATEGORY_IDS = ["default-uncategorized","system-cash-category"] as const;
 
 /** user-defined types **/
 
@@ -1757,6 +1757,11 @@ export type AccountError =
  * A transfer between accounts of one currency names a rate other than one (TRF-022).
  */
 { code: "TransferRateNotOne" } | 
+/**
+ * A dividend whose asset and account share a currency names a rate other than one
+ * (DIV-022A).
+ */
+{ code: "DividendRateNotOne" } | 
 /**
  * A part of a transfer is corrected alone (TRF-031).
  */
@@ -3555,7 +3560,7 @@ total: number;
  */
 ready_without: number }
 /**
- * Parameters for recording a cash dividend attributed to a held asset (DIV-020).
+ * Parameters for recording a cash dividend attributed to a held asset (DIV-011, DIV-023).
  */
 export type DividendDTO = { 
 /**

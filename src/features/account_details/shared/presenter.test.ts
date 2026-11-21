@@ -717,6 +717,13 @@ describe("dividendErrorToI18n", () => {
     expect(dividendErrorToI18n({ code })).toEqual({ key: `error.${code}` });
   });
 
+  // DIV-022A (#734) — a rate other than one between the same currency is refused with its reason.
+  it("DividendRateNotOne maps to its flat error key", () => {
+    expect(dividendErrorToI18n({ code: "DividendRateNotOne" })).toEqual({
+      key: "error.DividendRateNotOne",
+    });
+  });
+
   // DIV-022 (#465) — an amount that converts to nothing in the account's currency.
   it("TotalAmountNotPositive maps to its flat error key", () => {
     expect(dividendErrorToI18n({ code: "TotalAmountNotPositive" })).toEqual({

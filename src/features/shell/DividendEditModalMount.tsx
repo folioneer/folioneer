@@ -116,7 +116,11 @@ export function DividendEditModalMount() {
           transaction.dividend_amount === null
             ? transaction.quantity
             : microToExactDecimal(transaction.dividend_amount),
-        exchangeRate: microToExactDecimal(transaction.exchange_rate),
+        // DIV-022A — within one currency the rate is one, whatever rate was stored.
+        exchangeRate:
+          asset.currency === account.currency
+            ? "1"
+            : microToExactDecimal(transaction.exchange_rate),
         note: transaction.note ?? "",
         unitPriceMicro: transaction.unit_price,
       }}

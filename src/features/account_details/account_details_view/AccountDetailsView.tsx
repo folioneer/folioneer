@@ -649,7 +649,7 @@ export function AccountDetailsView() {
         />
       )}
 
-      {/* DIV-010/020 — Dividend modal (paying asset chosen inside) */}
+      {/* DIV-010, #734's mock — Dividend modal (paying asset chosen inside) */}
       {view.dividendOpen && (
         <DividendTransactionModal
           isOpen

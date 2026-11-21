@@ -798,6 +798,10 @@ impl HoldingTransactionUseCase {
         let typed = self.typed_by_owner(transaction_id).await?;
         let stored = &typed.transaction;
         let fields = change_fields(stored, &change, None, false)?;
+        // DIV-022A — asked as the correction would refuse it.
+        self.ensure_corrected_dividend_rate(&stored.id, fields.exchange_rate)
+            .await
+            .map_err(|error| refusal_from_account(&error))?;
         let becomes = self
             .account_service
             .preview_correction(
@@ -933,6 +937,10 @@ impl HoldingTransactionUseCase {
                 })
             })?;
         let date = fields.date.clone();
+        // DIV-022A — previewed as the correction would refuse it.
+        self.ensure_corrected_dividend_rate(&recorded.id, fields.exchange_rate)
+            .await
+            .map_err(|error| refusal_from_account(&error))?;
         let mut previewed = self
             .account_service
             .preview_correction(
@@ -2124,6 +2132,9 @@ pub fn refusal_from_account(error: &AccountError) -> Refusal {
         ),
         AccountError::TransferRateNotOne => {
             "the two accounts share a currency: a transfer between them takes no rate".to_string()
+        }
+        AccountError::DividendRateNotOne => {
+            "the asset and the account share a currency: the dividend's rate is 1".to_string()
         }
         AccountError::PartOfTransfer => {
             "this is part of a transfer: correct the transfer".to_string()

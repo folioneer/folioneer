@@ -132,6 +132,18 @@ describe("DividendEditModalMount (DIV-040)", () => {
     expect(await screen.findByTestId("edit-dividend-modal")).toHaveTextContent("|asset-currency");
   });
 
+  // DIV-022A (#734) — within one currency the rate is one: the correction sends 1, even for a
+  // dividend stored with another rate, which the core would refuse.
+  it("corrects a same-currency dividend at a rate of one, whatever rate is stored", async () => {
+    useAppStore.setState({
+      assets: [{ id: "asset-1", name: "ASML", currency: "EUR" }] as never,
+    } as never);
+    mockUseSearch.mockReturnValue(params("tx-div-1"));
+    mockGetTransactions.mockResolvedValue({ status: "ok", data: [dividendTx] });
+    render(<DividendEditModalMount />);
+    expect(await screen.findByTestId("edit-dividend-modal")).toHaveTextContent("|18.6|1|");
+  });
+
   // Without the account or the asset the dialog could not state them nor know whether a
   // rate applies: nothing is shown rather than a dialog with empty labels.
   it("renders nothing while the store holds no such asset or account", async () => {

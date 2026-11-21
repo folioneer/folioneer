@@ -106,6 +106,10 @@ pub enum AccountError {
     /// A transfer between accounts of one currency names a rate other than one (TRF-022).
     #[error("A transfer between accounts of one currency takes no exchange rate")]
     TransferRateNotOne,
+    /// A dividend whose asset and account share a currency names a rate other than one
+    /// (DIV-022A).
+    #[error("A dividend in the account's own currency takes a rate of one")]
+    DividendRateNotOne,
     /// A part of a transfer is corrected alone (TRF-031).
     #[error("This transaction is part of a transfer; correct the transfer")]
     PartOfTransfer,
