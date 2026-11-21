@@ -415,14 +415,6 @@ export interface AccountSummaryViewModel {
   totalGlobalValueRaw: number;
   /** True when the account currently holds a non-zero cash balance (CSH-019/095). */
   hasCashHolding: boolean;
-  /** Formatted sum of management fees across all active holdings, account currency (FEE-053). */
-  totalManagementFees: string;
-  /** Raw total management fees in micro-units (FEE-053). */
-  totalManagementFeesRaw: number;
-  /** Formatted net cash input since inception: deposits − withdrawals, account currency (ACD-053). */
-  totalNetCashInput: string;
-  /** ACD-058 — formatted capital brought in: net cash input plus opening balances at cost. */
-  totalCapitalBroughtIn: string;
   /** MKT-208 — how many active holdings have an outdated price (MKT-206). */
   outdatedPriceCount: number;
 }
@@ -706,10 +698,6 @@ export function toAccountSummary(response: AccountDetailsResponse): AccountSumma
     totalGlobalValue: microToFormatted(response.total_global_value, 2),
     totalGlobalValueRaw: response.total_global_value,
     hasCashHolding,
-    totalManagementFees: microToFormatted(response.total_management_fees, 2),
-    totalManagementFeesRaw: response.total_management_fees,
-    totalNetCashInput: microToFormatted(response.total_net_cash_input, 2),
-    totalCapitalBroughtIn: microToFormatted(response.total_capital_brought_in, 2),
     outdatedPriceCount: response.outdated_price_count,
   };
 }

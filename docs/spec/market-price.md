@@ -989,7 +989,7 @@ A "Fill missing price history" icon button in the actions of each active, non-ca
 ### UX Draft — Outdated price (MKT-205+)
 
 - **Holding row**: next to the source badge, the staleness label of an outdated price turns into "⚠ Outdated price · 71d" in the warning colour (MKT-207); "Price typed by hand" (MKT-158) still follows under it when it applies.
-- **Account header**: after Global Value, Net Cash Input and the management fees, a warning chip "⚠ 2 outdated prices" (MKT-208); absent at zero and in a view with a date, today included.
+- **Account header**: after the Global Value, a warning chip "⚠ 2 outdated prices" (MKT-208); absent at zero and in a view with a date, today included.
 - **Accounts list**: the total row carries the same chip with the portfolio's count (MKT-208); absent at zero, and with the row itself while a search filters the list (ACC-032).
 - **Why not updated**: under the price, or under "No price available", "Not updated: …" in the warning colour; its tooltip gives the date of the failed fetch (MKT-222).
 

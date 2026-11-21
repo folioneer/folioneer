@@ -510,7 +510,7 @@ A recurring rule, one per `(account, asset)`, that generates Management Fee Dedu
 
 > Status: confirmed
 
-The cumulative cost of Management Fee Deductions attributed to a holding, in the account currency — each deduction valued at the market price as of its own date. Per-holding and per-account figures shown on Account Details. Named to distinguish it from the brokerage-commission `fees` field on a `Transaction`.
+The cumulative cost of Management Fee Deductions attributed to a holding, in the account currency — each deduction valued at the market price as of its own date. Named to distinguish it from the brokerage-commission `fees` field on a `Transaction`.
 
 ---
 
