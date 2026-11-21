@@ -173,7 +173,7 @@ class QualityChecker:
         self.verbose = verbose
         # Strict mode promotes stack-marker skips to failures when the marker
         # is "expected" (always-expected by default; sqlx is conditional on
-        # src-tauri/migrations/ existing). release.py passes --strict so a
+        # src-tauri/migrations/ existing). A release (`just release-check`) is strict, so a
         # missing marker — e.g. accidentally deleted .sqlx/ — blocks the
         # release instead of silently skipping the check.
         self.strict_mode = strict_mode
@@ -673,16 +673,20 @@ class QualityChecker:
         When they cannot be read, the tests are built: a check that turns itself off unseen
         is the failure FLOW-042 removes.
         """
-        result = subprocess.run(
-            ["bash", str(self.repo_root / "scripts" / "branch.sh"), "files"],
-            cwd=self.repo_root,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if result.returncode != 0:
+        def git(*args: str) -> subprocess.CompletedProcess:
+            return subprocess.run(
+                ["git", *args], cwd=self.repo_root, capture_output=True, text=True, check=False
+            )
+
+        # The branch's paths since it left main, with the work not committed yet.
+        base = git("merge-base", "HEAD", "main")
+        changed = git("diff", "--name-only", base.stdout.strip()) if base.returncode == 0 else base
+        untracked = git("ls-files", "--others", "--exclude-standard")
+        if changed.returncode != 0 or untracked.returncode != 0:
             return os.environ.get("CI") != "true"
-        return builds_tests_without_the_app(result.stdout.splitlines())
+        return builds_tests_without_the_app(
+            changed.stdout.splitlines() + untracked.stdout.splitlines()
+        )
 
     def _run_backend_group(self):
         """Backend steps: rust tests, sqlx, clippy, fmt."""
@@ -810,7 +814,7 @@ class QualityChecker:
         if self.suite_failed:
             # Failures go to stderr so the report can be redirected /
             # piped without dragging the error block into downstream
-            # consumers. Compare merge.py's stderr discipline.
+            # consumers.
             print(f"\n{FAILURE}❌ SUITE FAILED{RESET}", file=sys.stderr)
             if self.failures:
                 print(f"\n{INFO}— Failure details —{RESET}", file=sys.stderr)
@@ -865,7 +869,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help=(
             "Promote stack-marker skips to failures. "
-            "Used by release.py to catch accidentally-deleted markers."
+            "A release (just release-check) is strict, to catch accidentally-deleted markers."
         ),
     )
     parser.add_argument(

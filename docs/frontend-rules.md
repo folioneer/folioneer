@@ -348,3 +348,8 @@ query parameters, the interface holding only the user's choice. A hook fetches a
 state; a presenter formats. Architecture rule A12 fails on a new `validate*.ts` file or a new
 `.sort(` / `.filter(` in feature code; today's sites are frozen per file in `arch-allowlist.json`,
 one tech-debt entry per feature (DEBT-046–DEBT-053), and may only disappear.
+
+Not a finding for `app:reviewer-frontend`: a removed frontend validation, when the core
+enforces the rule (F32); a value the core rejects is shown from the core's error on save or
+from the draft check. A review never asks to re-add a numeric or business check to the interface; it
+flags only a lost message or a lost save guard the spec still names.

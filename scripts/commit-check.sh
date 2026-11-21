@@ -36,14 +36,14 @@ for sha in $SHAS; do
     continue
   fi
   TITLE=$(git log -1 --pretty=%s "$sha")
-  # A `fixup!` commit is folded by `just merge` into the commit it
+  # A `fixup!` commit is folded by the plugin's `merge.py` into the commit it
   # names; the rules apply to the title it carries.
   TITLE=${TITLE#fixup! }
   BODY=$(git log -1 --pretty=%b "$sha")
   AUTHOR=$(git log -1 --pretty='%an <%ae>' "$sha")
   AUTHOR_EMAIL=$(git log -1 --pretty=%ae "$sha")
 
-  # Conventional-commit format is load-bearing for release.py
+  # Conventional-commit format is load-bearing for the plugin's release.py
   # changelog parsing — enforced for every author, including bots.
   if ! echo "$TITLE" | grep -E "$REGEX" >/dev/null; then
     echo "::error::$sha — invalid conventional format: $TITLE"

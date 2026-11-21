@@ -54,11 +54,6 @@ if [[ "$HAS_REFS" == true && "$DELETE_ONLY" == true ]]; then
     exit 0
 fi
 
-if [ ! -f "$CHECK_SCRIPT" ] || [ ! -f "$SCOPE_SCRIPT" ]; then
-    echo -e "${YELLOW}⚠  scripts/check.py or scripts/changed-scope.sh missing. Skipping validation.${NC}"
-    exit 0
-fi
-
 SCOPE=$(printf '%s' "$CHANGED" | bash "$SCOPE_SCRIPT")
 
 run_check() {

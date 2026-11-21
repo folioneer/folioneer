@@ -234,6 +234,17 @@ tracing::info!(target: BACKEND, field = value, "message");
 
 **B32** — MAY use `#[allow(clippy::too_many_arguments)]` on domain factory methods and production constructors (e.g. orchestrator or service new() with many injected dependencies). MUST NOT use on test helpers — use a builder struct instead.
 
+## Security
+
+What `app:reviewer-security` checks for this project, beside its own checks:
+
+- **Personal data** this project holds: a user's email, full name and address; it is kept
+  in memory or in Tauri's secure storage.
+- **Environment values in a release build** (owner, 2026-09-27): a value from the
+  environment that chooses what the application runs or writes (a path, a URL) is tied to
+  the running application — `APPIMAGE` is honoured only when the executable sits inside
+  `APPDIR` 🟡.
+
 ## Tests
 
 **B33** — Tests MUST NOT be trivial. A trivial test is one that verifies:

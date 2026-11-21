@@ -5,6 +5,8 @@ Read together with `frontend-rules.md` and `test-rules.md`.
 
 > Rule numbers (E1, E2, …) are stable IDs — once assigned, they never change. New rules are appended; deprecated rules keep their number with a note.
 
+The helpers folder is `e2e/_helpers/`: a reusable helper lives there, never in a scenario file.
+
 ---
 
 ## E1 — Forms MUST have a stable `id` attribute

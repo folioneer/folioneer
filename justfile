@@ -97,66 +97,18 @@ check-full:
     @[ -f scripts/check.py ] || { echo "❌ scripts/check.py not found — restore it from git history"; exit 1; }
     python3 scripts/check.py
 
-# What a release validates before it versions anything — every test, the build, the full query check — run at the hand-over of a batch (docs/workflow.md § 3)
+# What a release validates before it versions anything — every test, the build, the full query check — run at the hand-over of a batch (docs/workflow.md § Ending a batch)
 release-check:
     @[ -f scripts/check.py ] || { echo "❌ scripts/check.py not found — restore it from git history"; exit 1; }
     python3 scripts/check.py --release
-
-# Release new version (interactive)
-release *ARGS:
-    @[ -f scripts/release.py ] || { echo "❌ scripts/release.py not found — restore it from git history"; exit 1; }
-    python3 scripts/release.py {{ARGS}}
 
 # Count lines of code per language (cloc)
 stat: (_used "stat")
     cloc . --vcs=git
 
-# Refuses with a specific diagnostic + recovery command if FF is not safe
-# (squash/rebase merge on GitHub, divergence, dirty tree, etc.).
-# Rebase, fast-forward merge the current branch into main, push, delete the branch
-merge:
-    @[ -f scripts/merge.py ] || { echo "❌ scripts/merge.py not found — restore it from git history"; exit 1; }
-    python3 scripts/merge.py
-
-# Wait for the checks of a pull request (the current branch's, or a number) and end with the verdict: 0 green, 1 failed, 2 GitHub unreachable, 3 timed out, 4 not open
-watch-pr *ARGS:
-    @python3 scripts/watch-pr.py "$@"
-
-# Re-run the failed jobs of a workflow run (the run id of the URL `just watch-pr` printed): a lane the usage limit stopped, once it has reset
-rerun-failed RUN: (_used "rerun-failed")
-    gh run rerun "$1" --failed
-
-# The figures of a batch for /flow-audit: `just flow-audit v0.12.0 v0.13.0 --previous v0.11.0 --pretty`
-flow-audit *ARGS:
-    python3 scripts/flow-audit.py "$@"
-
-# The last N batch ends (release `v*` or `batch/<date>` tags), newest first
-batch-ends n="1": (_used "batch-ends")
-    @git fetch -q origin --tags
-    @git for-each-ref --sort=-creatordate --count="$1" --format='%(refname:short)' 'refs/tags/v*' refs/tags/batch/
-
-# End a batch with no `feat` or `fix`: tag the fresh main `batch/<UTC date>` and push the tag
-batch-end: (_used "batch-end")
-    #!/usr/bin/env bash
-    set -euo pipefail
-    git fetch -q origin main --tags
-    if [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]; then
-        echo "batch-end: check out a fresh main first" >&2
-        exit 1
-    fi
-    tag="batch/$(date -u +%F)"
-    if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
-        echo "batch-end: $tag already exists — a batch already ended today" >&2
-        exit 1
-    fi
-    git tag -a "$tag" -m "Batch ended without a release"
-    git push -q origin "$tag"
-    echo "✅ $tag pushed"
-
-# Run the first Queued item of the Project (github.com/orgs/folioneer/projects/1) headless (docs/workflow.md § 9); logs under logs/run-entry/
-run-entry:
-    @[ -f scripts/run-entry.sh ] || { echo "❌ scripts/run-entry.sh not found — restore it from git history"; exit 1; }
-    bash scripts/run-entry.sh
+# One Queued item, headless: one run at a time, a 3-hour budget, logged under logs/run-entry/ (daneel's plugins/app/README.md § Headless runs)
+run-entry: (_used "run-entry")
+    mkdir -p logs/run-entry && flock -n -E 0 logs/run-entry/.lock timeout --signal=INT --kill-after=60 ${RUN_ENTRY_BUDGET:-3h} claude -p "/app:run-entry" --permission-mode acceptEdits --output-format text >> logs/run-entry/$(date -u +%Y%m%dT%H%M%SZ).log 2>&1
 
 # SQLX_OFFLINE=false forces online mode so `prepare` hits the dev DB even
 # though .cargo/config.toml sets SQLX_OFFLINE=true globally.

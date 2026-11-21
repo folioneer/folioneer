@@ -89,11 +89,26 @@
       "Bash(git commit --no-verify*)",
       "Bash(git commit -n *)",
       "Bash(git push --no-verify*)",
-      "Bash(just release*)",
       "Bash(git tag *)",
       "Bash(gh pr merge *)",
       "Bash(gh issue delete *)",
-      "Edit(.claude/settings.json)"
+      "Edit(.claude/settings.json)",
+      "Bash(gh release create *)",
+      "Bash(gh release edit *)",
+      "Bash(gh api *releases*)"
     ]
+  },
+  "enabledPlugins": {
+    "flow@daneel": true,
+    "app@daneel": true
+  },
+  "extraKnownMarketplaces": {
+    "daneel": {
+      "source": {
+        "source": "github",
+        "repo": "phileggel/daneel",
+        "ref": "app--v0.11.3"
+      }
+    }
   }
 }

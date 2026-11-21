@@ -5,7 +5,7 @@ core behaves — the Rust behaviour every surface calls — written or amended b
 the issue and the code and checked by `spec-reviewer` before anything is built from it.
 
 Each surface has its own description, never a spec (owner, 2026-11-07, #789): the window in
-its validated mocks (`folioneer/folioneer-design`, `docs/workflow.md` § 4), the command line
+its validated mocks (`folioneer/folioneer-design`, `docs/workflow.md` § Design proposal), the command line
 in `docs/surfaces/command-line.md`, an AI agent's connection (MCP) in
 `docs/surfaces/mcp.md`. A spec holds no wording in any language, no layout, no command-line
 argument and no tool shape; its rules are scoped `(backend)`, the core's scope.
@@ -161,7 +161,7 @@ When referencing a rule in code, documentation, or tests, use the full code:
   description, not a rule.
 - An active ADR's choice is applied without asking; the owner is asked only when the
   feature must break one.
-- Every assumption is an open question, asked before the work (`docs/workflow.md` § 3);
+- Every assumption is an open question, asked before the work (the method's decision scan, `method.md` § 2);
   a decision that passes the ADR gate (`docs/adr/README.md`) is an open question
   `ADR-SUGGESTED: {the decision and why}`, never mandated.
 - **What and why, never how**: no SQL, file paths, function or component names, libraries

@@ -1,4 +1,4 @@
-<!-- Format: docs/workflow.md § 3, step 8. Under 20 lines. -->
+<!-- Format: daneel's loop.md § 1, step 8. Under 20 lines. -->
 
 Closes #123 (or none for a plain request). **Task** — the issue or the request, in one line. **Scope** — commit type and layers. **Design** — mock approved, or none. **Touching** — the paths.
 

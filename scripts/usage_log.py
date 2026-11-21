@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The usage log: one line per run of a script or a recipe (docs/workflow.md § 5).
+"""The usage log: one line per run of a script or a recipe (docs/workflow.md § The harness).
 
 `logs/usage.log`, local and never committed: time, tool, duration, result, separated
 by tabs. The flow audit reads it after a release, then empties it. Nothing is written

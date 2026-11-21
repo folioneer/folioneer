@@ -1,0 +1,83 @@
+{
+  "flow-audit": {
+    "commit_types": ["feat", "fix", "refactor", "chore", "ci", "docs", "test"],
+    "guides": [
+      "CLAUDE.md",
+      "docs/workflow.md",
+      "docs/agentic-setup.md",
+      "docs/*-rules.md",
+      ".claude/rules/*.md"
+    ],
+    "records": ["CHANGELOG.md", "docs/adr/", "docs/lessons.md"],
+    "path_roots": [
+      "src/",
+      "src-tauri/",
+      "docs/",
+      "scripts/",
+      "e2e/",
+      ".github/",
+      ".claude/",
+      ".githooks/"
+    ]
+  },
+  "plan-batch": {
+    "owner": "folioneer",
+    "number": 1,
+    "workflow": "docs/workflow.md"
+  },
+  "review": {
+    "owners": "docs/README.md",
+    "setup": "docs/agentic-setup.md",
+    "glossary": "docs/ubiquitous-language.md",
+    "rules": {
+      "arch": [
+        "docs/backend-rules.md",
+        "docs/frontend-rules.md",
+        "docs/ddd-reference.md"
+      ],
+      "backend": [
+        "docs/backend-rules.md",
+        "docs/error-model.md",
+        "docs/test-rules.md"
+      ],
+      "frontend": ["docs/frontend-rules.md", "docs/i18n-rules.md"],
+      "sql": ["docs/backend-rules.md"],
+      "e2e": ["docs/e2e-rules.md", "docs/test-rules.md"],
+      "security": ["docs/backend-rules.md"],
+      "infra": ["docs/workflow.md"]
+    },
+    "lanes": {
+      "infra": ["^contract-gaps\\.json$"],
+      "security": ["^src-tauri/src/context/sync/"]
+    }
+  },
+  "run-entry": {
+    "recipes": {
+      "push_harness": "harness --coverage"
+    },
+    "record_paths": ["docs/adr/", "docs/lessons.md"]
+  },
+  "run-batch": {
+    "version_files": [
+      "package.json",
+      "package-lock.json",
+      "src-tauri/Cargo.toml",
+      "src-tauri/tauri.conf.json"
+    ],
+    "release_workflow": "release.yml",
+    "release_check": "release-check"
+  },
+  "design-proposal": {
+    "repo": "folioneer/folioneer-design"
+  },
+  "visual-proof": {
+    "vite_preview_port": 1422,
+    "vite_preview_host": "127.0.0.1",
+    "global_css_import": "src/ui/global.css",
+    "i18n_import": "src/i18n/config.ts"
+  },
+  "dep-audit": {
+    "licence_check": "licence-check",
+    "terms_doc": "docs/external-dependencies.md"
+  }
+}
