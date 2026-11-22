@@ -176,3 +176,13 @@ Append-only; supersede in place if the underlying ecosystem changes.
 **Root cause** — A CI runner has no D-Bus session bus. GTK and WebKitGTK call services on it at start-up; with no bus the call ends on its 30-second timeout instead of failing at once. Silencing the accessibility bridge (`NO_AT_BRIDGE=1`) removes the warning, not the wait.
 
 **Mitigation** — Start the run inside its own session bus: `dbus-run-session -- xvfb-run …`. The E2E step went from 12 min 26 s to 2 min 32 s on the same 23 files. A wait of exactly 30 seconds, repeated, is a timeout: look for who is being waited on before looking at the code that waits.
+
+## L-021 — A reviewer session's report path is granted by an absolute `Edit` rule
+
+**First observed**: 2026-11-22 (PR #902, the infra lane)
+
+**Symptom** — The CI reviewer ends with "no report": its Write to `<workspace>/.review/…` is refused although `--allowedTools` grants `Write(.review/**)` and `Edit(.review/**)`; the same lane wrote its report on another pull request.
+
+**Root cause** — Claude Code grants the Write tool through `Edit(…)` rules; a `Write(…)` rule grants nothing to it. A rule's path without a leading slash reads from the session's current folder, which a `cd` moves: the session had run `cd <worktree> && grep …`, so `Edit(.review/**)` covered the worktree's `.review/`, not the checkout's. A single leading `/` reads from the project root; `//` is the filesystem root.
+
+**Mitigation** — The report folder is also granted absolutely: `Edit(/${{ github.workspace }}/.review/**)`, which expands to `//home/…`. Checked locally with `claude -p --setting-sources project --permission-mode default`: after a `cd`, the relative rule is refused and the `//` one writes; `Write(//…)` alone is refused; `Edit(/<absolute path>)` with one slash is refused. A permission probe runs with the user's settings off — they may allow the write and prove nothing.
