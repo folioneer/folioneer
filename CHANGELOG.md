@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.21.1] - 2026-11-22
+
+### Fixed
+
+- [price] a weekend download no longer counts assets as skipped, and rates download even when prices fail
+- [account] the capital brought into an account counts a holding transferred in or out at its cost
+- [price] a closing price the market had not finished at the daily download is recorded by the next one
+- [sync] a sync that holds a change back or raises a notice now shows on the sync indicator at once
+- [transaction] Back returns to the account chosen on the transaction list, and a refused deletion says why
+- [sync] the sync page shows a finished sync without being reopened
+- [account] an account viewed at a past date shows its cash line even when it held no cash
+
 ## [0.21.0] - 2026-11-21
 
 ### Added
