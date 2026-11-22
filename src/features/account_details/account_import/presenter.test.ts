@@ -91,10 +91,6 @@ describe("account import presenter", () => {
       key: "account_import.error.columns_not_in_file",
       vars: { columns: "Qté, Prix" },
     });
-    expect(accountImportErrorToI18n({ code: "MapperFileInvalid", reason: "no date" })).toEqual({
-      key: "account_import.error.mapper_file_invalid",
-      vars: { reason: "no date" },
-    });
     expect(accountImportErrorToI18n({ code: "DatabaseError" })).toEqual({
       key: "error.DatabaseError",
     });
@@ -104,6 +100,19 @@ describe("account import presenter", () => {
     expect(accountImportErrorToI18n({ code: "UnreadableFile" } as never)).toEqual({
       key: "error.Unknown",
     });
+  });
+
+  // IMP-020H (owner, 2026-11-22, #722) — a refused mapper file is worded from its typed
+  // problem: the field and the line, never the reader's text.
+  it.each([
+    ["NotJson", null, "mapper_file_not_json", { line: 3 }],
+    ["MissingField", "separator", "mapper_file_missing_field", { field: "separator", line: 3 }],
+    ["UnknownField", "built_in", "mapper_file_unknown_field", { field: "built_in", line: 3 }],
+    ["InvalidValue", null, "mapper_file_invalid_value", { line: 3 }],
+  ] as const)("words a %s refusal", (problem, field, key, vars) => {
+    expect(
+      accountImportErrorToI18n({ code: "MapperFileInvalid", problem, field, line: 3 }),
+    ).toEqual({ key: `account_import.error.${key}`, vars });
   });
 });
 

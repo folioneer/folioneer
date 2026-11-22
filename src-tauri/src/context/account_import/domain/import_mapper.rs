@@ -133,8 +133,55 @@ pub struct AssetMatch {
     pub asset_id: String,
 }
 
-/// The longest reason told about a file: it may quote the file's own text.
-const REASON_LENGTH: usize = 200;
+/// IMP-020H — why a file does not decode as a mapper, for the window to word (#722).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub enum MapperFileProblem {
+    /// The file is not JSON, or ends before it closes.
+    NotJson,
+    /// A field a mapper needs is missing; the error names it.
+    MissingField,
+    /// A field a mapper does not have; the error names it.
+    UnknownField,
+    /// A value outside the ones allowed.
+    InvalidValue,
+}
+
+/// The longest field name a refusal repeats from a file.
+const FIELD_LENGTH: usize = 60;
+
+/// IMP-020H — the reader's error as a typed problem: its line, and the missing or unknown
+/// field's name (a missing one is a mapper's own; an unknown one, the file's key, bounded).
+fn file_problem(error: &serde_json::Error) -> AccountImportError {
+    use serde_json::error::Category;
+    // A reader over bytes always counts lines from 1.
+    let line = u32::try_from(error.line()).unwrap_or(u32::MAX).max(1);
+    // serde_json names a missing or unknown field only in its message; the wording is pinned
+    // by `imp_020h_a_bad_file_names_its_problem_and_line` and `tests/csv_import.rs`.
+    let message = error.to_string();
+    let named = |prefix: &str| {
+        message
+            .strip_prefix(prefix)
+            .and_then(|rest| rest.split_once('`'))
+            .map(|(field, _)| field.chars().take(FIELD_LENGTH).collect::<String>())
+    };
+    let (problem, field) = match error.classify() {
+        Category::Io | Category::Syntax | Category::Eof => (MapperFileProblem::NotJson, None),
+        Category::Data => {
+            if let Some(field) = named("missing field `") {
+                (MapperFileProblem::MissingField, Some(field))
+            } else if let Some(field) = named("unknown field `") {
+                (MapperFileProblem::UnknownField, Some(field))
+            } else {
+                (MapperFileProblem::InvalidValue, None)
+            }
+        }
+    };
+    AccountImportError::MapperFileInvalid {
+        problem,
+        field,
+        line,
+    }
+}
 
 /// The info entry of a mapper's file (IMP-020).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
@@ -199,13 +246,11 @@ pub struct ImportMapperDraft {
 }
 
 impl ImportMapperDraft {
-    /// IMP-020B — a draft read from a mapper's file, a byte order mark dropped; `reason` says
-    /// why it does not read.
+    /// IMP-020B — a draft read from a mapper's file, a byte order mark dropped; what does not
+    /// read names its problem and line, never the reader's text (#722).
     pub fn from_file(bytes: &[u8]) -> Result<Self, AccountImportError> {
         let text = bytes.strip_prefix(&[0xEF, 0xBB, 0xBF]).unwrap_or(bytes);
-        serde_json::from_slice(text).map_err(|e| AccountImportError::MapperFileInvalid {
-            reason: e.to_string().chars().take(REASON_LENGTH).collect(),
-        })
+        serde_json::from_slice(text).map_err(|e| file_problem(&e))
     }
 }
 
@@ -545,12 +590,61 @@ mod tests {
         );
         let with_mark = [&[0xEF, 0xBB, 0xBF], file.as_slice()].concat();
         assert!(ImportMapperDraft::from_file(&with_mark).is_ok());
-        for bad in [&b"not json"[..], br#"{"info":{"provider":"A"}}"#] {
-            assert!(matches!(
-                ImportMapperDraft::from_file(bad),
-                Err(AccountImportError::MapperFileInvalid { reason }) if !reason.is_empty()
-            ));
-        }
+    }
+
+    // IMP-020H (owner, 2026-11-22, #722) — a file that does not decode as a mapper names its
+    // problem and the line, never the reader's own text.
+    #[test]
+    fn imp_020h_a_bad_file_names_its_problem_and_line() {
+        let refused = |bytes: &[u8]| match ImportMapperDraft::from_file(bytes) {
+            Err(AccountImportError::MapperFileInvalid {
+                problem,
+                field,
+                line,
+            }) => (problem, field, line),
+            other => panic!("refused as invalid: {other:?}"),
+        };
+        assert_eq!(
+            refused(b"{\n  \"info\":\n  oops"),
+            (MapperFileProblem::NotJson, None, 3)
+        );
+        assert_eq!(
+            refused(br#"{"info":{"provider":"A"}}"#),
+            (
+                MapperFileProblem::MissingField,
+                Some("separator".to_string()),
+                1
+            )
+        );
+        assert_eq!(
+            refused(br#"{"info":"#),
+            (MapperFileProblem::NotJson, None, 1),
+            "a file that ends early"
+        );
+        assert_eq!(
+            refused(b"{\n\"info\": {\"provider\": \"A\"}\n}"),
+            (
+                MapperFileProblem::MissingField,
+                Some("separator".to_string()),
+                3
+            ),
+            "the line where the entry lacking it closes"
+        );
+        assert_eq!(
+            refused(b"{\n\"info\": {\"provider\": 7}\n}"),
+            (MapperFileProblem::InvalidValue, None, 2)
+        );
+        let mut extra = serde_json::to_value(draft("A")).expect("serializes");
+        extra["built_in"] = serde_json::json!(true);
+        let (problem, field, _) = refused(extra.to_string().as_bytes());
+        assert_eq!(
+            (problem, field.as_deref()),
+            (MapperFileProblem::UnknownField, Some("built_in"))
+        );
+        let long = format!(r#"{{"{}":1}}"#, "x".repeat(5_000));
+        let (_, field, _) = refused(long.as_bytes());
+        let field = field.expect("named");
+        assert!(field.chars().count() <= 60, "a field name is bounded");
     }
 
     // IMP-020 — a new mapper's file name reads as its provider, and takes no held one.
@@ -565,19 +659,6 @@ mod tests {
             new_mapper_id("Broker", &["BROKER".to_string(), "broker-2".to_string()]),
             "broker-3"
         );
-    }
-
-    // IMP-020B — a reason quoting a file's text is bounded.
-    #[test]
-    fn imp_020b_a_reason_is_bounded() {
-        let field = "x".repeat(5_000);
-        let file = format!(r#"{{"{field}":1}}"#);
-        let Err(AccountImportError::MapperFileInvalid { reason }) =
-            ImportMapperDraft::from_file(file.as_bytes())
-        else {
-            panic!("refused");
-        };
-        assert!(reason.chars().count() <= 200);
     }
 
     // IMP-020 — a file name works on every platform shipped, a reserved one taking a suffix.
