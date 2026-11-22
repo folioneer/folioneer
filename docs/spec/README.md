@@ -5,7 +5,7 @@ core behaves — the Rust behaviour every surface calls — written or amended b
 the issue and the code and checked by `spec-reviewer` before anything is built from it.
 
 Each surface has its own description, never a spec (owner, 2026-11-07, #789): the window in
-its validated mocks (`folioneer/folioneer-design`, `docs/workflow.md` § Design proposal), the command line
+its validated mocks (`folioneer/folioneer-design`, `docs/workflow.md` § Design proposal), indexed by screen in `docs/surfaces/window.md`, the command line
 in `docs/surfaces/command-line.md`, an AI agent's connection (MCP) in
 `docs/surfaces/mcp.md`. A spec holds no wording in any language, no layout, no command-line
 argument and no tool shape; its rules are scoped `(backend)`, the core's scope.
@@ -16,8 +16,8 @@ the rule's scope: a rule that states the core's behaviour — a `(frontend + bac
 rescoped `(backend)`, and only its surface part moves; a rule that only describes a surface
 moves to that surface's description, its number left vacant, and the code and tests that
 cited it cite that description instead — its file and heading (`command-line.md § export`).
-A window rule leaves once a validated mock shows it, the code and tests citing the mock's
-issue; until then it stays. The UX Draft leaves with the
+A window rule leaves once a validated mock shows it; the code and tests then cite the screen
+that lists the mock (`window.md § accounts-list`). Until then it stays. The UX Draft leaves with the
 window rules. A spec left with no rule retires its trigram (`retired` in the registry).
 
 ## Numbering

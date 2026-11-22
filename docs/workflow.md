@@ -41,7 +41,8 @@ The mocks are pushed to `folioneer/folioneer-design` (owner, 2026-10-19;
 `design-proposal.repo`) — one folder per issue, straight to its `main`, no pull request,
 review or CI — and posted on the issue with each image inline. A new surface has no current
 state to capture (owner, 2026-10-24). Once validated, the mocks are the window's
-description: no spec restates them (`docs/surfaces/README.md`).
+description: no spec restates them (`docs/surfaces/README.md`), and the task's pull request
+adds their issue and folder under their screen in `docs/surfaces/window.md`.
 
 ## Ending a batch
 
