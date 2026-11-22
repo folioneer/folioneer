@@ -158,9 +158,8 @@ class NamedCommands(unittest.TestCase):
         for path in ("CLAUDE.md", ".claude/settings.json", ".claude/daneel.json", ".claude/agents", ".claude/skills"):
             self.assertIn(path, restored.group(1).split())
 
-    # PR #902, L-021 — the Write tool is granted by `Edit` rules, and a relative one reads
-    # from the session's current folder: after a `cd` into the branch's worktree,
-    # `Edit(.review/**)` no longer covered the report; `//` makes the path absolute.
+    # PR #902 — after a `cd` into the branch's worktree, `Edit(.review/**)` no longer
+    # covered the report: the grant's comment in review.yml says why.
     def test_the_report_is_writable_from_any_folder_the_session_moved_to(self):
         self.assertIn("Edit(/${{ github.workspace }}/.review/**)", granted_tools())
 

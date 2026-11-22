@@ -246,6 +246,13 @@ jobs:
             on GitHub yourself; the workflow does that from the saved file.
             Be concise: one line per finding (location, claim, fix); no
             restating of the diff, no narrative, no unrequested alternatives.
+          # The report is granted by `Edit` rules: they also grant the Write tool, a `Write(…)`
+          # rule grants it nothing. A rule's path without a leading slash reads from the
+          # session's current folder, which a `cd` into the branch's worktree moves (PR #902:
+          # "no report"), and one leading `/` reads from the project root; `//` — here `/`
+          # before the workspace's absolute path — is the filesystem root. Probed with
+          # `claude -p --setting-sources project --permission-mode default`, the user's
+          # settings off: they may allow the write and prove nothing.
           claude_args: |
             --model claude-sonnet-5
             --max-turns 80
