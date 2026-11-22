@@ -158,6 +158,13 @@ class NamedCommands(unittest.TestCase):
         for path in ("CLAUDE.md", ".claude/settings.json", ".claude/daneel.json", ".claude/agents", ".claude/skills"):
             self.assertIn(path, restored.group(1).split())
 
+    # PR #902 — a relative path rule reads from the session's current folder: after a `cd`
+    # into the branch's worktree, `.review/**` no longer covered the report in the checkout.
+    def test_the_report_is_writable_from_any_folder_the_session_moved_to(self):
+        tools = granted_tools()
+        for tool in ("Write", "Edit"):
+            self.assertIn(tool + "(/${{ github.workspace }}/.review/**)", tools)
+
     def test_the_web_tools_are_not_granted(self):
         for tool in granted_tools():
             self.assertFalse(tool.startswith("Web"), tool)
