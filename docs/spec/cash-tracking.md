@@ -176,7 +176,7 @@ The asset-mutation commands (`update_asset`, `archive_asset`, `unarchive_asset`,
 
 ### Cash Holding Display (090–099)
 
-**CSH-090 — Cash Holding included in AccountDetailsResponse (backend)**: Every account has a Cash Holding (CSH-012), and `AccountDetailsUseCase` always includes it in `AccountDetailsResponse.holdings` (the active list) — **exempt from the ACD-020 `quantity > 0` filter** and never placed in `closed_holdings`, even at `quantity = 0`. Asset-metadata enrichment (ACD-022) treats the Cash Asset like any other asset — `asset_name` becomes "Cash EUR" / "Cash USD" / etc.
+**CSH-090 — Cash Holding included in AccountDetailsResponse (backend)**: Every account has a Cash Holding (CSH-012), and `AccountDetailsUseCase` always includes it in `AccountDetailsResponse.holdings` (the active list) — **exempt from the ACD-020 `quantity > 0` filter** and never placed in `closed_holdings`, even at `quantity = 0`. The as-of view includes it the same way, with its balance on the as-of date, whatever the balance. Asset-metadata enrichment (ACD-022) treats the Cash Asset like any other asset — `asset_name` becomes "Cash EUR" / "Cash USD" / etc.
 
 **CSH-091 — Cash row layout (frontend)**: The Cash row displays its quantity as a currency amount (e.g. `€1,250.00`), no average price column, no cost basis column, no realized P&L column, no Buy/Sell row actions. Its inline actions are a "Deposit" / "Withdraw" pair plus a "View transactions" (inspect) action (CSH-110) — replacing the standard holding-row actions.
 
