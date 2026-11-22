@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT (SELECT COUNT(*) FROM sync_received_states WHERE record_kind = ?1 AND record_identity = ?2 AND logical_timestamp = ?3)\n                    + (SELECT COUNT(*) FROM changes WHERE record_kind = ?1 AND record_identity = ?2 AND logical_timestamp = ?3) AS \"count!: i64\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "count!: i64",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "f8cbe973d950a6a1fae49777688d573b701dcf3bd0184fac211c83e3c8f1072a"
+}

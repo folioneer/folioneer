@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT OR IGNORE INTO sync_received_states (record_kind, record_identity, logical_timestamp) VALUES (?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "34ffdec8eedffb12b6fd50d9c03ba986a7eb63faa8ead659fdea80ce1ccffffa"
+}

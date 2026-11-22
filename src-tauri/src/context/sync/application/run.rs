@@ -1155,6 +1155,12 @@ mod tests {
     /// A laptop area holding one segment `1..=1` with `change`, sealed under the kept key,
     /// and the manifest announcing it — served by the mock folder store.
     fn folder_with_laptop_segment(change: SegmentChange) -> MockFolderStore {
+        folder_with_laptop_changes(vec![change])
+    }
+
+    /// Laptop's one segment, holding `changes` in sequence order from 1.
+    fn folder_with_laptop_changes(changes: Vec<SegmentChange>) -> MockFolderStore {
+        let last = changes.len() as i64;
         let key = kept_key_for_tests();
         let manifest = encode_manifest(
             &key,
@@ -1163,7 +1169,7 @@ mod tests {
                 device_name: "Laptop".into(),
                 data_format_version: DATA_FORMAT_VERSION,
                 app_version: Some("0.42.0".into()),
-                latest_sequence: 1,
+                latest_sequence: last,
             },
         )
         .expect("manifest encodes");
@@ -1172,9 +1178,9 @@ mod tests {
             &Segment {
                 device_id: "laptop-device".into(),
                 first_sequence: 1,
-                last_sequence: 1,
+                last_sequence: last,
                 data_format_version: DATA_FORMAT_VERSION,
-                changes: vec![change],
+                changes,
             },
         )
         .expect("segment encodes");
@@ -1195,7 +1201,7 @@ mod tests {
             .returning(move |_| Ok(Some(manifest.clone())));
         folder_store
             .expect_list_segment_names()
-            .returning(|_| Ok(vec![segment_file_name(1, 1)]));
+            .returning(move |_| Ok(vec![segment_file_name(1, last)]));
         folder_store
             .expect_read_segment_bytes()
             .returning(move |_, _| Ok(Some(segment.clone())));
@@ -1213,6 +1219,65 @@ mod tests {
             origin: Origin::User,
             content: Some(content.into()),
         }
+    }
+
+    // #925 / CFR-011 — a change based on a state this device received and ignored (an
+    // application change outranked by the user's own state) is not held back forever
+    // waiting for that state: it is decided against the state this device holds.
+    #[tokio::test]
+    async fn a_change_based_on_an_ignored_state_is_decided_not_held_back() {
+        let pool = make_pool().await;
+        seed_sync_device(&pool, "desktop-device").await;
+        let state_repo: Arc<dyn SyncStateRepository> =
+            Arc::new(SqliteSyncStateRepository::new(pool.clone()));
+        let at = |value: u64| format!("{value:020}");
+        let refreshed = SegmentChange {
+            sequence: 1,
+            logical_timestamp: at(7),
+            based_on: None,
+            record_kind: RecordKind::Account,
+            record_identity: "account-1".into(),
+            operation: Operation::Updated,
+            origin: Origin::Application,
+            content: Some(r#"{"id":"account-1","name":"Livret","currency":"EUR"}"#.into()),
+        };
+        let renamed = SegmentChange {
+            sequence: 2,
+            logical_timestamp: at(8),
+            based_on: Some(at(7)),
+            record_kind: RecordKind::Account,
+            record_identity: "account-1".into(),
+            operation: Operation::Updated,
+            origin: Origin::User,
+            content: Some(r#"{"id":"account-1","name":"Livret A","currency":"EUR"}"#.into()),
+        };
+        let folder_store = folder_with_laptop_changes(vec![refreshed, renamed]);
+        let mut applier = MockChangeApplier::new();
+        applier.expect_live_record().returning(|_, _, _| {
+            Ok(Some(crate::shared::domain::SyncedRecord {
+                rank: Some(crate::shared::domain::Rank {
+                    origin: Origin::User,
+                    logical_timestamp: crate::shared::domain::LogicalTimestamp::new(5),
+                    device_id: "desktop-device".into(),
+                }),
+                content: r#"{"id":"account-1","name":"Courant","currency":"EUR"}"#.into(),
+            }))
+        });
+        applier
+            .expect_clashing_name()
+            .returning(|_, _, _, _| Ok(None));
+        applier
+            .expect_children_of_account()
+            .returning(|_, _| Ok(vec![]));
+        applier.expect_write().returning(|_, _| Ok(()));
+        let run = run_over(&pool, Arc::clone(&state_repo), folder_store);
+
+        let report = run.run(&device(), &applier).await.expect("run");
+        assert_eq!(
+            report.held_back_changes, 0,
+            "CFR-011: nothing waits for a state this device already received"
+        );
+        assert_eq!(report.applied_changes, 1, "the user's rename prevails");
     }
 
     // SYN-065 — a full run applies another device's segment through the applier, counts
