@@ -57,10 +57,10 @@ npm install
 **6. Verify**
 
 ```bash
-just check-full
+just release-check
 ```
 
-This runs lint + format + typecheck + tests for both backend and frontend. If it goes green, the environment is ready.
+This runs lint + format + typecheck + tests + the build for both backend and frontend. If it goes green, the environment is ready.
 
 (Version requirements: `package.json` and `src-tauri/Cargo.toml`. macOS/Windows: install Rust via https://rustup.rs and Node via https://nodejs.org; system-library step is Linux-only.)
 

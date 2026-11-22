@@ -59,11 +59,11 @@ What the owner is told rests on what was read. A statement that the code does or
 ## Commands
 
 - `just dev` (a debug build uses its own data folder and never touches the daily fetch; `--reset-db` resets only that database) · `just dev-seed [--replace]` (a detached copy of the installed database).
-- `just test [paths]` · `just test-rust [filter]` (two build jobs) · `just test-unit` · `just test-scripts [files]`. `just e2e [specs]` (under xvfb, as CI runs it; by hand — the harness never runs it, CI stays its gate).
-- `just quiet <recipe> [args]` (one line: the verdict by exit code; the output in `tmp/<recipe>.log`) · `just harness [--coverage]` (the coverage run holds the foreground; without a terminal, `HARNESS_FOREGROUND=1`) · `just check [--frontend|--backend]` · `just check-full` · `just release-check` · `just format` · `just arch-check` (`--write-allowlist` only lowers the frozen debt) · `just rule-homes` · `just coverage-gate` · `just generate-types`.
+- `just test [paths]` · `just test-rust [filter]` (two build jobs) · `just test-scripts [files]`. `just e2e [specs]` (under xvfb, as CI runs it; by hand — the harness never runs it, CI stays its gate).
+- `just quiet <recipe> [args]` (one line: the verdict by exit code; the output in `tmp/<recipe>.log`) · `just harness [--coverage]` (the coverage run holds the foreground; without a terminal, `HARNESS_FOREGROUND=1`) · `just check [--frontend|--backend]` · `just release-check` · `just format` · `just arch-check` (`--write-allowlist` only lowers the frozen debt) · `just rule-homes` · `just coverage-gate` · `just generate-types`.
 - In `<app>/skills/run-entry/scripts/`: `watch-pr.py [number]` (waits for a pull request's checks; the verdict by exit code) · `merge.py` (refuses until every check is green and every CI 🔴 and 🟡 graded; folds `fixup!` commits). In `<flow>/skills/flow-audit/scripts/`: `flow-audit.py` (a batch's figures).
 - `just install` · `just stat` · `just worktree <branch>`. A recipe exists because CI, a hook, a skill, an agent or a script calls it, or because it is listed here; otherwise it goes.
-- Ending a batch: `method.md` § 5 and `docs/workflow.md` § Ending a batch — `/app:run-batch` cuts the release to its draft (`release.py`) or tags `batch/<date>` (`batch-end.sh`); the owner publishes the draft with `gh release edit vX.Y.Z --draft=false` once both platforms attached their assets; then `/flow:flow-audit`.
+- Ending a batch: `method.md` § 5 and `docs/workflow.md` § Ending a batch — `/app:run-batch` cuts the release to its draft (`release.py`) or tags `batch/<date>` (`batch-end.sh`); the owner publishes the draft with `just publish-release`, which checks its tag and its release run first; then `/flow:flow-audit`.
 
 ## Standards
 

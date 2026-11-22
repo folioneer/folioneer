@@ -50,7 +50,7 @@ description: no spec restates them (`docs/surfaces/README.md`).
 - **A batch with a `feat` or `fix`** (`/app:run-batch` Step 4): a `just release-check`
   failure is fixed in a pull request of its own before the release; the `v*` tag starts
   `release.yml`, which builds the draft; the owner publishes it
-  (`gh release edit vX.Y.Z --draft=false`) once both platforms attached their assets.
+  with `just publish-release`, which checks the draft first.
 
 ## The harness
 

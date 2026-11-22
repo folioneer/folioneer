@@ -43,12 +43,6 @@ class ScopedRecipes(unittest.TestCase):
     def test_the_lint_recipe_takes_a_layer(self):
         self.assertIn('scripts/check.py --fast "$@"', dry_run("check", "--frontend"))
 
-    # Without a scope the unit recipe still runs both suites.
-    def test_without_a_scope_both_suites_run(self):
-        both = dry_run("test-unit")
-        self.assertIn("npm test --", both)
-        self.assertIn("cargo test", both)
-
     # An argument reaches the command whole: a space does not split it and the shell reads
     # nothing in it. `check` is the one recipe cheap enough to run for real here.
     def test_an_argument_with_a_space_or_a_shell_character_stays_one_argument(self):

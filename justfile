@@ -44,9 +44,6 @@ coverage-be: (_used "coverage-be")
     mkdir -p coverage/backend && cd src-tauri && cargo llvm-cov --lib --tests --lcov --output-path ../coverage/backend/lcov.info --ignore-filename-regex '(^|/)build\.rs$|dev/generate_bindings\.rs$|/src-tauri/tests/'
     python3 scripts/coverage-strip-tests.py coverage/backend/lcov.info
 
-# Run unit tests only (excludes E2E, which is `just e2e`, and coverage; see coverage-fe/coverage-be)
-test-unit: test test-rust
-
 # Run the E2E suite under xvfb, as CI does; pass spec files to run some (just e2e e2e/split/split.test.ts)
 e2e *SPECS:
     bash scripts/e2e.sh "$@"
@@ -86,21 +83,17 @@ _used RECIPE:
 quiet RECIPE *ARGS:
     @bash scripts/verdict.sh "$1" just "$@"
 
-# ---- shared recipes ----------------------------------------------------
 # Run fast quality check (lint/format only, no tests); pass --frontend or --backend for one layer
 check *ARGS:
-    @[ -f scripts/check.py ] || { echo "❌ scripts/check.py not found — restore it from git history"; exit 1; }
     python3 scripts/check.py --fast "$@"
-
-# Run full quality check (tests + build + lint)
-check-full:
-    @[ -f scripts/check.py ] || { echo "❌ scripts/check.py not found — restore it from git history"; exit 1; }
-    python3 scripts/check.py
 
 # What a release validates before it versions anything — every test, the build, the full query check — run at the hand-over of a batch (docs/workflow.md § Ending a batch)
 release-check:
-    @[ -f scripts/check.py ] || { echo "❌ scripts/check.py not found — restore it from git history"; exit 1; }
     python3 scripts/check.py --release
+
+# The owner publishes the newest draft release (scripts/publish-release.sh)
+publish-release:
+    bash scripts/publish-release.sh
 
 # Count lines of code per language (cloc)
 stat: (_used "stat")
@@ -115,18 +108,18 @@ run-entry: (_used "run-entry")
 # Regenerate the SQLx offline query cache (run after schema or query changes): brings the
 # check database up to the latest migration, then prepares against it
 prepare-sqlx: (_used "prepare-sqlx")
-    @if [ -d src-tauri ]; then cd src-tauri && mkdir -p .local && DATABASE_URL="sqlite:.local/dev_check.sqlite" sqlx database create && DATABASE_URL="sqlite:.local/dev_check.sqlite" sqlx migrate run; fi
-    @if [ -d src-tauri ]; then cd src-tauri && SQLX_OFFLINE=false DATABASE_URL="sqlite:.local/dev_check.sqlite" cargo sqlx prepare -- --tests; else echo "ℹ skipping prepare-sqlx (no src-tauri/)"; fi
+    cd src-tauri && mkdir -p .local && DATABASE_URL="sqlite:.local/dev_check.sqlite" sqlx database create && DATABASE_URL="sqlite:.local/dev_check.sqlite" sqlx migrate run
+    cd src-tauri && SQLX_OFFLINE=false DATABASE_URL="sqlite:.local/dev_check.sqlite" cargo sqlx prepare -- --tests
 
 # The markdown fixer runs prettier with the same args as check.py's
 # _PRETTIER_DOCS_CMD (`--write` mirroring its `--check`), so `just format`
 # always satisfies `just check`.
 # Auto-fix formatting and linting on both layers
 format: (_used "format")
-    @if [ -d src-tauri ]; then cd src-tauri && cargo fmt; else echo "ℹ skipping cargo fmt (no src-tauri/)"; fi
-    @if [ -d src-tauri ]; then cd src-tauri && cargo clippy --fix --allow-dirty --quiet; else echo "ℹ skipping clippy (no src-tauri/)"; fi
-    @if [ -f package.json ]; then npm run format:fix; else echo "ℹ skipping format:fix (no package.json)"; fi
-    @if [ -f package.json ]; then npx prettier --write "**/*.md" --ignore-path .gitignore; else echo "ℹ skipping prettier docs (no package.json)"; fi
+    cd src-tauri && cargo fmt
+    cd src-tauri && cargo clippy --fix --allow-dirty --quiet
+    npm run format:fix
+    npx prettier --write "**/*.md" --ignore-path .gitignore
 
 # Create a git worktree beside this checkout on a new branch off main, sharing node_modules so its git hooks run (usage: just worktree <branch>)
 worktree BRANCH: (_used "worktree")

@@ -95,7 +95,9 @@
       "Edit(.claude/settings.json)",
       "Bash(gh release create *)",
       "Bash(gh release edit *)",
-      "Bash(gh api *releases*)"
+      "Bash(gh api *releases*)",
+      "Bash(*just*publish-release*)",
+      "Bash(*publish-release.sh*)"
     ]
   },
   "enabledPlugins": {
