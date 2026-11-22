@@ -102,5 +102,7 @@ The pieces only this repository has: the tools of its build.
   skips it for anything the suite builds or runs.
 - `scripts/licence-check.py` — refuses a shipped dependency under a licence outside
   `licence-allowlist.json`. Never: extends the allowlist.
+- `scripts/publish-release.sh` — the owner publishes the newest draft release, after
+  checking its tag and release run, on a yes. Never: run by the agent, or without a terminal.
 - `scripts/sync-format-check.sh` — refuses a change to a published sync format
   snapshot. Never: blocks a new version's snapshot.
