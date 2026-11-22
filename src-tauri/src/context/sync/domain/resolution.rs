@@ -271,6 +271,7 @@ pub struct Decision {
 /// order cannot matter (CFR-013). Whole-record replacement: when `incoming` prevails it
 /// prevails entirely; fields are never merged one by one, except the two record kinds that
 /// bypass this function altogether (`resolve_observation`, `Outcome::MergeMax`).
+#[cfg(test)]
 pub fn resolve(incoming: &Change, current: Option<&RecordState>) -> Outcome {
     resolve_seen(incoming, current, false)
 }
@@ -393,6 +394,7 @@ pub fn resolve_observation(incoming: &Change, current: Option<&RecordState>) -> 
 /// device already holds (CFR-021); and reports a natural-key collision on both creating
 /// devices (CFR-034). `current_content` is the content this device holds live for the
 /// identity, in the form the repositories serialize it.
+#[cfg(test)]
 pub fn decide(
     incoming: &Change,
     current: Option<&RecordState>,

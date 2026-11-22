@@ -124,20 +124,18 @@ pub async fn apply_change(
     let applied = match decision.outcome {
         Outcome::Apply { .. } | Outcome::MergeMax => {
             write(conn, applier, change_log, change, content, &mut notices).await?;
-            note_received(conn, change_log, change).await?;
             Applied::Applied
         }
-        Outcome::Ignore { .. } => {
-            note_received(conn, change_log, change).await?;
-            Applied::Ignored
-        }
+        Outcome::Ignore { .. } => Applied::Ignored,
         Outcome::Drop { notice } => {
-            note_received(conn, change_log, change).await?;
             notices.push(notice);
             Applied::Dropped
         }
         Outcome::HoldBack { waiting_for } => Applied::HeldBack(waiting_for),
     };
+    if !matches!(applied, Applied::HeldBack(_)) {
+        note_received(conn, change_log, change).await?;
+    }
     Ok(ApplyResult {
         applied,
         notices: own_notices(notices, own_device_id),

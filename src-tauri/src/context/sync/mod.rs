@@ -27,14 +27,14 @@ pub use application::{
 };
 pub use domain::{
     cascade_child_tombstones, collision_notice, duplicate_name_notice, ensure_device_name,
-    local_write_allowed, notice_for, reference_outcome, resolve, resolve_observation,
-    segment_file_name, segment_sequence_range, Change, ChangeApplier, ChangeLogRepository,
-    Concurrency, ConflictNotice, ConflictNoticeKind, DerivationParameters, FolderHeader,
-    FolderProblem, FolderStore, HeldBackChange, HoldingInconsistency, InconsistentHolding,
-    Manifest, NoticeDraft, Outcome, PortfolioRecord, PortfolioSnapshot, RankStamper, RecordState,
-    RosterEntry, Segment, SegmentChange, StoredDevice, SyncCursor, SyncDevice, SyncFailure,
-    SyncFolderState, SyncHealth, SyncReport, SyncReportView, SyncStateRepository, SyncStatus,
-    SyncStatusView, Tombstone, WaitingFor, WriteHeaderOutcome, APP_VERSION, TEXT_BOUND,
+    local_write_allowed, notice_for, reference_outcome, resolve_observation, segment_file_name,
+    segment_sequence_range, Change, ChangeApplier, ChangeLogRepository, Concurrency,
+    ConflictNotice, ConflictNoticeKind, DerivationParameters, FolderHeader, FolderProblem,
+    FolderStore, HeldBackChange, HoldingInconsistency, InconsistentHolding, Manifest, NoticeDraft,
+    Outcome, PortfolioRecord, PortfolioSnapshot, RankStamper, RecordState, RosterEntry, Segment,
+    SegmentChange, StoredDevice, SyncCursor, SyncDevice, SyncFailure, SyncFolderState, SyncHealth,
+    SyncReport, SyncReportView, SyncStateRepository, SyncStatus, SyncStatusView, Tombstone,
+    WaitingFor, WriteHeaderOutcome, APP_VERSION, TEXT_BOUND,
 };
 pub use error::SyncError;
 pub use infrastructure::codec::{header_data_format_version, DATA_FORMAT_VERSION};
