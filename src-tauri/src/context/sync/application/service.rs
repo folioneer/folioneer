@@ -19,6 +19,8 @@ struct LastRun {
     failures: Vec<SyncFailure>,
     roster: Vec<RosterEntry>,
     paused: bool,
+    held_back_count: u32,
+    notice_count: usize,
 }
 
 /// Device lifecycle + status assembly for the sync bounded context.
@@ -73,25 +75,47 @@ impl SyncService {
             .ok_or(SyncError::SyncDisabled)
     }
 
-    /// Keeps the run for `SyncStatus` (SYN-063/069) and raises `SyncCompleted` when the run applied at
-    /// least one change or left different failures or paused state than the previous one
-    /// (SYN-064) — so a reset, a format gate, or an unavailable folder reaches the shell
-    /// without polling. A run that ended without a failure is recorded as the last sync;
-    /// a failed one is not a sync (SYN-063), so the status the report carries back to the
-    /// caller states the last successful sync, not the attempt.
+    /// Keeps the run for `SyncStatus` (SYN-063/069) and raises `SyncCompleted` when the run
+    /// applied at least one change or left different failures, paused state, held-back count
+    /// or notice count than the previous one (SYN-064) — so a reset, a format gate, an
+    /// unavailable folder, a change held back or a notice reaches the shell without polling.
+    /// Held-back changes and notices that cannot be read keep the previous run's counts. A run
+    /// that ended without a failure is recorded as the last sync; a failed one is not a sync
+    /// (SYN-063), so the status the report carries back to the caller states the last
+    /// successful sync, not the attempt.
     pub async fn remember_run(&self, report: &mut SyncReport) {
-        let run = LastRun {
-            failures: report.failures.clone(),
-            roster: report.status.roster.clone(),
-            paused: report.status.paused,
+        let pending = match self.fill_pending(&mut report.status).await {
+            Ok(()) => Some((report.status.held_back_count, report.status.notices.len())),
+            Err(e) => {
+                tracing::warn!(target: BACKEND, err = ?e, "remember_run: held-back changes or notices unreadable");
+                None
+            }
         };
-        let previous = self
-            .last_run
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .replace(run);
+        // One lock for the read and the swap: a concurrent run cannot slip between them. The
+        // block ends the lock before the awaits below.
+        let (previous, held_back_count, notice_count) = {
+            let mut last_run = self.last_run.lock().unwrap_or_else(PoisonError::into_inner);
+            let (held_back_count, notice_count) = pending
+                .or_else(|| {
+                    last_run
+                        .as_ref()
+                        .map(|run| (run.held_back_count, run.notice_count))
+                })
+                .unwrap_or_default();
+            let previous = last_run.replace(LastRun {
+                failures: report.failures.clone(),
+                roster: report.status.roster.clone(),
+                paused: report.status.paused,
+                held_back_count,
+                notice_count,
+            });
+            (previous, held_back_count, notice_count)
+        };
         let changed = previous.as_ref().is_none_or(|previous| {
-            previous.failures != report.failures || previous.paused != report.status.paused
+            previous.failures != report.failures
+                || previous.paused != report.status.paused
+                || previous.held_back_count != held_back_count
+                || previous.notice_count != notice_count
         });
         let recorded = report.failures.is_empty()
             && self
@@ -228,11 +252,20 @@ impl SyncService {
             return Ok(SyncStatus::disabled());
         };
         let mut status = self.status_of(&device).await;
-        status.notices = self.state_repo.list_undismissed_notices().await?;
+        self.fill_pending(&mut status).await?;
+        Ok(status)
+    }
+
+    /// The part of `SyncStatus` read from the store: the undismissed notices (SYN-066) and
+    /// the held-back changes (SYN-041).
+    async fn fill_pending(&self, status: &mut SyncStatus) -> Result<(), SyncError> {
+        // Both read before either is written: a failed read leaves the status as it was.
+        let notices = self.state_repo.list_undismissed_notices().await?;
         let held_back = self.state_repo.list_held_back().await?;
+        status.notices = notices;
         status.held_back_count = held_back.len() as u32;
         status.oldest_held_back_since = held_back.first().map(|change| change.held_since.clone());
-        Ok(status)
+        Ok(())
     }
 }
 
@@ -241,6 +274,8 @@ mod tests {
     use super::*;
     use crate::context::sync::domain::MockFolderStore;
     use crate::context::sync::domain::MockSyncStateRepository;
+    use crate::context::sync::domain::{ConflictNotice, ConflictNoticeKind, HeldBackChange};
+    use crate::shared::domain::record_change::RecordKind;
 
     fn paused_device() -> SyncDevice {
         SyncDevice::restore(crate::context::sync::StoredDevice {
@@ -336,10 +371,113 @@ mod tests {
         assert_eq!(rx.drain(), vec![Event::SyncCompleted]);
     }
 
+    // #425 / SYN-064 — a sync that applied nothing but leaves a different number of changes
+    // held back, or of notices, than the previous one is announced: the indicator follows it.
+    #[tokio::test]
+    async fn a_new_held_back_count_or_notice_count_raises_sync_completed() {
+        let held_back: Arc<Mutex<Vec<HeldBackChange>>> = Arc::default();
+        let notices: Arc<Mutex<Vec<ConflictNotice>>> = Arc::default();
+        let mut state_repo = MockSyncStateRepository::new();
+        state_repo.expect_record_last_sync().returning(|_| Ok(()));
+        state_repo.expect_get_last_sync().returning(|| Ok(None));
+        let stored = Arc::clone(&held_back);
+        state_repo
+            .expect_list_held_back()
+            .returning(move || Ok(stored.lock().unwrap().clone()));
+        let stored = Arc::clone(&notices);
+        state_repo
+            .expect_list_undismissed_notices()
+            .returning(move || Ok(stored.lock().unwrap().clone()));
+        let bus = Arc::new(SideEffectEventBus::new());
+        let service = SyncService::new(Arc::new(state_repo), Arc::new(MockFolderStore::new()))
+            .with_event_bus(Arc::clone(&bus));
+        service
+            .remember_run(&mut quiet_report("2026-08-22T10:00:00Z"))
+            .await;
+        let mut rx = bus.subscribe();
+
+        held_back.lock().unwrap().push(HeldBackChange {
+            id: "held-1".into(),
+            origin_device_id: "laptop-device".into(),
+            sequence: 4,
+            payload: "{}".into(),
+            waiting_kind: RecordKind::Account,
+            waiting_identity: "account-1".into(),
+            held_since: "2026-08-22T10:00:05Z".into(),
+        });
+        service
+            .remember_run(&mut quiet_report("2026-08-22T10:00:05Z"))
+            .await;
+        assert_eq!(rx.drain(), vec![Event::SyncCompleted], "a change held back");
+
+        notices.lock().unwrap().push(ConflictNotice {
+            notice_id: "notice-1".into(),
+            kind: ConflictNoticeKind::OverruledEdit,
+            record_kind: RecordKind::Account,
+            record_identity: "account-1".into(),
+            record_label: "Savings".into(),
+            other_device_id: "laptop-device".into(),
+            other_device_name: "Laptop".into(),
+            raised_at: "2026-08-22T10:00:10Z".into(),
+        });
+        service
+            .remember_run(&mut quiet_report("2026-08-22T10:00:10Z"))
+            .await;
+        assert_eq!(rx.drain(), vec![Event::SyncCompleted], "a notice raised");
+
+        service
+            .remember_run(&mut quiet_report("2026-08-22T10:00:15Z"))
+            .await;
+        assert!(rx.drain().is_empty(), "nothing new");
+    }
+
+    // #425 — held-back changes or notices that cannot be read keep the previous run's counts:
+    // the failed read is not announced as a change.
+    #[tokio::test]
+    async fn an_unreadable_held_back_list_announces_nothing() {
+        let unreadable = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let mut state_repo = MockSyncStateRepository::new();
+        state_repo.expect_record_last_sync().returning(|_| Ok(()));
+        state_repo.expect_get_last_sync().returning(|| Ok(None));
+        state_repo
+            .expect_list_undismissed_notices()
+            .returning(|| Ok(vec![]));
+        let failing = Arc::clone(&unreadable);
+        state_repo.expect_list_held_back().returning(move || {
+            if failing.load(std::sync::atomic::Ordering::SeqCst) {
+                Err(SyncError::DatabaseError)
+            } else {
+                Ok(vec![])
+            }
+        });
+        let bus = Arc::new(SideEffectEventBus::new());
+        let service = SyncService::new(Arc::new(state_repo), Arc::new(MockFolderStore::new()))
+            .with_event_bus(Arc::clone(&bus));
+        service
+            .remember_run(&mut quiet_report("2026-08-22T10:00:00Z"))
+            .await;
+        let mut rx = bus.subscribe();
+
+        unreadable.store(true, std::sync::atomic::Ordering::SeqCst);
+        service
+            .remember_run(&mut quiet_report("2026-08-22T10:00:05Z"))
+            .await;
+        unreadable.store(false, std::sync::atomic::Ordering::SeqCst);
+        service
+            .remember_run(&mut quiet_report("2026-08-22T10:00:10Z"))
+            .await;
+
+        assert!(rx.drain().is_empty());
+    }
+
     fn repository_remembering_syncs() -> MockSyncStateRepository {
         let mut state_repo = MockSyncStateRepository::new();
         state_repo.expect_record_last_sync().returning(|_| Ok(()));
         state_repo.expect_get_last_sync().returning(|| Ok(None));
+        state_repo
+            .expect_list_undismissed_notices()
+            .returning(|| Ok(vec![]));
+        state_repo.expect_list_held_back().returning(|| Ok(vec![]));
         state_repo
     }
 
@@ -347,6 +485,10 @@ mod tests {
     #[tokio::test]
     async fn a_failed_run_records_no_last_sync() {
         let mut state_repo = MockSyncStateRepository::new();
+        state_repo
+            .expect_list_undismissed_notices()
+            .returning(|| Ok(vec![]));
+        state_repo.expect_list_held_back().returning(|| Ok(vec![]));
         state_repo.expect_record_last_sync().times(0);
         state_repo
             .expect_get_last_sync()
@@ -371,6 +513,10 @@ mod tests {
     async fn a_run_without_failure_records_the_last_sync() {
         let mut state_repo = MockSyncStateRepository::new();
         state_repo
+            .expect_list_undismissed_notices()
+            .returning(|| Ok(vec![]));
+        state_repo.expect_list_held_back().returning(|| Ok(vec![]));
+        state_repo
             .expect_record_last_sync()
             .withf(|completed_at| completed_at == "2026-09-27T12:52:00Z")
             .times(1)
@@ -392,6 +538,10 @@ mod tests {
     #[tokio::test]
     async fn a_failed_run_with_an_unreadable_last_sync_shows_none() {
         let mut state_repo = MockSyncStateRepository::new();
+        state_repo
+            .expect_list_undismissed_notices()
+            .returning(|| Ok(vec![]));
+        state_repo.expect_list_held_back().returning(|| Ok(vec![]));
         state_repo.expect_record_last_sync().times(0);
         state_repo
             .expect_get_last_sync()
