@@ -7,6 +7,7 @@ import {
   type DataExportError,
   type ExportFormat,
   type ExportReport,
+  events,
   type FetchAllAssetPricesError,
   type PortfolioSyncError,
   type PriceProviderChoice,
@@ -92,6 +93,13 @@ export async function pauseSync(): Promise<Result<SyncStatusView, SyncError>> {
 
 export async function resumeSync(): Promise<Result<SyncReportView, PortfolioSyncError>> {
   return await commands.resumeSync();
+}
+
+// SYN-064 — a sync announces itself once, by `SyncCompleted`; the returned function stops listening.
+export async function onSyncCompleted(callback: () => void): Promise<() => void> {
+  return events.event.listen((event) => {
+    if (event.payload.type === "SyncCompleted") callback();
+  });
 }
 
 export async function getSyncStatus(): Promise<Result<SyncStatusView, PortfolioSyncError>> {

@@ -10,6 +10,18 @@ import type {
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 
+// The events.event.listen surface onSyncCompleted uses, without Tauri's runtime events.
+const mockEventListen = vi.fn<
+  (cb: (e: { payload: { type: string } }) => void) => Promise<() => void>
+>(() => Promise.resolve(() => {}));
+vi.mock("@/bindings", async () => {
+  const actual = (await vi.importActual("@/bindings")) as Record<string, unknown>;
+  return {
+    ...actual,
+    events: { event: { listen: (cb: unknown) => mockEventListen(cb as never) } },
+  };
+});
+
 const mockInvoke = vi.mocked(invoke);
 
 // Import after mock is registered so bindings.ts picks up the mock
@@ -507,5 +519,25 @@ describe("price provider commands (MKT-214, MKT-215)", () => {
       error: { code: "NoExternalProvider" },
     });
     expect(invoke).toHaveBeenCalledWith("fetch_all_asset_prices", { trigger: "Launch" });
+  });
+});
+
+// SYN-064 — the sync section follows SyncCompleted, and only it.
+describe("onSyncCompleted", () => {
+  it("calls back on SyncCompleted only, and returns the listener's stop", async () => {
+    let listener: (e: { payload: { type: string } }) => void = () => {};
+    const stop = vi.fn();
+    mockEventListen.mockImplementation((cb) => {
+      listener = cb;
+      return Promise.resolve(stop);
+    });
+    const callback = vi.fn();
+
+    const unlisten = await providerGateway.onSyncCompleted(callback);
+    listener({ payload: { type: "AccountUpdated" } });
+    listener({ payload: { type: "SyncCompleted" } });
+
+    expect(callback).toHaveBeenCalledTimes(1);
+    expect(unlisten).toBe(stop);
   });
 });

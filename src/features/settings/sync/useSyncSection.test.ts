@@ -13,6 +13,7 @@ vi.mock("../gateway", () => ({
   inspectSyncFolder: vi.fn(),
   pickSyncFolder: vi.fn(),
   leaveSync: vi.fn(),
+  onSyncCompleted: vi.fn(async () => () => {}),
 }));
 
 vi.mock("@/lib/logger", () => ({ logger: { info: vi.fn(), error: vi.fn() } }));
@@ -67,6 +68,26 @@ function makeSyncReport(overrides: Partial<SyncReportView> = {}): SyncReportView
 describe("useSyncSection — load status on mount (SYN-063)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  // #883 / SYN-064 — on SyncCompleted the section reads the status again, without reopening.
+  it("reads the status again when a sync completes", async () => {
+    let announce: () => void = () => {};
+    vi.mocked(gateway.onSyncCompleted).mockImplementation(async (callback) => {
+      announce = callback;
+      return () => {};
+    });
+    vi.mocked(gateway.getSyncStatus)
+      .mockResolvedValueOnce({ status: "ok", data: makeSyncStatus() })
+      .mockResolvedValueOnce({ status: "ok", data: makeSyncStatus({ held_back_count: 2 }) });
+
+    const { result } = renderHook(() => useSyncSection());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    act(() => announce());
+
+    await waitFor(() => expect(gateway.getSyncStatus).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(result.current.heldBackCount).toBe(2));
   });
 
   it("is loading before the status call resolves", () => {
