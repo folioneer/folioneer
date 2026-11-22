@@ -415,7 +415,6 @@ mod tests {
             change_log.clone(),
             Arc::clone(&state_repo),
             Arc::clone(&folder_store),
-            Arc::new(crate::shared::infrastructure::change_recorder::NoopChangeRecorder),
         ));
         let sync_service = Arc::new(
             SyncService::new(Arc::clone(&state_repo), Arc::clone(&folder_store))

@@ -22,7 +22,7 @@ use crate::context::sync::infrastructure::crypto::{
     derive_key_blocking, ensure_derivation_parameters, ensure_passphrase_length, verify_check,
 };
 use crate::core::logger::BACKEND;
-use crate::shared::infrastructure::change_recorder::ChangeRecorder;
+use crate::shared::infrastructure::change_recorder::while_applying;
 
 /// Why a join did not complete. The two rebuild-specific outcomes are the use case's task
 /// codes (`PortfolioSyncTask`); everything else is the sync BC's own rejection.
@@ -157,7 +157,6 @@ pub(super) struct JoinPorts<'a> {
     pub change_log: &'a dyn ChangeLogRepository,
     pub state_repo: &'a dyn SyncStateRepository,
     pub folder_store: &'a dyn FolderStore,
-    pub change_recorder: &'a dyn ChangeRecorder,
     pub applier: &'a dyn ChangeApplier,
 }
 
@@ -168,9 +167,8 @@ pub(super) struct JoinRequest {
     pub device_name: String,
 }
 
-/// Joins the portfolio `folder` holds as a new device named `device_name`. The change
-/// recorder stays suspended for the whole rebuild — replaying the history records nothing
-/// (SYN-020).
+/// Joins the portfolio `folder` holds as a new device named `device_name`. The rebuild runs
+/// as an apply — replaying the history records nothing (SYN-020).
 pub(super) async fn join(
     ports: &JoinPorts<'_>,
     request: JoinRequest,
@@ -178,7 +176,6 @@ pub(super) async fn join(
     let JoinPorts {
         change_log,
         folder_store,
-        change_recorder,
         ..
     } = *ports;
     let JoinRequest {
@@ -244,41 +241,44 @@ pub(super) async fn join(
     )?
     .following(&header);
 
-    let _recording_suspended = change_recorder.suspend();
-    let mut transaction = change_log.begin().await?;
-    let rebuilt = rebuild(
-        &mut transaction,
-        ports,
-        &device,
-        key.as_bytes(),
-        logical_clock,
-        &history,
-    )
-    .await;
-    if let Err(error) = rebuilt {
-        tracing::error!(target: BACKEND, err = %error, "join: rebuild interrupted, rolled back");
-        return Err(JoinError::RebuildInterrupted);
-    }
-    let manifest = Manifest {
-        device_id: device.device_id.clone(),
-        device_name: device.device_name.clone(),
-        data_format_version: DATA_FORMAT_VERSION,
-        app_version: Some(APP_VERSION.to_string()),
-        latest_sequence: 0,
-    };
-    if let Err(error) = folder_store
-        .write_manifest(&device.device_id, encode_manifest(&key, &manifest)?)
-        .await
-    {
-        remove_device_area(folder_store, &device.device_id).await;
-        return Err(error.into());
-    }
-    if let Err(error) = transaction.commit().await {
-        tracing::error!(target: BACKEND, err = ?error, "join: commit failed");
-        remove_device_area(folder_store, &device.device_id).await;
-        return Err(JoinError::RebuildInterrupted);
-    }
-    Ok(SyncStatus::for_device(&device, None, vec![]))
+    // SYN-020 — the rebuild records nothing, in its own task only (#920).
+    while_applying(async {
+        let mut transaction = change_log.begin().await?;
+        let rebuilt = rebuild(
+            &mut transaction,
+            ports,
+            &device,
+            key.as_bytes(),
+            logical_clock,
+            &history,
+        )
+        .await;
+        if let Err(error) = rebuilt {
+            tracing::error!(target: BACKEND, err = %error, "join: rebuild interrupted, rolled back");
+            return Err(JoinError::RebuildInterrupted);
+        }
+        let manifest = Manifest {
+            device_id: device.device_id.clone(),
+            device_name: device.device_name.clone(),
+            data_format_version: DATA_FORMAT_VERSION,
+            app_version: Some(APP_VERSION.to_string()),
+            latest_sequence: 0,
+        };
+        if let Err(error) = folder_store
+            .write_manifest(&device.device_id, encode_manifest(&key, &manifest)?)
+            .await
+        {
+            remove_device_area(folder_store, &device.device_id).await;
+            return Err(error.into());
+        }
+        if let Err(error) = transaction.commit().await {
+            tracing::error!(target: BACKEND, err = ?error, "join: commit failed");
+            remove_device_area(folder_store, &device.device_id).await;
+            return Err(JoinError::RebuildInterrupted);
+        }
+        Ok(SyncStatus::for_device(&device, None, vec![]))
+    })
+    .await
 }
 
 /// Takes the joining device's area back out of the folder when its enrolment did not

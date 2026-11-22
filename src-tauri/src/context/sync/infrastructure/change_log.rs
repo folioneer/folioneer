@@ -12,7 +12,6 @@
 
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, OnceLock};
 
 use anyhow::Context;
@@ -25,7 +24,7 @@ use crate::context::sync::error::SyncError;
 use crate::core::logger::BACKEND;
 use crate::shared::domain::{ChangeDraft, LogicalTimestamp, Operation, Rank, RecordKind};
 use crate::shared::infrastructure::change_recorder::{
-    ChangeRecorder, LocalWriteOutranked, SuspendGuard,
+    applying, ChangeRecorder, LocalWriteOutranked,
 };
 
 /// The future a recorded-change hook returns.
@@ -41,7 +40,6 @@ pub type RecordedChangeHook = Arc<dyn Fn() -> HookFuture + Send + Sync>;
 /// change is written in the same transaction as the record it describes (SYN-020).
 pub struct SqliteChangeRecorder {
     pool: Pool<Sqlite>,
-    suspended: Arc<AtomicBool>,
     on_recorded: OnceLock<RecordedChangeHook>,
 }
 
@@ -50,7 +48,6 @@ impl SqliteChangeRecorder {
     pub fn new(pool: Pool<Sqlite>) -> Self {
         Self {
             pool,
-            suspended: Arc::new(AtomicBool::new(false)),
             on_recorded: OnceLock::new(),
         }
     }
@@ -97,7 +94,7 @@ impl ChangeRecorder for SqliteChangeRecorder {
         conn: &mut SqliteConnection,
         draft: ChangeDraft,
     ) -> anyhow::Result<Option<Rank>> {
-        if self.suspended.load(Ordering::SeqCst) {
+        if applying() {
             return Ok(Rank::NEVER);
         }
         let device = sqlx::query!("SELECT device_id, logical_clock FROM sync_device WHERE id = 1")
@@ -214,7 +211,7 @@ impl ChangeRecorder for SqliteChangeRecorder {
     }
 
     async fn is_recording(&self) -> bool {
-        if self.suspended.load(Ordering::SeqCst) {
+        if applying() {
             return false;
         }
         sqlx::query_scalar!(
@@ -227,10 +224,6 @@ impl ChangeRecorder for SqliteChangeRecorder {
             tracing::error!(target: BACKEND, err = ?error, "is_recording: sync_device lookup failed");
             false
         })
-    }
-
-    fn suspend(&self) -> SuspendGuard {
-        SuspendGuard::holding(Arc::clone(&self.suspended))
     }
 }
 
@@ -580,8 +573,9 @@ mod tests {
     use super::*;
     use crate::context::sync::application::publisher::{Publisher, SETTLING_INTERVAL};
     use crate::shared::domain::{Operation, Origin, RecordIdentity, RecordKind};
+    use crate::shared::infrastructure::change_recorder::while_applying;
     use sqlx::sqlite::SqlitePoolOptions;
-    use std::sync::atomic::AtomicUsize;
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::time::Duration;
 
     async fn make_pool() -> Pool<Sqlite> {
@@ -942,10 +936,41 @@ mod tests {
         assert_eq!(rank.origin, Origin::Application);
     }
 
-    // SYN-020 — the apply gate: is_recording() is false while an apply is in progress
-    // (`suspend()`'s guard), and true again once the guard is dropped.
+    // #920 / SYN-020, SYN-064 — an apply in another task suspends its own writes only: a
+    // local write made meanwhile records its change, so the other computers receive it.
     #[tokio::test]
-    async fn is_recording_false_while_apply_gate_held() {
+    async fn a_local_write_during_an_apply_in_another_task_records_its_change() {
+        let pool = make_pool().await;
+        seed_sync_device(&pool, "desktop-device").await;
+        let recorder = Arc::new(SqliteChangeRecorder::new(pool.clone()));
+        let (applying_tx, applying_rx) = tokio::sync::oneshot::channel::<()>();
+        let (done_tx, done_rx) = tokio::sync::oneshot::channel::<()>();
+        let applier = Arc::clone(&recorder);
+        let apply = tokio::spawn(async move {
+            while_applying(async {
+                assert!(!applier.is_recording().await, "the apply records nothing");
+                applying_tx.send(()).expect("test still listening");
+                done_rx.await.expect("test ends the apply");
+            })
+            .await;
+        });
+        applying_rx.await.expect("the apply started");
+
+        let mut conn = pool.acquire().await.expect("conn");
+        let rank = recorder
+            .record(&mut conn, account_created_draft("account-local"))
+            .await
+            .expect("a local write records");
+        done_tx.send(()).expect("apply still running");
+        apply.await.expect("apply ends");
+
+        assert!(rank.is_some(), "the local write's change is recorded");
+    }
+
+    // SYN-020 — the apply gate: is_recording() is false inside an apply (`while_applying`),
+    // and true again once it ends.
+    #[tokio::test]
+    async fn is_recording_false_inside_an_apply() {
         let pool = make_pool().await;
         seed_sync_device(&pool, "desktop-device").await;
         let recorder = SqliteChangeRecorder::new(pool.clone());
@@ -954,30 +979,29 @@ mod tests {
             recorder.is_recording().await,
             "recording before any gate is held"
         );
-        let guard = recorder.suspend();
-        assert!(
-            !recorder.is_recording().await,
-            "SYN-020: gate held, must not record"
-        );
-        drop(guard);
+        while_applying(async {
+            assert!(
+                !recorder.is_recording().await,
+                "SYN-020: gate held, must not record"
+            );
+        })
+        .await;
         assert!(
             recorder.is_recording().await,
             "gate released, recording resumes"
         );
     }
 
-    // SYN-020 — while the apply gate is held, record() writes nothing and reports the NEVER
-    // sentinel; once the guard drops, the same recorder records again.
+    // SYN-020 — inside an apply, record() writes nothing and reports the NEVER sentinel; once
+    // it ends, the same recorder records again.
     #[tokio::test]
-    async fn record_writes_nothing_while_suspended_and_resumes_after_guard_drops() {
+    async fn record_writes_nothing_inside_an_apply_and_resumes_after_it() {
         let pool = make_pool().await;
         seed_sync_device(&pool, "desktop-device").await;
         let recorder = SqliteChangeRecorder::new(pool.clone());
         let mut conn = pool.acquire().await.expect("conn");
 
-        let guard = recorder.suspend();
-        let rank = recorder
-            .record(&mut conn, account_created_draft("account-1"))
+        let rank = while_applying(recorder.record(&mut conn, account_created_draft("account-1")))
             .await
             .expect("suspended record must not error");
         assert_eq!(
@@ -985,7 +1009,6 @@ mod tests {
             Rank::NEVER,
             "SYN-020: nothing is recorded during an apply"
         );
-        drop(guard);
 
         let rank = recorder
             .record(&mut conn, account_created_draft("account-2"))

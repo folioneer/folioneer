@@ -4,39 +4,25 @@
 //! `infrastructure/` rather than `domain/` because it takes the live connection handle;
 //! the sync bounded context implements it (`context::sync::infrastructure::change_log`).
 
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
-
 use crate::shared::domain::name::same_name;
 use crate::shared::domain::{ChangeDraft, LogicalTimestamp, Rank};
 
-/// Holds the apply gate (SYN-020) until dropped: while it lives, the recorder it came from
-/// records nothing and reports not-recording.
-pub struct SuspendGuard {
-    suspended: Option<Arc<AtomicBool>>,
+tokio::task_local! {
+    /// Set for the task running an apply or a join's rebuild (SYN-020).
+    static APPLYING: ();
 }
 
-impl SuspendGuard {
-    /// The guard of a recorder that is never recording anyway — holds nothing.
-    pub fn inert() -> Self {
-        Self { suspended: None }
-    }
-
-    /// Raises `suspended` until the guard is dropped.
-    pub fn holding(suspended: Arc<AtomicBool>) -> Self {
-        suspended.store(true, Ordering::SeqCst);
-        Self {
-            suspended: Some(suspended),
-        }
-    }
+/// Runs `work` as an apply (SYN-020): the writes it makes, in its own task, record no change,
+/// and `is_recording` reports `false` there. A local write in another task meanwhile records
+/// its change as always (SYN-064, #920) — the suspension follows the applying task, never the
+/// whole process.
+pub async fn while_applying<F: std::future::Future>(work: F) -> F::Output {
+    APPLYING.scope((), work).await
 }
 
-impl Drop for SuspendGuard {
-    fn drop(&mut self) {
-        if let Some(suspended) = &self.suspended {
-            suspended.store(false, Ordering::SeqCst);
-        }
-    }
+/// `true` inside `while_applying`'s work, in its own task.
+pub fn applying() -> bool {
+    APPLYING.try_with(|_| ()).is_ok()
 }
 
 /// The application's own local write was refused before it was recorded (CFR-016): the
@@ -68,16 +54,10 @@ pub trait ChangeRecorder: Send + Sync {
         draft: ChangeDraft,
     ) -> anyhow::Result<Option<Rank>>;
 
-    /// `false` for the duration of an apply — the gate that satisfies SYN-020's "applying
-    /// another device's change never records a change" (`suspend`) — or while sync has
-    /// never been enabled or is paused; `true` otherwise.
+    /// `false` inside an apply's own task — SYN-020's "applying another device's change
+    /// never records a change" (`while_applying`) — or while sync has never been enabled or
+    /// is paused; `true` otherwise.
     async fn is_recording(&self) -> bool;
-
-    /// Holds the apply gate (SYN-020) until the returned guard is dropped: `record` writes
-    /// nothing and `is_recording` reports `false` for its lifetime. The `SyncGate` mutex
-    /// that keeps a local write and an in-progress apply from interleaving (SYN-064) is
-    /// this invariant's other half — the sync run holds both.
-    fn suspend(&self) -> SuspendGuard;
 }
 
 /// The CFR-014 rank in the TEXT form the three `sync_*` columns store: a repository stamps
@@ -131,10 +111,6 @@ impl ChangeRecorder for NoopChangeRecorder {
 
     async fn is_recording(&self) -> bool {
         false
-    }
-
-    fn suspend(&self) -> SuspendGuard {
-        SuspendGuard::inert()
     }
 }
 
