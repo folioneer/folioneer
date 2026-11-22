@@ -998,24 +998,26 @@ impl AccountDetailsUseCase {
             });
         }
 
-        // CSH-090/094 — include the system Cash Holding with its balance on the
-        // date. Cash carries no cost basis and no price; its quantity counts as
-        // account-currency value directly.
+        // CSH-090/094 — include the system Cash Holding with its balance on the date, at any
+        // balance, as the live view does. Cash carries no cost basis and no price; its quantity
+        // counts as account-currency value directly.
         let cash_balance = Account::cash_balance_as_of(&all_txs, as_of_date);
-        if cash_balance > 0 {
-            let cash_asset_id = system_cash_asset_id(&account.currency);
-            let cash_asset = self
-                .asset_service
-                .get_asset_by_id(&cash_asset_id)
-                .await
-                .map_err(|e| {
-                    tracing::error!(target: BACKEND, asset_id = %cash_asset_id, err = ?e, "get_account_details_as_of: get cash asset failed");
-                    AccountError::DatabaseError
-                })?
-                .ok_or_else(|| {
-                    tracing::error!(target: BACKEND, asset_id = %cash_asset_id, "get_account_details_as_of: cash asset missing");
-                    AccountError::DatabaseError
-                })?;
+        let cash_asset_id = system_cash_asset_id(&account.currency);
+        let cash_asset = self
+            .asset_service
+            .get_asset_by_id(&cash_asset_id)
+            .await
+            .map_err(|e| {
+                tracing::error!(target: BACKEND, asset_id = %cash_asset_id, err = ?e, "get_account_details_as_of: get cash asset failed");
+                AccountError::DatabaseError
+            })?;
+        // CSH-094 — with no Cash Asset (CSH-012 seeds it with the account) nothing is in cash:
+        // no line. A balance with no Cash Asset is an inconsistent store.
+        if cash_asset.is_none() && cash_balance != 0 {
+            tracing::error!(target: BACKEND, asset_id = %cash_asset_id, "get_account_details_as_of: cash asset missing");
+            return Err(AccountError::DatabaseError);
+        }
+        if let Some(cash_asset) = cash_asset {
             total_global_value = total_global_value.saturating_add(cash_balance);
             details.push(HoldingDetail {
                 quantity: crate::shared::domain::quantity::quantity_text(
@@ -4956,15 +4958,16 @@ mod tests {
             .get_account_details(&account.id, Some("2024-06-01"))
             .await
             .unwrap();
-        assert_eq!(resp.holdings.len(), 1);
-        assert_eq!(resp.holdings[0].current_value, Some(50_000_000));
-        assert_eq!(resp.holdings[0].performance_pct, None);
-        assert_eq!(resp.holdings[0].total_return_pct, None);
+        let held = resp.holdings.iter().find(|h| h.asset_id == gift).unwrap();
+        assert_eq!(held.current_value, Some(50_000_000));
+        assert_eq!(held.performance_pct, None);
+        assert_eq!(held.total_return_pct, None);
     }
 
-    // CSH-090 — an account whose cash is back to nothing on the day shows no cash line.
+    // CSH-090 — an account whose cash is back to nothing on the day keeps its cash line, at 0,
+    // as the live view does (#882).
     #[tokio::test]
-    async fn as_of_shows_no_cash_line_when_the_balance_is_nothing() {
+    async fn as_of_keeps_the_cash_line_when_the_balance_is_nothing() {
         let pool = make_pool().await;
         let (account_svc, asset_svc) = setup(&pool).await;
         let account = account_svc
@@ -4978,6 +4981,32 @@ mod tests {
             .unwrap();
         account_svc
             .record_withdrawal(&account.id, "2024-02-01".to_string(), 100_000_000, None)
+            .await
+            .unwrap();
+
+        let uc = AccountDetailsUseCase::new(
+            account_svc,
+            asset_svc,
+            make_currency_service_with_no_rate(),
+        );
+        let resp = uc
+            .get_account_details(&account.id, Some("2024-03-01"))
+            .await
+            .unwrap();
+        assert_eq!(resp.holdings.len(), 1);
+        assert_eq!(resp.holdings[0].asset_id, "system-cash-eur");
+        assert_eq!(resp.holdings[0].quantity, "0");
+        assert_eq!(resp.total_global_value, 0);
+    }
+
+    // CSH-094 — with no Cash Asset and nothing in cash the as-of view has no cash line and
+    // no error.
+    #[tokio::test]
+    async fn as_of_has_no_cash_line_without_a_cash_asset() {
+        let pool = make_pool().await;
+        let (account_svc, asset_svc) = setup(&pool).await;
+        let account = account_svc
+            .create("Acc".to_string(), String::new(), "EUR".to_string(), false)
             .await
             .unwrap();
 
