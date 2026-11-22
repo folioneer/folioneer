@@ -29,13 +29,13 @@ The device-wide configuration of the daily download. Exactly one configuration e
 
 The record of one execution of the scheduled download. Runs accumulate as an auditable history and power the once-per-day guard and the settings status line.
 
-| Field           | Business meaning                                                                                                              |
-| --------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `executed_at`   | When the run actually executed (may be later than the trigger when catching up).                                              |
-| `trigger_date`  | The calendar day whose trigger this run settles — always the **latest pending trigger** at execution time (SPF-021, SPF-022). |
-| `outcome`       | Whether the run succeeded, failed, or was skipped by the once-per-day guard.                                                  |
-| `updated_count` | Number of assets whose prices were written by this run.                                                                       |
-| `skipped_count` | Number of in-scope assets the run could not price (silently skipped).                                                         |
+| Field           | Business meaning                                                                                                                         |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `executed_at`   | When the run actually executed (may be later than the trigger when catching up).                                                         |
+| `trigger_date`  | The calendar day whose trigger this run settles — always the **latest pending trigger** at execution time (SPF-021, SPF-022).            |
+| `outcome`       | Whether the run succeeded or failed on its prices, or was skipped by the once-per-day guard; a rate failure never changes it (SPF-039A). |
+| `updated_count` | Number of assets whose prices were written by this run.                                                                                  |
+| `skipped_count` | Number of in-scope assets skipped per SPF-041.                                                                                           |
 
 ---
 
@@ -97,21 +97,27 @@ The record of one execution of the scheduled download. Runs accumulate as an aud
 
 **SPF-038 — Per-pair silent skip (backend)**: A currency pair the rate provider cannot serve is silently skipped — nothing written, no error surfaced — and the run continues with the remaining pairs, mirroring SPF-041.
 
-**SPF-039 — Price/rate failure independence (backend)**: Rate failures do not fail the price portion of the run, and vice versa; each portion's outcome is reflected in the run record independently of the other.
+**SPF-032A — A known symbol served no close (backend)**: When the provider serves a known symbol no close for the window, whatever days the window holds, the run writes nothing for it, and the asset is neither updated nor skipped (SPF-041).
+
+**SPF-039 — Price/rate failure independence (backend)**: Rate failures do not fail the price portion of the run, and vice versa: once a run passes the once-per-day guard (SPF-021) with an External provider chosen (SPF-072), its rates are refreshed whatever the price portion did.
+
+**SPF-039A — The run record states the price portion (backend)**: The run's outcome and counts are the price portion's. A rate failure — every External rate tier unreachable (FXR-070) — is logged and never recorded on the run.
+
+**SPF-039B — Recovering missed rate days (backend)**: Rate days a failed rate portion missed are asked for again only within the next run's window (SPF-036), which starts the day before the last successful run's trigger day; older ones are not recovered by a scheduled run (Update rates refills them, FXR-111).
 
 ### Scope & Skips (040–049)
 
 **SPF-040 — Scope mirrors the in-app fetch tasks (backend)**: The run's scope is every active holding across all accounts with a derivable provider symbol (MKT-110), excluding system cash assets (MKT-116) and assets whose price is typed by hand (MKT-151).
 
-**SPF-041 — Per-asset silent skip (backend)**: An in-scope asset is silently skipped — nothing written, no error surfaced — when its symbol cannot be derived, the provider has no data for it, the provider call fails, or the write fails (same skip set as MKT-114); its reason is kept per MKT-220. The run continues with the remaining assets, and the skip is counted in the run record.
+**SPF-041 — Per-asset silent skip (backend)**: An in-scope asset is silently skipped — nothing written, no error surfaced — when its symbol cannot be derived, the provider reports the symbol unknown (a known symbol served no close is SPF-032A's), the provider call fails, or the write fails (same skip set as MKT-114); its reason is kept per MKT-220. The run continues with the remaining assets, and the skip is counted in the run record.
 
-**SPF-042 — Empty scope is a quiet success (backend)**: When the scope is empty, the run records a successful execution with zero updates and exits. Unlike the in-app rejection (MKT-111), no error is raised — there is no user watching a scheduled run.
+**SPF-042 — Empty scope is a quiet success (backend)**: When the scope is empty, the run refreshes the rates (SPF-035, SPF-039), records a successful execution with zero updates and exits. Unlike the in-app rejection (MKT-111), no error is raised — there is no user watching a scheduled run.
 
 ### Outcome & Visibility (050–059)
 
 **SPF-050 — Every run is recorded (backend)**: Every execution — successful, failed, or skipped by the once-per-day guard — records a `ScheduledFetchRun`, except a leftover firing with no External provider chosen (SPF-072), with its trigger date, execution time, outcome, and update/skip counts.
 
-**SPF-051 — Transient retry within a run (backend)**: A run that cannot reach the provider at all retries up to **3 attempts** (with increasing delay) within the same execution before recording a failed run. Per-asset skips (SPF-041) and per-pair skips (SPF-038) are not retried.
+**SPF-051 — Transient retry within a run (backend)**: A run that cannot reach the price provider at all retries up to **3 attempts** (with increasing delay) within the same execution before recording a failed run. Per-asset skips (SPF-041), per-pair skips (SPF-038) and the rate portion (SPF-039A) are not retried.
 
 **SPF-052 — Status visible in Settings, never nagging (frontend)**: The Settings section displays the most recent run's status — when it ran, its outcome, and its counts (e.g. "Last download: yesterday 19:00 — 12 updated, 2 skipped"). A failed run appears there; no popup, snackbar, or dialog interrupts the user on the next app open.
 
@@ -155,7 +161,7 @@ Every day at trigger time (app open or closed)
         │    │  completes it                                             (SPF-033)
         │    └─ no data / failure: silent skip, counted                  (SPF-041)
         ├─ record dated daily rates for all persisted pairs,
-        │  backfilled like prices                                        (SPF-035–039)
+        │  backfilled like prices, whatever the prices did               (SPF-035–039B)
         ├─ record ScheduledFetchRun (outcome + counts)                   (SPF-050)
         └─ exit                                                          (SPF-016)
 

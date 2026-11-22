@@ -273,17 +273,6 @@ impl ScheduledFetchOrchestrator {
         } else {
             let (outcome, updated_count, skipped_count) =
                 self.sweep_prices_with_retry(&scope, from, to).await;
-            // SPF-035–039 — the FX portion never fails the price portion; its
-            // own failures are absorbed inside refresh_all_rates_range.
-            if outcome != ScheduledFetchOutcome::Failed {
-                if let Err(error) = self
-                    .currency_service
-                    .refresh_all_rates_range(fx_pairs, &from.to_string(), &to.to_string())
-                    .await
-                {
-                    tracing::warn!(target: crate::core::logger::BACKEND, err = ?error, "scheduled run: FX range refresh failed (SPF-039 — price outcome unaffected)");
-                }
-            }
             ScheduledFetchRun::new(
                 executed_at,
                 trigger_date.to_string(),
@@ -292,6 +281,16 @@ impl ScheduledFetchOrchestrator {
                 skipped_count,
             )
         };
+        // SPF-039, SPF-042 — the rates are refreshed whatever the price portion did, an empty
+        // scope included; SPF-039A — a rate failure is logged and never changes the run;
+        // SPF-039B — the next run's window asks again from the day before its trigger day.
+        if let Err(error) = self
+            .currency_service
+            .refresh_all_rates_range(fx_pairs, &from.to_string(), &to.to_string())
+            .await
+        {
+            tracing::warn!(target: crate::core::logger::BACKEND, err = ?error, "scheduled run: FX range refresh failed (SPF-039 — price outcome unaffected)");
+        }
 
         self.record(run.clone()).await?;
         // MKT-201 — a run that updated at least one asset is a fetch on this device. A
@@ -442,10 +441,10 @@ impl ScheduledFetchOrchestrator {
                             Err(error) => Err(error),
                         };
                         match recorded {
-                            // SPF-032/033 — an empty answer is a window with no close to give
-                            // (no trading day, or a session not closed yet): MKT-220 keeps
-                            // what it had.
-                            Ok(_) if no_close => skipped_count += 1,
+                            // SPF-032A/033 — an empty answer is a window with no close to give
+                            // (no trading day, or a trading day still in progress): neither
+                            // an update nor a skip, and MKT-220 keeps what it had.
+                            Ok(_) if no_close => {}
                             Ok(_) => {
                                 updated_count += 1;
                                 outcomes.push((asset.id.clone(), None));
@@ -627,32 +626,76 @@ mod tests {
         ))
     }
 
+    /// SPF-039 — a currency service that must be asked to refresh the window's rates exactly
+    /// once: its pair list is read by that refresh, and checked when the run is dropped.
+    fn currency_service_refreshing_rates_once() -> Arc<CurrencyService> {
+        let mut pair_repo = MockCurrencyPairRepository::new();
+        pair_repo.expect_upsert_pair().returning(Ok);
+        pair_repo
+            .expect_list_pairs_with_latest_rate()
+            .times(1)
+            .returning(|| Ok(vec![]));
+        Arc::new(CurrencyService::new(
+            Box::new(pair_repo),
+            Box::new(MockCurrencyRateRepository::new()),
+        ))
+    }
+
     #[allow(clippy::too_many_arguments)]
     /// Builds the orchestrator; a test that sets no expectation of its own on the splits
     /// gets a provider reporting none and a service keeping them (MKT-230).
     fn make_orchestrator(
         account_service: MockAccountServiceContract,
-        mut asset_service: MockAssetServiceContract,
-        mut price_provider: MockPriceProvider,
+        asset_service: MockAssetServiceContract,
+        price_provider: MockPriceProvider,
         repository: MockScheduledFetchRepository,
         scheduler: MockDailyFetchScheduler,
         now: NaiveDateTime,
     ) -> ScheduledFetchOrchestrator {
-        price_provider
-            .expect_fetch_splits()
-            .returning(|_, _| Ok(Vec::new()));
-        asset_service
-            .expect_record_reported_splits()
-            .returning(|_, _, _| Ok(()));
-        ScheduledFetchOrchestrator::new(
-            Arc::new(account_service),
-            Arc::new(asset_service),
-            Arc::new(price_provider),
-            make_currency_service(),
-            Arc::new(repository),
-            Arc::new(scheduler),
-            Arc::new(move || now),
-        )
+        OrchestratorParts {
+            account_service,
+            asset_service,
+            price_provider,
+            repository,
+            scheduler,
+            now,
+        }
+        .with_rates(make_currency_service())
+    }
+
+    /// The orchestrator's parts, for a test that also chooses its currency service (B32: a
+    /// builder, not a helper of many arguments).
+    struct OrchestratorParts {
+        account_service: MockAccountServiceContract,
+        asset_service: MockAssetServiceContract,
+        price_provider: MockPriceProvider,
+        repository: MockScheduledFetchRepository,
+        scheduler: MockDailyFetchScheduler,
+        now: NaiveDateTime,
+    }
+
+    impl OrchestratorParts {
+        fn with_rates(
+            mut self,
+            currency_service: Arc<CurrencyService>,
+        ) -> ScheduledFetchOrchestrator {
+            self.price_provider
+                .expect_fetch_splits()
+                .returning(|_, _| Ok(Vec::new()));
+            self.asset_service
+                .expect_record_reported_splits()
+                .returning(|_, _, _| Ok(()));
+            let now = self.now;
+            ScheduledFetchOrchestrator::new(
+                Arc::new(self.account_service),
+                Arc::new(self.asset_service),
+                Arc::new(self.price_provider),
+                currency_service,
+                Arc::new(self.repository),
+                Arc::new(self.scheduler),
+                Arc::new(move || now),
+            )
+        }
     }
 
     /// A fixed "now" after today's 22:15 trigger has already passed — the
@@ -1207,6 +1250,7 @@ mod tests {
     }
 
     // SPF-042 — an empty scope is a quiet success: Succeeded with 0 updates, 0 skips.
+    // SPF-039 (#489) — its rates are refreshed all the same.
     #[tokio::test]
     async fn run_scheduled_fetch_empty_scope_is_a_quiet_success() {
         let mut repository = MockScheduledFetchRepository::new();
@@ -1232,14 +1276,15 @@ mod tests {
         let mut account_service = MockAccountServiceContract::new();
         account_service.expect_get_all().returning(|| Ok(vec![]));
 
-        let orchestrator = make_orchestrator(
+        let orchestrator = OrchestratorParts {
             account_service,
-            MockAssetServiceContract::new(),
-            MockPriceProvider::new(),
+            asset_service: MockAssetServiceContract::new(),
+            price_provider: MockPriceProvider::new(),
             repository,
-            MockDailyFetchScheduler::new(),
-            now_after_trigger(),
-        );
+            scheduler: MockDailyFetchScheduler::new(),
+            now: now_after_trigger(),
+        }
+        .with_rates(currency_service_refreshing_rates_once());
 
         let run = orchestrator.run_scheduled_fetch().await.unwrap();
         assert_eq!(run.outcome, ScheduledFetchOutcome::Succeeded);
@@ -1359,14 +1404,16 @@ mod tests {
             .times(MAX_RETRY_ATTEMPTS as usize)
             .returning(|_, _, _| Err(anyhow::anyhow!("network unreachable")));
 
-        let orchestrator = make_orchestrator(
+        // SPF-039 (#489) — a failed price sweep still refreshes the rates.
+        let orchestrator = OrchestratorParts {
             account_service,
             asset_service,
             price_provider,
             repository,
-            MockDailyFetchScheduler::new(),
-            now_after_trigger(),
-        );
+            scheduler: MockDailyFetchScheduler::new(),
+            now: now_after_trigger(),
+        }
+        .with_rates(currency_service_refreshing_rates_once());
 
         let run = orchestrator.run_scheduled_fetch().await.unwrap();
         assert_eq!(run.outcome, ScheduledFetchOutcome::Failed);
@@ -1711,9 +1758,10 @@ mod tests {
     }
 
     // SPF-041 — a sweep counts one updated asset per asset whose closes were recorded,
-    // and one skipped asset per asset with no data, an empty answer, a failed write or a
-    // provider error (four of the rule's skip cases; a symbol that cannot be derived is
-    // not exercised here). SPF-040 — a position no longer held is not asked for.
+    // and one skipped asset per asset with no data, a failed write or a provider error
+    // (three of the rule's skip cases; a symbol that cannot be derived is not exercised
+    // here). SPF-032A (#489) — an empty answer is neither. SPF-040 — a position no longer
+    // held is not asked for.
     #[tokio::test]
     async fn spf_041_a_sweep_counts_its_updated_and_its_skipped_assets() {
         let orchestrator = sweeping_orchestrator(
@@ -1729,7 +1777,7 @@ mod tests {
         let run = orchestrator.run_scheduled_fetch().await.unwrap();
         assert_eq!(run.outcome, ScheduledFetchOutcome::Succeeded);
         assert_eq!(run.updated_count, 1);
-        assert_eq!(run.skipped_count, 4);
+        assert_eq!(run.skipped_count, 3);
     }
 
     // MKT-230 / MKT-193B (#529) — a failed split reading skips the asset as a failed close
@@ -1743,14 +1791,14 @@ mod tests {
         assert_eq!(run.skipped_count, 1);
     }
 
-    // MKT-230 (#609) — an empty answer still reads and keeps the window's splits, and the
-    // asset is skipped as an empty answer is.
+    // MKT-230 (#609) — an empty answer still reads and keeps the window's splits; SPF-032A
+    // (#489) — the asset is neither updated nor skipped.
     #[tokio::test]
     async fn mkt_230_an_empty_answer_still_keeps_the_splits() {
         let orchestrator = sweeping_orchestrator(&["EMPTYSPLIT"], |_| Ok(Some(vec![])));
         let run = orchestrator.run_scheduled_fetch().await.unwrap();
         assert_eq!(run.updated_count, 0);
-        assert_eq!(run.skipped_count, 1);
+        assert_eq!(run.skipped_count, 0);
         assert_eq!(
             EMPTY_ANSWER_SPLITS_KEPT.load(std::sync::atomic::Ordering::SeqCst),
             1
