@@ -91,7 +91,8 @@ export function TransactionListPage() {
     const { error } = await cancelTransaction(deletingTransactionId, accountId);
     setDeletingTransactionId(null);
     if (error) {
-      showSnackbar(t("transaction.error_generic"), "error");
+      // CSH-081 — a refusal says why, with its own message.
+      showSnackbar(t(error.key, error.vars), "error");
     } else {
       showSnackbar(t("transaction.success_deleted"), "success");
       await handleDeleteSuccess();

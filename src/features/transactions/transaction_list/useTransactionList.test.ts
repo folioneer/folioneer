@@ -220,6 +220,25 @@ describe("useTransactionList", () => {
     expect(mockGetAssetIdsForAccount).toHaveBeenCalledWith("account-2");
   });
 
+  // #881 / TXL-015 — the selected account reaches the URL, so the header's Back follows it;
+  // the route's own account and asset stay, so nothing is fetched again.
+  it("handleAccountChange records the selected account in the URL for Back", async () => {
+    const { result } = renderHook(() => useTransactionList());
+    await act(async () => {});
+    mockNavigate.mockClear();
+
+    await act(async () => {
+      result.current.handleAccountChange("account-2");
+    });
+
+    expect(mockNavigate).toHaveBeenCalledWith({
+      to: "/accounts/$accountId/transactions/$assetId",
+      params: { accountId: "account-1", assetId: "asset-1" },
+      search: { selectedAccountId: "account-2" },
+      replace: true,
+    });
+  });
+
   // handleDeleteSuccess navigates back when list becomes empty (TXL-043)
   it("handleDeleteSuccess navigates to account when list is empty after delete", async () => {
     mockGetTransactions.mockResolvedValue({ status: "ok", data: [] });

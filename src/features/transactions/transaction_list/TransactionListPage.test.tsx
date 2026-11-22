@@ -2,11 +2,13 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TransactionListPage } from "./TransactionListPage";
 
-const { mockNavigate, mockUseTransactionList, mockCancelTransaction } = vi.hoisted(() => ({
-  mockNavigate: vi.fn(),
-  mockUseTransactionList: vi.fn(),
-  mockCancelTransaction: vi.fn(),
-}));
+const { mockNavigate, mockUseTransactionList, mockCancelTransaction, mockShowSnackbar } =
+  vi.hoisted(() => ({
+    mockNavigate: vi.fn(),
+    mockUseTransactionList: vi.fn(),
+    mockCancelTransaction: vi.fn(),
+    mockShowSnackbar: vi.fn(),
+  }));
 
 vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => mockNavigate,
@@ -27,7 +29,9 @@ vi.mock("react-i18next", () => ({
 }));
 
 vi.mock("@/lib/logger", () => ({ logger: { info: vi.fn(), error: vi.fn() } }));
-vi.mock("@/ui/components/snackbar/snackbarStore", () => ({ useSnackbar: () => vi.fn() }));
+vi.mock("@/ui/components/snackbar/snackbarStore", () => ({
+  useSnackbar: () => mockShowSnackbar,
+}));
 vi.mock("../add_transaction/AddTransactionModal", () => ({ AddTransactionModal: () => null }));
 vi.mock("../edit_transaction_modal/EditTransactionModal", () => ({
   EditTransactionModal: () => <div data-testid="generic-edit-modal" />,
@@ -138,5 +142,27 @@ describe("TransactionListPage — cash-row edit dispatch (CSH-111)", () => {
 
     expect(mockNavigate).not.toHaveBeenCalled();
     expect(screen.queryByTestId("generic-edit-modal")).toBeNull();
+  });
+});
+
+describe("TransactionListPage — a refused deletion (CSH-081)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUseTransactionList.mockReturnValue(makeListState());
+  });
+
+  // #881 — a deletion the core refuses says why, with its own message, not a generic error.
+  it("shows the refusal's own message", async () => {
+    mockCancelTransaction.mockResolvedValue({
+      error: { key: "cash.insufficient_cash_inline", vars: { balance: "10.00", currency: "EUR" } },
+    });
+    render(<TransactionListPage />);
+
+    fireEvent.click(document.getElementById("txl-delete-tx-dep") as HTMLElement);
+    fireEvent.click(await screen.findByTestId("txl-delete-confirm"));
+
+    await vi.waitFor(() =>
+      expect(mockShowSnackbar).toHaveBeenCalledWith("cash.insufficient_cash_inline", "error"),
+    );
   });
 });

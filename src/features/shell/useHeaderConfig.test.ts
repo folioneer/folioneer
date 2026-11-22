@@ -42,6 +42,28 @@ describe("useHeaderConfig", () => {
     expect(result.current.onBack).toBeDefined();
   });
 
+  // #881 / TXL-015 — Back goes to the account selected in the filter, not the route's.
+  it("goes back to the account the list's filter selected", () => {
+    makeLocation("/accounts/acc-1/transactions/asset-1", "?selectedAccountId=acc-2");
+    const { result } = renderHook(() => useHeaderConfig());
+    result.current.onBack?.();
+    expect(mockNavigate).toHaveBeenCalledWith({
+      to: "/accounts/$accountId",
+      params: { accountId: "acc-2" },
+    });
+  });
+
+  it("goes back to the route's account when the filter is unchanged", () => {
+    mockNavigate.mockClear();
+    makeLocation("/accounts/acc-1/transactions/asset-1");
+    const { result } = renderHook(() => useHeaderConfig());
+    result.current.onBack?.();
+    expect(mockNavigate).toHaveBeenCalledWith({
+      to: "/accounts/$accountId",
+      params: { accountId: "acc-1" },
+    });
+  });
+
   // /accounts/$accountId
   it("returns account name for account detail route", () => {
     makeLocation("/accounts/acc-1");

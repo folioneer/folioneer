@@ -121,8 +121,16 @@ export function useTransactionList() {
       setTransactionError(null);
       setSortDirection("desc");
       fetchAssetIds(newAccountId);
+      // TXL-015 — the selected account reaches the URL for the header's Back; the route's
+      // account and asset stay, so the mount fetch does not run again.
+      navigate({
+        to: "/accounts/$accountId/transactions/$assetId",
+        params: { accountId, assetId },
+        search: { selectedAccountId: newAccountId === accountId ? undefined : newAccountId },
+        replace: true,
+      });
     },
-    [fetchAssetIds],
+    [fetchAssetIds, navigate, accountId, assetId],
   );
 
   const handleAssetChange = useCallback(

@@ -82,11 +82,16 @@ const transactionListRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/accounts/$accountId/transactions/$assetId",
   component: TransactionListPage,
-  validateSearch: (search: Record<string, unknown>) => ({
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { pendingTransactionAssetId?: string; selectedAccountId?: string } => ({
     pendingTransactionAssetId:
       typeof search.pendingTransactionAssetId === "string"
         ? search.pendingTransactionAssetId
         : undefined,
+    // TXL-015 — the account the filter selected, when it differs from the route's: Back goes there.
+    selectedAccountId:
+      typeof search.selectedAccountId === "string" ? search.selectedAccountId : undefined,
   }),
 });
 
