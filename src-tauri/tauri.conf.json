@@ -22,7 +22,7 @@
     }
   },
   "productName": "Folioneer",
-  "version": "0.21.1",
+  "version": "0.21.2",
   "identifier": "com.folioneer.desktop",
   "plugins": {
     "updater": {

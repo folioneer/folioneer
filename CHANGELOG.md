@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.21.2] - 2026-11-22
+
+### Fixed
+
+- [import] a refused mapper file says in the window's language what is wrong and on which line
+- [price] a scheduled download flags an asset the provider has stopped quoting for a week
+- [account] an account's currency can no longer be changed after it is created
+- [sync] a change made on another computer no longer waits forever when it follows one this computer ignored
+- [sync] a change recorded while a sync is applying now reaches the other computers
+
 ## [0.21.1] - 2026-11-22
 
 ### Fixed
