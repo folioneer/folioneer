@@ -129,7 +129,6 @@ async fn build_ctx_on_bus(folder: &std::path::Path, bus: Arc<SideEffectEventBus>
         change_log.clone(),
         state_repo.clone(),
         folder_store.clone(),
-        recorder,
     ));
     let sync_service = Arc::new(
         SyncService::new(state_repo.clone(), folder_store.clone())
@@ -256,6 +255,16 @@ async fn join_produces_a_byte_identical_portfolio() {
     assert_eq!(
         desktop_accounts.first().map(|account| &account.name),
         laptop_accounts.first().map(|account| &account.name),
+    );
+
+    // SYN-020: the rebuild replays another device's history and records no change of its own.
+    let laptop_changes: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM changes")
+        .fetch_one(&laptop.pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        laptop_changes, 0,
+        "SYN-020: a join's rebuild records no change"
     );
 
     // SYN-014: after joining, a sync_device row, a cursor on Desktop, and the joiner's own

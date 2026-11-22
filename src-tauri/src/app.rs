@@ -199,7 +199,6 @@ pub fn run() {
                     Arc::clone(&sync_change_log),
                     Arc::clone(&sync_state_repo),
                     Arc::clone(&sync_folder_store),
-                    Arc::clone(&change_recorder) as Arc<dyn ChangeRecorder>,
                 ));
                 let sync_service = Arc::new(
                     SyncService::new(Arc::clone(&sync_state_repo), Arc::clone(&sync_folder_store))

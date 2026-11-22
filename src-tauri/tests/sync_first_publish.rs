@@ -99,7 +99,6 @@ async fn build_ctx(folder: &std::path::Path) -> Ctx {
         change_log.clone(),
         state_repo.clone(),
         folder_store.clone(),
-        recorder,
     ));
     let sync_service = Arc::new(
         folioneer_lib::context::sync::SyncService::new(state_repo.clone(), folder_store.clone())

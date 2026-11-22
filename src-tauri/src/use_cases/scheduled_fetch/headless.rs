@@ -168,7 +168,6 @@ pub async fn run(build_providers: impl FnOnce() -> anyhow::Result<HeadlessProvid
         Arc::new(SqliteChangeLogRepository::new(sync_pool)),
         Arc::new(state_repo),
         Arc::new(FsFolderStore::new(PathBuf::new())),
-        change_recorder,
     ));
     publish_after_scheduled_fetch(device, sync_run).await;
     exit_code
@@ -218,7 +217,6 @@ mod tests {
             change_log,
             state_repo,
             Arc::new(MockFolderStore::new()),
-            Arc::new(crate::shared::infrastructure::change_recorder::NoopChangeRecorder),
         ));
 
         // SYN-068: never applies — there is no apply path reachable from this function at

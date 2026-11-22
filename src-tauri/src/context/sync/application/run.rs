@@ -24,12 +24,12 @@ use crate::context::sync::infrastructure::codec::{
 };
 use crate::context::sync::infrastructure::crypto::{verify_check, Key};
 use crate::core::logger::BACKEND;
-use crate::shared::infrastructure::change_recorder::ChangeRecorder;
+use crate::shared::infrastructure::change_recorder::while_applying;
 
-/// Serializes a local write against an in-progress apply (SYN-064/SYN-020): the mutex
-/// `SyncRun::run`'s full apply transaction holds for its whole duration, so a local write
-/// waits for it rather than interleaving. The change recorder's `suspend()` gate (SYN-020)
-/// and this mutex are the same invariant's two halves — the run holds both.
+/// The mutex `SyncRun::run`'s full apply transaction holds for its whole duration (SYN-064),
+/// so two applies never overlap. A local write meanwhile is serialized by the database's
+/// write lock and records its change: the recorder's suspension follows the applying task
+/// only (`while_applying`, SYN-020, #920).
 pub struct SyncGate {
     mutex: tokio::sync::Mutex<()>,
 }
@@ -48,8 +48,8 @@ impl SyncGate {
         }
     }
 
-    /// Runs `f` while holding the gate, so a concurrent local write started after this call
-    /// begins waits until `f` completes (SYN-064).
+    /// Runs `f` while holding the gate, so a second apply started meanwhile waits until `f`
+    /// completes (SYN-064).
     pub async fn run_exclusive<F, Fut, T>(&self, f: F) -> T
     where
         F: FnOnce() -> Fut,
@@ -65,7 +65,6 @@ pub struct SyncRun {
     change_log: Arc<dyn ChangeLogRepository>,
     state_repo: Arc<dyn SyncStateRepository>,
     folder_store: Arc<dyn FolderStore>,
-    change_recorder: Arc<dyn ChangeRecorder>,
     sync_gate: Arc<SyncGate>,
 }
 
@@ -156,19 +155,16 @@ fn folder_failure(error: SyncError) -> Result<SyncFailure, SyncError> {
 }
 
 impl SyncRun {
-    /// Creates a run bound to the given change log, sync state, folder, and the change
-    /// recorder it suspends while applying (SYN-020).
+    /// Creates a run bound to the given change log, sync state and folder.
     pub fn new(
         change_log: Arc<dyn ChangeLogRepository>,
         state_repo: Arc<dyn SyncStateRepository>,
         folder_store: Arc<dyn FolderStore>,
-        change_recorder: Arc<dyn ChangeRecorder>,
     ) -> Self {
         Self {
             change_log,
             state_repo,
             folder_store,
-            change_recorder,
             sync_gate: Arc::new(SyncGate::new()),
         }
     }
@@ -198,7 +194,6 @@ impl SyncRun {
                 change_log: self.change_log.as_ref(),
                 state_repo: self.state_repo.as_ref(),
                 folder_store: self.folder_store.as_ref(),
-                change_recorder: self.change_recorder.as_ref(),
                 applier,
             },
             join::JoinRequest {
@@ -271,11 +266,11 @@ impl SyncRun {
         } else {
             let held_back = self.state_repo.list_held_back().await?;
             self.sync_gate
-                .run_exclusive(|| async {
-                    // SYN-020 — applying never records a change: the recorder stays
-                    // suspended for the whole apply transaction.
-                    let _recording_suspended = self.change_recorder.suspend();
-                    self.apply_intake(device, applier, held_back, intake).await
+                .run_exclusive(|| {
+                    // SYN-020 — applying never records a change: the apply's own task records
+                    // none for its whole transaction, while a local write in another task
+                    // still records its change (SYN-064, #920).
+                    while_applying(self.apply_intake(device, applier, held_back, intake))
                 })
                 .await?
         };
@@ -598,7 +593,7 @@ mod tests {
         SqliteChangeLogRepository, SqliteChangeRecorder, SqliteSyncStateRepository,
     };
     use crate::shared::domain::{ChangeDraft, Operation, Origin, RecordIdentity, RecordKind};
-    use crate::shared::infrastructure::change_recorder::NoopChangeRecorder;
+    use crate::shared::infrastructure::change_recorder::ChangeRecorder;
     use sqlx::sqlite::SqlitePoolOptions;
     use sqlx::{Pool, Sqlite};
 
@@ -611,7 +606,6 @@ mod tests {
             Arc::new(SqliteChangeLogRepository::new(pool.clone())),
             state_repo,
             Arc::new(folder_store),
-            Arc::new(NoopChangeRecorder),
         )
     }
 
@@ -1090,8 +1084,7 @@ mod tests {
     // SYN-060/065 — the full apply run
     // -------------------------------------------------------------------------
 
-    // SYN-064 — SyncGate.run_exclusive holds the mutex for the whole apply; a local write
-    // started after the run begins must wait until it completes.
+    // SYN-064 — SyncGate.run_exclusive runs the apply under the mutex and hands back its value.
     #[tokio::test]
     async fn sync_gate_run_exclusive_returns_the_closures_value() {
         let gate = SyncGate::new();
@@ -1437,7 +1430,6 @@ mod tests {
             Arc::new(SqliteChangeLogRepository::new(pool.clone())),
             state_repo,
             Arc::new(folder_store),
-            recorder,
         );
 
         let report = run.run(&device(), &applier).await.expect("run");
@@ -1457,7 +1449,7 @@ mod tests {
             "SYN-020: applying leaves no changes row for this device"
         );
         assert!(
-            run.change_recorder.is_recording().await,
+            applier.recorder.is_recording().await,
             "the gate is released once the run completes"
         );
     }
