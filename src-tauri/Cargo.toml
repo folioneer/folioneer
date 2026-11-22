@@ -17,6 +17,8 @@ default-run = "folioneer"
 name = "folioneer_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+# Dev-only binaries live in `dev/`, never `src/bin/`: the Windows (NSIS) bundler expects a
+# bundled `.exe` for every file there and ignores `required-features`, so the release fails.
 [[bin]]
 name = "generate_bindings"
 path = "dev/generate_bindings.rs"

@@ -7,7 +7,7 @@ import { browser } from "@wdio/globals";
  * Standard setValue() does NOT reliably trigger React's synthetic onChange in
  * WebKitGTK — the DOM value is set but React state never updates.
  *
- * L-019 — the synthetic event is not always taken either: React then re-renders
+ * The synthetic event is not always taken either: React then re-renders
  * the field with its old value and the typed one vanishes. So after setting, the
  * helper waits for the page to settle and reads the field back; a field that no
  * longer shows the value is logged with what the page looked like and typed once

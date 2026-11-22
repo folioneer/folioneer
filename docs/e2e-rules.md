@@ -105,6 +105,11 @@ async function setReactInputValue(
 After calling `setReactInputValue`, React re-renders synchronously within the same
 event-loop tick. The next `waitForEnabled` poll will see the updated disabled state.
 
+The synthetic event is not always taken either: React then re-renders the field with its
+old value. The shared helper (`e2e/helpers/react.ts`) reads the field back after the page
+settles and types again, logging a `[setReactInputValue]` line: one that holds after the
+retry is the driver, one that keeps failing is a form bug.
+
 ## E7 — Custom date pickers require locale-formatted input
 
 `DateField` renders `<input type="text">` and displays dates in the project's configured
@@ -166,3 +171,17 @@ WebDriver's synthetic key events are not trusted, so they cannot drive the Headl
 - The full fill-and-submit flow is covered by RTL component tests.
 
 **System file dialog** — no test can drive it. A debug build takes the file `FOLIONEER_E2E_PICKED_FILE` names instead (`wdio.conf.ts`: `e2e/account_import/broker.csv`); a release build never reads it.
+
+## When local and CI disagree
+
+- **A path that branches on a host service** (the keychain, a locale, the display server)
+  takes another branch on the runner. Assert only what every legal branch shares, and
+  reproduce the runner with `npm run test:e2e:ci`: in its own session bus nothing answers
+  for the Secret Service.
+- **"Element click intercepted" in several unrelated specs** is a layout overflow, not
+  flakiness: the runner's fonts are wider. Look for what the failing clicks share on screen
+  (one dense row); F33 is the fix.
+- **A failure only the local machine shows**, CI green on the same commit: first run one
+  spec of a known-green tag in a `git worktree` on the same machine. If it fails the same
+  way, the machine is the variable and a bisect is pointless. Stop a stale driver with
+  `pkill -x <name>`, never `pkill -f`: the pattern matches the shell running it.

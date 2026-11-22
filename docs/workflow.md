@@ -22,6 +22,8 @@ rule.
 - **Self-check**: while working, the recipes take a scope (`just test <paths>`,
   `just test-rust <filter>`, `just check --frontend` or `--backend`); `just harness
 --coverage` runs before the first push (`run-entry.recipes.push_harness`).
+- **The branch** is named when it is created: renaming the head branch of an open pull
+  request closes the pull request.
 - **Evidence**: beside `/app:visual-proof`, the E2E run in CI captures the real
   application and links its screenshots from the pull request.
 - **CI reviewers**: the code lanes, and `spec` and `contract` on a changed spec or contract
@@ -96,7 +98,7 @@ runs does not log. A script that runs another logs both (`harness.sh` and each c
 calls), and a worktree keeps its own file: the audit reads the main checkout's. Skills and agents are
 counted from the session's transcript.
 
-**Heavy runs.** A mutation sweep runs in CI only (`mutants.yml`): the local machine cannot carry it beside the hooks and other builds. A background job is stopped by its task or process id, never by name.
+**Heavy runs.** A mutation sweep runs in CI only (`mutants.yml`): the local machine cannot carry it beside the hooks and other builds, and an in-place run that dies leaves a mutated source file behind (`git status` first, `git checkout -- <tree>` restores it). A background job is stopped by its task or process id, never by name.
 
 **The infra lane's own checks.** What `app:reviewer-infra` checks for this project,
 beside its own checks:
@@ -106,6 +108,9 @@ beside its own checks:
 - a recipe needs a caller — CI, a git hook, a skill, a script — or a line in `CLAUDE.md`
   § Commands as a tool people run 🟡; a change that removes a recipe's last caller removes
   the recipe;
+- a workflow a required check comes from has a `workflow_dispatch` entry (with the pull
+  request's number when it posts to one) 🟡: GitHub drops pull-request events at times, and
+  `gh workflow run <name> --ref <branch>` is then the way to fire the runs;
 - `prepare-sqlx` names its prerequisite, the `DATABASE_URL` it reads, in its doc comment 🟡;
 - the Windows bundle: WiX artifacts (`release/wix/`) cleared before a release build 🟡, and
   an `icon.ico` over 64 KB 🟡 (WiX `light.exe` can fail without a message).
