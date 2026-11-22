@@ -423,7 +423,7 @@ class QualityChecker:
     def sqlx_check_database(self) -> dict:
         """The database address `cargo sqlx prepare --check` is given when the shell sets none.
 
-        sqlx-cli 0.9 refuses to start without one, even offline (docs/lessons.md, 2026-05-22).
+        sqlx-cli 0.9 refuses to start without one, even offline.
         CI sets it in the workflow; a release run from a terminal has none, so it gets the
         check database `just prepare-sqlx` keeps, at the address CI uses.
         """

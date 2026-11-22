@@ -353,3 +353,8 @@ Not a finding for `app:reviewer-frontend`: a removed frontend validation, when t
 enforces the rule (F32); a value the core rejects is shown from the core's error on save or
 from the draft check. A review never asks to re-add a numeric or business check to the interface; it
 flags only a lost message or a lost save guard the spec still names.
+
+**F33** — A dense row of text and buttons MUST wrap (`flex-wrap` on the row and its groups)
+rather than rely on the window fitting it: `whitespace-nowrap` text in a `min-w-0` flex child
+overflows over its siblings, and the runner's wider fonts make a row that fits locally cover
+its buttons in CI.

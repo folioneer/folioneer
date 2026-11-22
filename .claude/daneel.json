@@ -8,7 +8,7 @@
       "docs/*-rules.md",
       ".claude/rules/*.md"
     ],
-    "records": ["CHANGELOG.md", "docs/adr/", "docs/lessons.md"],
+    "records": ["CHANGELOG.md", "docs/adr/"],
     "path_roots": [
       "src/",
       "src-tauri/",
@@ -62,7 +62,7 @@
     "recipes": {
       "push_harness": "harness --coverage"
     },
-    "record_paths": ["docs/adr/", "docs/lessons.md"]
+    "record_paths": ["docs/adr/"]
   },
   "run-batch": {
     "version_files": [

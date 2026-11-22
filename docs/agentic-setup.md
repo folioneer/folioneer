@@ -27,10 +27,10 @@ Written to read the same in every repository that works this way.
   in a hook's message beyond the line that failed.
 - `docs/ubiquitous-language.md` — what the domain words mean, validated by the owner.
   Never: extended by the agent without a question.
-- `docs/lessons.md` — failures worth teaching, one per entry. Never: a rule's home.
 - `ARCHITECTURE.md` — where code lives. Never: why a choice was made (an ADR does).
 - `.claude/rules/` — loads the rules document of a layer, or a document folder's
-  `README.md`, when one of its files is read. Never: states the rule itself.
+  `README.md`, when one of its files is read. Never: states the rule itself; never an `@`
+  import, which loads at launch whatever the rule's `paths:` scope.
 - `.claude/settings.json` — what the agent may run without asking, what it may
   never run, and the plugins enabled at their pin. Never: allows what `CLAUDE.md` forbids,
   nor edited by the agent.

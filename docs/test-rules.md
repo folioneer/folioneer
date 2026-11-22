@@ -104,6 +104,12 @@ const { result } = renderHook(() => useMyHook(item, onClose));
 
 A test that expects today's date takes it as the code does: `todayIso()` (`@/ui/format/date`), the day on this computer. `new Date().toISOString()` is the day in UTC: away from UTC it differs for part of every day, and the test fails there while CI, in UTC, passes. A test that needs a given day fixes the clock (`vi.useFakeTimers()` and `vi.setSystemTime(...)`).
 
+### `beforeEach` takes a block body
+
+Vitest runs a function `beforeEach` returns as the test's teardown: `beforeEach(() =>
+mock.mockReset())` returns the mock, which runs once more after the test (a rejecting one
+then fails it). Write `() => { mock.mockReset(); }` whenever the call returns anything.
+
 ### Async patterns
 
 Use `waitFor` to wait for async state to settle, `act` to trigger synchronous actions:

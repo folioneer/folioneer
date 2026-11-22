@@ -2,7 +2,9 @@ import { act, render } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SellTransactionModal } from "./SellTransactionModal";
 
-// L-019 — the real dialog and hook, the backend answering whenever the test says so.
+// The form keeps every value it receives, while draft checks answer late — the half of a
+// lost typed value no E2E run can show (E2E rule E6 has the driver's half): the real dialog
+// and hook, the backend answering whenever the test says so.
 const pending: Array<(value: unknown) => void> = [];
 const { mockDraft, mockSnapshot } = vi.hoisted(() => ({
   mockDraft: vi.fn(),
@@ -22,7 +24,9 @@ vi.mock("@/features/transactions/useTransactions", () => ({
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key, i18n: { language: "en" } }),
 }));
-vi.mock("@/lib/logger", () => ({ logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn() } }));
+vi.mock("@/lib/logger", () => ({
+  logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn() },
+}));
 
 /** Types a value the way the E2E helper does: native setter, then input and change events. */
 function type(id: string, value: string) {
@@ -43,7 +47,7 @@ async function answerChecks() {
   });
 }
 
-describe("SellTransactionModal — typing while the draft check answers (L-019)", () => {
+describe("SellTransactionModal — typing while the draft check answers", () => {
   beforeEach(() => {
     pending.length = 0;
     mockDraft.mockImplementation(() => new Promise((resolve) => pending.push(resolve)));

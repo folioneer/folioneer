@@ -128,7 +128,8 @@ jobs:
         if: steps.scope.outputs.run == 'true'
         # `test:e2e:ci` is the project's xvfb wrapper around `test:e2e` (see package.json).
         # It runs inside its own D-Bus session: without one, every start of the app waits
-        # 30 seconds (docs/lessons.md L-020).
+        # 30 seconds for a bus that never answers.
+        # A wait of exactly 30 seconds, repeated, is a timeout: find who is waited on first.
         shell: bash
         run: npm run test:e2e:ci
 
