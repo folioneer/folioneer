@@ -246,11 +246,18 @@ jobs:
             on GitHub yourself; the workflow does that from the saved file.
             Be concise: one line per finding (location, claim, fix); no
             restating of the diff, no narrative, no unrequested alternatives.
+          # The report is granted by `Edit` rules: they also grant the Write tool, a `Write(…)`
+          # rule grants it nothing. A rule's path without a leading slash reads from the
+          # session's current folder, which a `cd` into the branch's worktree moves (PR #902:
+          # "no report"), and one leading `/` reads from the project root; `//` — here `/`
+          # before the workspace's absolute path — is the filesystem root. Probed with
+          # `claude -p --setting-sources project --permission-mode default`, the user's
+          # settings off: they may allow the write and prove nothing.
           claude_args: |
             --model claude-sonnet-5
             --max-turns 80
             --add-dir /home/runner/work/_temp/branch
-            --allowedTools "Read" "Grep" "Glob" "Write(.review/**)" "Edit(.review/**)" "Bash(bash .daneel/plugins/app/scripts/branch.sh *)" "Bash(bash .daneel/plugins/app/scripts/review-path.sh *)" "Bash(bash ${{ github.workspace }}/.daneel/plugins/app/scripts/branch.sh *)" "Bash(bash ${{ github.workspace }}/.daneel/plugins/app/scripts/review-path.sh *)" "Bash(git diff *)" "Bash(git log *)" "Bash(git show *)" "Bash(git status *)" "Bash(git rev-parse *)" "Bash(git merge-base *)" "Bash(git cat-file *)" "Bash(git ls-remote --tags https://github.com/*)" "Bash(grep *)" "Bash(head *)" "Bash(tail *)" "Bash(cat *)" "Bash(ls *)" "Bash(wc *)" "Bash(sort *)" "Bash(uniq *)" "Bash(cut *)" "Bash(tr *)" "Bash(sed -n *)" "Bash(echo *)" "Bash(test *)" "Bash(shellcheck *)"
+            --allowedTools "Read" "Grep" "Glob" "Edit(.review/**)" "Edit(/${{ github.workspace }}/.review/**)" "Bash(bash .daneel/plugins/app/scripts/branch.sh *)" "Bash(bash .daneel/plugins/app/scripts/review-path.sh *)" "Bash(bash ${{ github.workspace }}/.daneel/plugins/app/scripts/branch.sh *)" "Bash(bash ${{ github.workspace }}/.daneel/plugins/app/scripts/review-path.sh *)" "Bash(git diff *)" "Bash(git log *)" "Bash(git show *)" "Bash(git status *)" "Bash(git rev-parse *)" "Bash(git merge-base *)" "Bash(git cat-file *)" "Bash(git ls-remote --tags https://github.com/*)" "Bash(grep *)" "Bash(head *)" "Bash(tail *)" "Bash(cat *)" "Bash(ls *)" "Bash(wc *)" "Bash(sort *)" "Bash(uniq *)" "Bash(cut *)" "Bash(tr *)" "Bash(sed -n *)" "Bash(echo *)" "Bash(test *)" "Bash(shellcheck *)"
 
       - name: Redact secret-shaped strings from what leaves the runner
         # The session's shell inherits the job environment; a prompt injection
