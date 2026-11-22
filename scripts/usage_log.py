@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""The usage log: one line per run of a script or a recipe (docs/workflow.md § The harness).
+"""The usage log: one line per run of a script or a recipe (daneel flow; `/flow:flow-audit` reads it).
 
 `logs/usage.log`, local and never committed: time, tool, duration, result, separated
-by tabs. The flow audit reads it after a release, then empties it. Nothing is written
+by tabs. The flow audit reads it after a batch ends, then empties it. Nothing is written
 in CI, nor when `USAGE_LOG=off` (the script tests); `USAGE_LOG=<path>` moves the file.
 
 A tool reaches the log in one of three ways:
