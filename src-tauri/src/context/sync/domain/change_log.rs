@@ -10,7 +10,7 @@ use crate::context::sync::domain::device::SyncDevice;
 use crate::context::sync::domain::folder::SegmentChange;
 use crate::context::sync::domain::tombstone::Tombstone;
 use crate::context::sync::error::SyncError;
-use crate::shared::domain::RecordKind;
+use crate::shared::domain::{LogicalTimestamp, RecordKind};
 
 /// Persistence for the change log, the tombstones (CFR-015), and the enrolment-owned device
 /// state.
@@ -37,6 +37,25 @@ pub trait ChangeLogRepository: Send + Sync {
         conn: &mut SqliteConnection,
         kind: RecordKind,
         identity: &str,
+    ) -> Result<(), SyncError>;
+
+    /// Whether this device received the state of `identity` at `at` from another device —
+    /// applied, superseded, dropped or ignored — or made it itself, on `conn` (CFR-011).
+    async fn was_received(
+        &self,
+        conn: &mut SqliteConnection,
+        kind: RecordKind,
+        identity: &str,
+        at: &LogicalTimestamp,
+    ) -> Result<bool, SyncError>;
+
+    /// Notes that the state of `identity` at `at` was received, on `conn` (CFR-011).
+    async fn note_received(
+        &self,
+        conn: &mut SqliteConnection,
+        kind: RecordKind,
+        identity: &str,
+        at: &LogicalTimestamp,
     ) -> Result<(), SyncError>;
 
     /// Advances the logical clock to at least `at_least`, on `conn` (CFR-010: a logical

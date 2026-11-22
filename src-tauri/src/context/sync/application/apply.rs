@@ -10,7 +10,7 @@ use std::collections::HashSet;
 use sqlx::SqliteConnection;
 
 use crate::context::sync::domain::{
-    account_parent, cascade_child_tombstones, decide, display_name, duplicate_name_notice,
+    account_parent, cascade_child_tombstones, decide_seen, display_name, duplicate_name_notice,
     parent_references, reference_outcome, removed_child_notice, upgraded_content, Change,
     ChangeApplier, ChangeLogRepository, NoticeDraft, Outcome, RecordState, Tombstone, WaitingFor,
 };
@@ -83,6 +83,7 @@ pub async fn apply_change(
     };
     match reference_outcome(change, &known, account_state.as_ref()) {
         Some(Outcome::Drop { notice }) => {
+            note_received(conn, change_log, change).await?;
             return Ok(ApplyResult {
                 applied: Applied::Dropped,
                 notices: own_notices(vec![notice], own_device_id),
@@ -109,15 +110,29 @@ pub async fn apply_change(
         Some((state, content)) => (Some(state), content.as_deref()),
         None => (None, None),
     };
-    let decision = decide(change, state, content);
+    // CFR-011 (#925) — whether this device already received the state the change is based on.
+    let based_on_received = match &change.based_on {
+        Some(based_on) => {
+            change_log
+                .was_received(conn, change.record_kind, &change.record_identity, based_on)
+                .await?
+        }
+        None => false,
+    };
+    let decision = decide_seen(change, state, content, based_on_received);
     let mut notices = decision.notices;
     let applied = match decision.outcome {
         Outcome::Apply { .. } | Outcome::MergeMax => {
             write(conn, applier, change_log, change, content, &mut notices).await?;
+            note_received(conn, change_log, change).await?;
             Applied::Applied
         }
-        Outcome::Ignore { .. } => Applied::Ignored,
+        Outcome::Ignore { .. } => {
+            note_received(conn, change_log, change).await?;
+            Applied::Ignored
+        }
         Outcome::Drop { notice } => {
+            note_received(conn, change_log, change).await?;
             notices.push(notice);
             Applied::Dropped
         }
@@ -127,6 +142,23 @@ pub async fn apply_change(
         applied,
         notices: own_notices(notices, own_device_id),
     })
+}
+
+/// CFR-011 (#925) — notes `change` as a received state of its record — applied, dropped or
+/// ignored — so a later change based on it is never held back waiting for it.
+async fn note_received(
+    conn: &mut SqliteConnection,
+    change_log: &dyn ChangeLogRepository,
+    change: &Change,
+) -> Result<(), SyncError> {
+    change_log
+        .note_received(
+            conn,
+            change.record_kind,
+            &change.record_identity,
+            &change.logical_timestamp,
+        )
+        .await
 }
 
 /// Only the notices CFR-060 raises on this device are persisted here; the other device

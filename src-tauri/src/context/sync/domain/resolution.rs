@@ -272,12 +272,23 @@ pub struct Decision {
 /// prevails entirely; fields are never merged one by one, except the two record kinds that
 /// bypass this function altogether (`resolve_observation`, `Outcome::MergeMax`).
 pub fn resolve(incoming: &Change, current: Option<&RecordState>) -> Outcome {
+    resolve_seen(incoming, current, false)
+}
+
+/// `resolve`, knowing whether this device already received the state the change is based on
+/// (CFR-011): a change based on a received state is decided against the state this device
+/// holds, never held back waiting for a state it will not apply (#925).
+pub fn resolve_seen(
+    incoming: &Change,
+    current: Option<&RecordState>,
+    based_on_received: bool,
+) -> Outcome {
     let Some(state) = current else {
         return Outcome::Apply { notice: None };
     };
     let current_timestamp = &state.rank().logical_timestamp;
     if let Some(based_on) = &incoming.based_on {
-        if based_on > current_timestamp {
+        if based_on > current_timestamp && !based_on_received {
             return Outcome::HoldBack {
                 waiting_for: WaitingFor::OwnState {
                     based_on: based_on.clone(),
@@ -387,6 +398,16 @@ pub fn decide(
     current: Option<&RecordState>,
     current_content: Option<&str>,
 ) -> Decision {
+    decide_seen(incoming, current, current_content, false)
+}
+
+/// `decide`, knowing whether the change's base was already received (`resolve_seen`).
+pub fn decide_seen(
+    incoming: &Change,
+    current: Option<&RecordState>,
+    current_content: Option<&str>,
+    based_on_received: bool,
+) -> Decision {
     let outcome = match incoming.record_kind {
         RecordKind::AssetPrice | RecordKind::ReportedSplit | RecordKind::CurrencyRate => {
             resolve_observation(incoming, current)
@@ -397,7 +418,7 @@ pub fn decide(
         {
             Outcome::MergeMax
         }
-        _ => resolve(incoming, current),
+        _ => resolve_seen(incoming, current, based_on_received),
     };
     let identical = current_content.is_some() && current_content == incoming.content.as_deref();
     let mut notices: Vec<NoticeDraft> = notice_for(&outcome).into_iter().collect();
@@ -736,6 +757,31 @@ mod tests {
             }
         }
         current
+    }
+
+    // CFR-011 (#925) — a change based on a state newer than the one held waits for it, unless
+    // this device already received that state and ignored it: then it is decided.
+    #[test]
+    fn a_change_based_on_an_ignored_state_is_decided_not_held_back() {
+        let current = RecordState::Live(rank("desktop", Origin::User, 5));
+        let based_on_seven = change(
+            "laptop",
+            RecordKind::Account,
+            "account-1",
+            Operation::Updated,
+            Origin::User,
+            8,
+            Some(7),
+            Some("{}"),
+        );
+        assert!(matches!(
+            resolve_seen(&based_on_seven, Some(&current), false),
+            Outcome::HoldBack { .. }
+        ));
+        assert!(matches!(
+            resolve_seen(&based_on_seven, Some(&current), true),
+            Outcome::Apply { .. }
+        ));
     }
 
     /// Every permutation of `items`, by simple recursive selection (no `itertools`

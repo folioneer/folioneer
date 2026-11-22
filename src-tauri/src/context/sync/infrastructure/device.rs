@@ -228,6 +228,7 @@ impl SyncStateRepository for SqliteSyncStateRepository {
             "DELETE FROM sync_cursors",
             "DELETE FROM held_back_changes",
             "DELETE FROM conflict_notices",
+            "DELETE FROM sync_received_states",
         ] {
             sqlx::query(statement)
                 .execute(&mut *transaction)
@@ -552,6 +553,10 @@ mod tests {
         .unwrap();
         repo.insert_held_back(&sample_held_back()).await.unwrap();
         repo.insert_notice(&sample_notice()).await.unwrap();
+        sqlx::query("INSERT INTO sync_received_states VALUES ('Account', 'account-1', '00000000000000000007')")
+            .execute(&pool)
+            .await
+            .unwrap();
 
         repo.discard_device_state().await.unwrap();
 
@@ -559,6 +564,14 @@ mod tests {
         assert!(repo.get_cursor("laptop-device").await.unwrap().is_none());
         assert!(repo.list_held_back().await.unwrap().is_empty());
         assert!(repo.list_undismissed_notices().await.unwrap().is_empty());
+        let received: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sync_received_states")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            received, 0,
+            "SYN-082: the received states go with the device"
+        );
     }
 
     // SYN-033 — upsert_cursor then get_cursor round-trips.

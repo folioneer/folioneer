@@ -363,6 +363,49 @@ impl ChangeLogRepository for SqliteChangeLogRepository {
         Ok(())
     }
 
+    async fn was_received(
+        &self,
+        conn: &mut SqliteConnection,
+        kind: RecordKind,
+        identity: &str,
+        at: &LogicalTimestamp,
+    ) -> Result<bool, SyncError> {
+        let record_kind = kind.to_string();
+        let wire = at.as_str().to_string();
+        let found = sqlx::query_scalar!(
+            r#"SELECT (SELECT COUNT(*) FROM sync_received_states WHERE record_kind = ?1 AND record_identity = ?2 AND logical_timestamp = ?3)
+                    + (SELECT COUNT(*) FROM changes WHERE record_kind = ?1 AND record_identity = ?2 AND logical_timestamp = ?3) AS "count!: i64""#,
+            record_kind,
+            identity,
+            wire
+        )
+        .fetch_one(conn)
+        .await
+        .map_err(|error| SyncError::database("was_received: read failed", error))?;
+        Ok(found > 0)
+    }
+
+    async fn note_received(
+        &self,
+        conn: &mut SqliteConnection,
+        kind: RecordKind,
+        identity: &str,
+        at: &LogicalTimestamp,
+    ) -> Result<(), SyncError> {
+        let record_kind = kind.to_string();
+        let wire = at.as_str().to_string();
+        sqlx::query!(
+            "INSERT OR IGNORE INTO sync_received_states (record_kind, record_identity, logical_timestamp) VALUES (?, ?, ?)",
+            record_kind,
+            identity,
+            wire
+        )
+        .execute(conn)
+        .await
+        .map_err(|error| SyncError::database("note_received: write failed", error))?;
+        Ok(())
+    }
+
     async fn advance_logical_clock(
         &self,
         conn: &mut SqliteConnection,
@@ -496,6 +539,7 @@ impl ChangeLogRepository for SqliteChangeLogRepository {
             "DELETE FROM sync_cursors",
             "DELETE FROM held_back_changes",
             "DELETE FROM conflict_notices",
+            "DELETE FROM sync_received_states",
         ] {
             sqlx::query(statement)
                 .execute(&mut *conn)
@@ -936,6 +980,58 @@ mod tests {
         assert_eq!(rank.origin, Origin::Application);
     }
 
+    // CFR-011 (#925) — this device's own change is a known state too: one later superseded by a
+    // higher-ranked change with an earlier timestamp is never waited for.
+    #[tokio::test]
+    async fn this_devices_own_change_counts_as_a_known_state() {
+        let pool = make_pool().await;
+        seed_sync_device(&pool, "desktop-device").await;
+        let recorder = SqliteChangeRecorder::new(pool.clone());
+        let repository = SqliteChangeLogRepository::new(pool.clone());
+        let mut conn = pool.acquire().await.expect("conn");
+        let rank = recorder
+            .record(&mut conn, account_created_draft("account-1"))
+            .await
+            .expect("recorded")
+            .expect("ranked");
+
+        assert!(repository
+            .was_received(
+                &mut conn,
+                RecordKind::Account,
+                "account-1",
+                &rank.logical_timestamp
+            )
+            .await
+            .expect("read"));
+    }
+
+    // CFR-011 (#925) — a received state is found by its exact timestamp, and only for its record.
+    #[tokio::test]
+    async fn a_received_state_is_found_by_its_exact_timestamp() {
+        let pool = make_pool().await;
+        let repository = SqliteChangeLogRepository::new(pool.clone());
+        let mut conn = pool.acquire().await.expect("conn");
+        let at = LogicalTimestamp::new;
+        for _ in 0..2 {
+            repository
+                .note_received(&mut conn, RecordKind::Account, "account-1", &at(7))
+                .await
+                .expect("noted, twice");
+        }
+        for (identity, stamp, expected) in [
+            ("account-1", 7, true),
+            ("account-1", 6, false),
+            ("account-2", 7, false),
+        ] {
+            let found = repository
+                .was_received(&mut conn, RecordKind::Account, identity, &at(stamp))
+                .await
+                .expect("read");
+            assert_eq!(found, expected, "{identity} at {stamp}");
+        }
+    }
+
     // #920 / SYN-020, SYN-064 — an apply in another task suspends its own writes only: a
     // local write made meanwhile records its change, so the other computers receive it.
     #[tokio::test]
@@ -1172,6 +1268,7 @@ mod tests {
             "INSERT INTO sync_cursors (device_id, applied_through, last_applied_at) VALUES ('laptop', 1, NULL)",
             "INSERT INTO held_back_changes (id, origin_device_id, sequence, payload, waiting_kind, waiting_identity, held_since) VALUES ('h', 'laptop', 2, '{}', 'Account', 'a', '2026-08-22T00:00:00Z')",
             "INSERT INTO conflict_notices (notice_id, kind, record_kind, record_identity, record_label, other_device_id, other_device_name, raised_at) VALUES ('n', 'OverruledEdit', 'Account', 'a', 'PEA', 'laptop', 'Laptop', '2026-08-22T00:00:00Z')",
+            "INSERT INTO sync_received_states (record_kind, record_identity, logical_timestamp) VALUES ('Account', 'a', '00000000000000000007')",
         ] {
             sqlx::query(statement).execute(&pool).await.expect("seeded");
         }
@@ -1182,6 +1279,7 @@ mod tests {
                 "sync_cursors",
                 "held_back_changes",
                 "conflict_notices",
+                "sync_received_states",
                 "sync_device",
             ] {
                 let count: i64 = sqlx::query_scalar(&format!("SELECT COUNT(*) FROM {table}"))
@@ -1201,7 +1299,7 @@ mod tests {
         drop(rolled_back);
         assert_eq!(
             counts().await,
-            [1, 1, 1, 1],
+            [1, 1, 1, 1, 1],
             "a failed enrolment keeps them"
         );
 
@@ -1211,6 +1309,6 @@ mod tests {
             .await
             .expect("forgotten");
         committed.commit().await.expect("committed");
-        assert_eq!(counts().await, [0, 0, 0, 1], "the device stays");
+        assert_eq!(counts().await, [0, 0, 0, 0, 1], "the device stays");
     }
 }
