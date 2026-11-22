@@ -229,8 +229,15 @@ describe("useManagementFee (FEE-020/021/022)", () => {
 
   // FEE-020 — a message about the other mode's input does not survive the switch
   it("clears a submit error when the mode changes", async () => {
+    mockRecordManagementFee.mockResolvedValue({
+      status: "error",
+      error: { code: "AssetNotHeld" },
+    });
     const { result } = renderHook(() => useManagementFee(BASE_PROPS));
-    act(() => result.current.handleChange("assetId", "asset-equity-1"));
+    act(() => {
+      result.current.handleChange("assetId", "asset-equity-1");
+      result.current.handleChange("percent", "1");
+    });
     await act(async () => {
       await result.current.handleSubmit(fakeSubmit);
     });
@@ -444,16 +451,17 @@ describe("useManagementFee (FEE-020/021/022)", () => {
     expect(mockRecordManagementFee).not.toHaveBeenCalled();
   });
 
-  // FEE-021 — validation error set when assetId missing at submit time
-  it("sets error.AssetNotHeld when submit attempted with no asset selected", async () => {
+  // FEE-021/025 (#460) — a local refusal keeps submit disabled and says nothing of its own.
+  it("keeps submit disabled and sets no message when no asset is selected", async () => {
     const { result } = renderHook(() => useManagementFee(BASE_PROPS));
     act(() => result.current.handleChange("percent", "1.5"));
+    expect(result.current.isFormValid).toBe(false);
 
     await act(async () => {
       await result.current.handleSubmit(fakeSubmit);
     });
 
-    expect(result.current.error).toEqual({ key: "error.AssetNotHeld" });
+    expect(result.current.error).toBeNull();
     expect(mockRecordManagementFee).not.toHaveBeenCalled();
   });
 });

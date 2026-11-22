@@ -1387,6 +1387,48 @@ mod tests {
         fees
     }
 
+    // FEE-048A / FEE-049 (#460) — a cursor that could not be saved leaves its periods to be
+    // generated again; at the next run each period whose deduction exists is settled, not an
+    // error, and the cursor moves past them.
+    #[tokio::test]
+    async fn fee_049_a_cursor_that_could_not_be_saved_settles_its_periods_at_the_next_run() {
+        let pool = setup_pool().await;
+        let (account_svc, account, stock_id) = scheduled_account(&pool, "FEE-049-cursor").await;
+        sqlx::query(
+            "CREATE TRIGGER refuse_cursor BEFORE INSERT ON fee_catch_up_positions \
+             BEGIN SELECT RAISE(ABORT, 'cursor refused'); END",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        let schedule = account_svc
+            .get_fee_schedule(&account.id, &stock_id)
+            .await
+            .unwrap()
+            .expect("schedule");
+        let today = chrono::NaiveDate::from_ymd_opt(2024, 3, 15).expect("valid date");
+        let orchestrator = FeeGenerationOrchestrator::new(account_svc.clone());
+        assert!(orchestrator.apply_schedule(&schedule, today).await.is_err());
+        assert_eq!(deductions(&account_svc, &account).await.len(), 2);
+
+        sqlx::query("DROP TRIGGER refuse_cursor")
+            .execute(&pool)
+            .await
+            .unwrap();
+        orchestrator
+            .apply_schedule(&schedule, today)
+            .await
+            .expect("periods already deducted are settled");
+
+        assert_eq!(deductions(&account_svc, &account).await.len(), 2);
+        let after = account_svc
+            .get_fee_schedule(&account.id, &stock_id)
+            .await
+            .unwrap()
+            .expect("schedule");
+        assert_eq!(after.last_applied_period.as_deref(), Some("2024-02-29"));
+    }
+
     // FEE-043 / FEE-063 — a generated deduction the user edits or deletes is not generated
     // again: the cursor stays where it was.
     #[tokio::test]

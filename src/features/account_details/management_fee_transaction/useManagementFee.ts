@@ -117,10 +117,9 @@ export function useManagementFee({ accountId, onSubmitSuccess }: UseManagementFe
           ? validatePercentage(formData.percent)
           : validateResultingQuantity(formData.resultingQuantity);
       const dateErr = validateDate(formData.date);
-      const validationError =
-        formData.assetId === "" ? { key: "error.AssetNotHeld" } : (amountErr ?? dateErr);
-      if (validationError) {
-        setError(validationError);
+      // FEE-021/025 — a local refusal only keeps submit disabled (`isFormValid`): this
+      // guard says nothing of its own.
+      if (formData.assetId === "" || amountErr || dateErr) {
         return;
       }
 
