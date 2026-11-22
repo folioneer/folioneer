@@ -4,6 +4,7 @@
 # The line is written by scripts/usage_log.py (time, tool, duration, result); the
 # script's own exit code is left as it was.
 _usage_log_py="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/usage_log.py"
-_usage_log_start=$(date +%s.%N)
+# Not `date +%s.%N`: `%N` is GNU-only, and BSD's literal `N` would drop the line.
+_usage_log_start=$(python3 -c 'import time; print(time.time())')
 # The code is read first: the command substitution below would overwrite `$?`.
 trap '_usage_log_code=$?; python3 "$_usage_log_py" record "$(basename "$0")" "$_usage_log_start" "$_usage_log_code" || true' EXIT
