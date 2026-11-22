@@ -566,7 +566,7 @@ The action the user starts on a holding to fill its price history from the accou
 
 ### Backfill
 
-Recording every missed trading-day close since the last successful scheduled fetch, up to 30 days back. Older gaps are left untouched.
+Recording every trading-day close from the day before the last successful scheduled fetch's trigger day, up to 30 days back. Older gaps are left untouched.
 
 > Status: confirmed
 

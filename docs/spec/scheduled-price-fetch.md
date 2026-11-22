@@ -81,7 +81,7 @@ The record of one execution of the scheduled download. Runs accumulate as an aud
 
 **SPF-030 — Close-of-day semantics (backend)**: The scheduled download records **daily closing prices**, never a live intraday quote. Each recorded price is dated to the trading day it closes — including during catch-up: a run executing the morning after a missed trigger records the previous day's close, not the morning's price. A close is recorded as traded on its date, never adjusted for a later split (MKT-193A): the run requests its window's splits beside the closes, a failed or malformed split request skipping the asset (MKT-193B, SPF-041).
 
-**SPF-031 — Backfill window (backend)**: Each run retrieves, per asset, the **daily close series** covering the days missing since the last successful scheduled run — a capability the External provider already exposes (its chart data carries dated daily history, MKT-117) — and records every completed trading-day close in that window, up to a maximum of 30 days back. Gaps older than 30 days are left untouched.
+**SPF-031 — Backfill window (backend)**: Each run retrieves, per asset, the **daily close series** covering the days from the day before the last successful scheduled run's trigger day (`trigger_date`) to today — a capability the External provider already exposes (its chart data carries dated daily history, MKT-117) — and records every completed trading-day close in that window, up to a maximum of 30 days back. Gaps older than 30 days are left untouched. Starting the day before the trigger day lets a trading day still in progress at the last trigger — dated that day, or the day before it for a computer east of the market — be recorded (SPF-033). With no successful run yet, the window starts 30 days back.
 
 **SPF-032 — Non-trading days produce no rows (backend)**: Weekends and market holidays have no close; the run writes nothing for those dates. This is not a skip or an error.
 
@@ -91,7 +91,7 @@ The record of one execution of the scheduled download. Runs accumulate as an aud
 
 **SPF-035 — Exchange rates in the same run (backend)**: The run also records **daily reference exchange rates** for every persisted currency pair (the same scope as the in-app rate refresh, FXR-071), each rate dated to its day — never a live snapshot re-dated to the run day.
 
-**SPF-036 — Exchange-rate backfill (backend)**: Missing rate days since the last successful scheduled run are backfilled up to 30 days, mirroring SPF-031. The rate providers expose dated daily history for this (the primary provider serves date-range queries; verified live 2026-07-12).
+**SPF-036 — Exchange-rate backfill (backend)**: Rate days in the SPF-031 window are backfilled, mirroring SPF-031. The rate providers expose dated daily history for this (the primary provider serves date-range queries; verified live 2026-07-12).
 
 **SPF-037 — Exchange-rate non-trading days (backend)**: Days for which the rate provider publishes no reference rate (weekends, ECB holidays) produce no rate rows, mirroring SPF-032. This is not a skip or an error.
 
@@ -148,8 +148,8 @@ Every day at trigger time (app open or closed)
     → OS launches the application invisibly                              (SPF-020)
         ├─ once-per-day guard: already settled today? → record skip, exit (SPF-021)
         ├─ scope = active holdings, minus cash + typed by hand            (SPF-040)
-        ├─ for each asset: fetch daily closes missing since last
-        │  successful run (≤ 30 days), dated to their trading day        (SPF-030, SPF-031)
+        ├─ for each asset: fetch daily closes from the day before the
+        │  last success's trigger day (≤ 30 days), dated to their day    (SPF-030, SPF-031)
         │    ├─ non-trading days: no row                                 (SPF-032)
         │    ├─ unfinished trading day: previous close only; next run
         │    │  completes it                                             (SPF-033)

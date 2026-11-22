@@ -513,16 +513,17 @@ fn latest_pending_trigger(now: NaiveDateTime, trigger_time: &str) -> NaiveDate {
 }
 
 /// Computes the `[from, to]` backfill window for the daily-close / rate fetch
-/// (SPF-031/036): the day after `last_success` through `today`, capped at
-/// [`BACKFILL_CAP_DAYS`] days back when `last_success` is absent or older than
-/// the cap.
+/// (SPF-031/036): the day before `last_success`'s trigger day through `today`. A market
+/// still open at that trigger — a session dated the day before it, east of the market —
+/// has its close written now (SPF-033). Capped at [`BACKFILL_CAP_DAYS`] days back when
+/// `last_success` is absent or older than the cap.
 pub fn backfill_window(
     last_success: Option<NaiveDate>,
     today: NaiveDate,
 ) -> (NaiveDate, NaiveDate) {
     let capped_from = today - chrono::Duration::days(BACKFILL_CAP_DAYS);
     let from = match last_success {
-        Some(date) => (date + chrono::Duration::days(1)).max(capped_from),
+        Some(date) => (date - chrono::Duration::days(1)).max(capped_from),
         None => capped_from,
     };
     (from, today)
@@ -679,12 +680,14 @@ mod tests {
         assert_eq!(to, today());
     }
 
-    // SPF-031 — a recent prior success anchors the window to the day after it.
+    // SPF-031/033 (#729) — a recent prior success anchors the window to the day before its
+    // trigger day: a session still open at that trigger, even east of its market, is written
+    // by this run.
     #[test]
-    fn backfill_window_starts_the_day_after_last_success() {
+    fn backfill_window_starts_the_day_before_the_last_success_trigger_day() {
         let last_success = today() - chrono::Duration::days(5);
         let (from, to) = backfill_window(Some(last_success), today());
-        assert_eq!(from, last_success + chrono::Duration::days(1));
+        assert_eq!(from, last_success - chrono::Duration::days(1));
         assert_eq!(to, today());
     }
 
@@ -1486,6 +1489,103 @@ mod tests {
         let run = orchestrator.run_scheduled_fetch().await.unwrap();
         assert_eq!(run.outcome, ScheduledFetchOutcome::Succeeded);
         assert_eq!(run.updated_count, 1);
+    }
+
+    // #729 / SPF-033 — the day before's run may have found a session still open, dated that
+    // day or, east of the market, the day before: this run asks from the day before it.
+    #[tokio::test]
+    async fn spf_033_a_run_asks_again_for_the_day_the_last_run_could_not_finish() {
+        let mut account_service = MockAccountServiceContract::new();
+        account_service.expect_get_all().returning(|| {
+            Ok(vec![crate::context::account::Account::restore(
+                "acc-1".to_string(),
+                "Portfolio".to_string(),
+                String::new(),
+                "USD".to_string(),
+                false,
+            )])
+        });
+        account_service
+            .expect_get_holdings_for_account()
+            .returning(|_| {
+                Ok(vec![crate::context::account::Holding::restore(
+                    "holding-1".to_string(),
+                    "acc-1".to_string(),
+                    "asset-1".to_string(),
+                    crate::shared::domain::quantity::from_surface(10_000_000),
+                    50_000_000,
+                    0,
+                    None,
+                )])
+            });
+        let mut asset_service = MockAssetServiceContract::new();
+        asset_service.expect_get_asset_by_id().returning(|_| {
+            Ok(Some(crate::context::asset::Asset::restore(
+                "asset-1".to_string(),
+                crate::context::asset::AssetKind::Custom,
+                "Test Asset".to_string(),
+                crate::context::asset::AssetClass::Stocks,
+                crate::context::asset::AssetCategory::from_storage(
+                    crate::context::asset::SYSTEM_CATEGORY_ID.to_string(),
+                    "generic.uncategorized".to_string(),
+                ),
+                "USD".to_string(),
+                1,
+                "AAPL".to_string(),
+                None,
+                false,
+                None,
+                false,
+                false,
+            )))
+        });
+        asset_service
+            .expect_record_daily_closes()
+            .times(1)
+            .returning(|_, closes| Ok(closes.len() as u32));
+        let mut price_provider = MockPriceProvider::new();
+        price_provider
+            .expect_fetch_daily_closes()
+            .withf(|_, from, to| from == "2026-06-08" && to == "2026-06-10")
+            .returning(|_, _, _| {
+                Ok(Some(vec![crate::context::asset::DatedClose {
+                    date: "2026-06-10".to_string(),
+                    price: 100_000_000,
+                }]))
+            });
+        let mut pair_repo = MockCurrencyPairRepository::new();
+        pair_repo.expect_upsert_pair().returning(Ok);
+        pair_repo
+            .expect_list_pairs_with_latest_rate()
+            .returning(|| Ok(vec![]));
+
+        price_provider
+            .expect_fetch_splits()
+            .returning(|_, _| Ok(Vec::new()));
+        asset_service
+            .expect_record_reported_splits()
+            .returning(|_, _, _| Ok(()));
+        let orchestrator = ScheduledFetchOrchestrator::new(
+            Arc::new(account_service),
+            Arc::new(asset_service),
+            Arc::new(price_provider),
+            Arc::new(CurrencyService::new(
+                Box::new(pair_repo),
+                Box::new(MockCurrencyRateRepository::new()),
+            )),
+            Arc::new(configured_repository(Some(ScheduledFetchRun::new(
+                "2026-06-09T22:15:00".to_string(),
+                "2026-06-09".to_string(),
+                ScheduledFetchOutcome::Succeeded,
+                1,
+                0,
+            )))),
+            Arc::new(MockDailyFetchScheduler::new()),
+            Arc::new(now_after_trigger),
+        );
+
+        let run = orchestrator.run_scheduled_fetch().await.unwrap();
+        assert_eq!(run.outcome, ScheduledFetchOutcome::Succeeded);
     }
 
     /// MKT-230 — how often the splits of the asset EMPTYSPLIT were kept.
