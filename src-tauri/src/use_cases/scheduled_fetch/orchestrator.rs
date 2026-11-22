@@ -249,6 +249,9 @@ impl ScheduledFetchOrchestrator {
         let (scope, fx_pairs) = match self.gather_scope().await {
             Ok(scope_and_pairs) => scope_and_pairs,
             Err(()) => {
+                // SPF-039 — the rates are refreshed whatever the price portion did: the pairs
+                // already persisted, as the scope that would add more could not be read.
+                self.refresh_rates(Vec::new(), from, to).await;
                 let run = ScheduledFetchRun::new(
                     executed_at,
                     trigger_date.to_string(),
@@ -284,13 +287,7 @@ impl ScheduledFetchOrchestrator {
         // SPF-039, SPF-042 — the rates are refreshed whatever the price portion did, an empty
         // scope included; SPF-039A — a rate failure is logged and never changes the run;
         // SPF-039B — the next run's window asks again from the day before its trigger day.
-        if let Err(error) = self
-            .currency_service
-            .refresh_all_rates_range(fx_pairs, &from.to_string(), &to.to_string())
-            .await
-        {
-            tracing::warn!(target: crate::core::logger::BACKEND, err = ?error, "scheduled run: FX range refresh failed (SPF-039 — price outcome unaffected)");
-        }
+        self.refresh_rates(fx_pairs, from, to).await;
 
         self.record(run.clone()).await?;
         // MKT-201 — a run that updated at least one asset is a fetch on this device. A
@@ -303,6 +300,23 @@ impl ScheduledFetchOrchestrator {
             }
         }
         Ok(run)
+    }
+
+    /// SPF-035–039 — refreshes the rates of the window for `pairs` and every pair already
+    /// persisted; a failure is logged and never changes the run (SPF-039A).
+    async fn refresh_rates(
+        &self,
+        pairs: Vec<crate::context::currency::CurrencyPair>,
+        from: NaiveDate,
+        to: NaiveDate,
+    ) {
+        if let Err(error) = self
+            .currency_service
+            .refresh_all_rates_range(pairs, &from.to_string(), &to.to_string())
+            .await
+        {
+            tracing::warn!(target: crate::core::logger::BACKEND, err = ?error, "scheduled run: FX range refresh failed (SPF-039 — price outcome unaffected)");
+        }
     }
 
     /// Persists a run record (SPF-050 — every path records).
@@ -1315,14 +1329,16 @@ mod tests {
             .expect_get_all()
             .returning(|| Err(crate::context::account::AccountError::DatabaseError));
 
-        let orchestrator = make_orchestrator(
+        // SPF-039 (#921) — a scope that cannot be built still refreshes the persisted rates.
+        let orchestrator = OrchestratorParts {
             account_service,
-            MockAssetServiceContract::new(),
-            MockPriceProvider::new(),
+            asset_service: MockAssetServiceContract::new(),
+            price_provider: MockPriceProvider::new(),
             repository,
-            MockDailyFetchScheduler::new(),
-            now_after_trigger(),
-        );
+            scheduler: MockDailyFetchScheduler::new(),
+            now: now_after_trigger(),
+        }
+        .with_rates(currency_service_refreshing_rates_once());
 
         // Even a hard failure building the scope must still result in a
         // recorded run (SPF-050) — never an early return that skips recording.

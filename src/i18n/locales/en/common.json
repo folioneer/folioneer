@@ -1308,6 +1308,7 @@
     "Unknown": "An unexpected error occurred. Please try again.",
     "DatabaseError": "An unexpected database error occurred. Please try again.",
     "NameEmpty": "Name cannot be empty.",
+    "CurrencyNotChangeable": "An account's currency cannot be changed once it is created.",
     "NameAlreadyExists": "An account with this name already exists.",
     "InvalidCurrency": "\"{{currency}}\" is not a valid currency code.",
     "InvalidCountry": "{{country}} is not a two-letter country code.",

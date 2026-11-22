@@ -14,12 +14,13 @@ This spec covers the CRUD lifecycle of accounts. The Account Details view (drill
 
 A financial account owned by the user.
 
-| Field     | Business meaning                                                                                                                                      |
-| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `name`    | User-defined display name (e.g. "PEA Boursorama", "Livret A"). Unique among the accounts of its profile (the case ignored for every letter, ACC-003). |
-| `country` | The account's own country (two upper-case letters), when one is set; absent otherwise (ACC-041).                                                      |
-| `wrapper` | The identifier of the tax wrapper the account sits in, normally one of the lists of ACC-040; absent when none is set (ACC-043, ACC-044).              |
-| `holder`  | Whose name the account is in, free text; absent when none is set (ACC-050). Read by no figure (ACC-052).                                              |
+| Field      | Business meaning                                                                                                                                      |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`     | User-defined display name (e.g. "PEA Boursorama", "Livret A"). Unique among the accounts of its profile (the case ignored for every letter, ACC-003). |
+| `currency` | The account's currency (ISO 4217), set when it is created and fixed from then on (ACC-002A); its Cash Holding is in it (CSH-014).                     |
+| `country`  | The account's own country (two upper-case letters), when one is set; absent otherwise (ACC-041).                                                      |
+| `wrapper`  | The identifier of the tax wrapper the account sits in, normally one of the lists of ACC-040; absent when none is set (ACC-043, ACC-044).              |
+| `holder`   | Whose name the account is in, free text; absent when none is set (ACC-050). Read by no figure (ACC-052).                                              |
 
 ### PortfolioTotal
 
@@ -42,6 +43,8 @@ The total of every account of the profile in use (PFL-050), read together with t
 **ACC-001 — Name normalisation (backend)** _(formerly R1)_: The `name` is normalised on receipt before any validation or storage: leading and trailing whitespace is stripped.
 
 **ACC-002 — Account validation (backend)** _(formerly R2)_: An `Account` is valid if and only if its `name` (after ACC-001 normalisation) is non-empty. Any violation is rejected with an explicit error.
+
+**ACC-002A — An account's currency is fixed once created (backend)**: An account update that gives another currency than the account's own is refused, and the account is left unchanged; its Cash Holding stays in that currency (CSH-014) (owner, 2026-11-22, #921).
 
 **ACC-003 — Name uniqueness (backend)** _(formerly R3)_: No two accounts of one profile share a name (PFL-022; comparison is performed on the normalised name per ACC-001, the case ignored for every letter, an accented one included: "épargne" is "ÉPARGNE"; an accent still tells two names apart: "Epargne" is not "Épargne". Names are compared letter by letter as typed: a capital that is written as two letters is not its small letter ("STRASSE" is not "Straße"), and a letter typed with a separate combining accent is not the same letter typed as one character). Any create or edit operation resulting in a duplicate is rejected with a specific error. ACC-001, ACC-002, and ACC-003 apply to both creation and modification.
 
@@ -143,7 +146,7 @@ The tax wrapper an account sits in — a PEA, an assurance vie, a Depot — is a
 
 **ACC-043 — An account's wrapper (backend)**: An account may carry any wrapper the lists hold, whatever its country — a French PEA in an account of another country is the user's choice (owner, 2026-10-18). A wrapper's identifier is free text wherever it is stored or synced, so a device whose lists do not know one keeps it. Setting a wrapper the lists do not hold is refused, unless it is the one the account already carries: an edit keeps a wrapper another device's newer lists set.
 
-**ACC-044 — Setting and editing them (backend)**: Both are optional, set when the account is created or edited (ACC-016, ACC-017), and travel with the account to the other devices (SYN-038). An edit states both, and one left empty is cleared; a change of country, the account's or the portfolio's, never clears the wrapper. An account that existed before has neither, and nothing else changes for it.
+**ACC-044 — Setting and editing them (backend)**: Both are optional, set when the account is created or edited (ACC-016, ACC-017), and travel with the account to the other devices (SYN-038). An edit states both, and one left empty is cleared; a change of country, the account's or the portfolio's, never clears the wrapper. An account that existed before has neither, and nothing else changes for it. An edit never changes the account's currency (ACC-002A).
 
 **ACC-045 — Country in the account form (frontend)**: Once the lists are read (ACC-040) the create and edit modals show a Country and a Wrapper (ACC-048); until then, or when they cannot be read, neither shows and the account keeps what it has. Country is a searchable list of every country, named in the window's language, in the order ACC-040 gives: the portfolio's first, named after it with "(the portfolio's)" — choosing it leaves the account without a country of its own, so it follows the portfolio's. The portfolio's country is listed once, as the portfolio's entry. An account whose own country is stored keeps it on save until another country is chosen; when that stored country equals the portfolio's, no entry shows as selected and it is still kept.
 

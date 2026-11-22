@@ -49,6 +49,32 @@ const formData = (overrides: Partial<AccountFormData> = {}): AccountFormData => 
 const options = (id: string) =>
   [...(document.getElementById(id) as HTMLSelectElement).options].map((option) => option.value);
 
+describe("AccountForm — currency (ACC-002A)", () => {
+  // ACC-002A (owner, 2026-11-22, #921) — an account's currency is fixed once created: the edit
+  // form shows it read-only; the creation form lets it be typed.
+  it("shows the currency read-only when it is locked", () => {
+    const { rerender } = render(
+      <AccountForm
+        formData={formData()}
+        handleChange={vi.fn()}
+        setCountry={vi.fn()}
+        wrapperLists={null}
+        currencyLocked
+      />,
+    );
+    expect(screen.getByLabelText("account.form_currency_label")).toBeDisabled();
+    rerender(
+      <AccountForm
+        formData={formData()}
+        handleChange={vi.fn()}
+        setCountry={vi.fn()}
+        wrapperLists={null}
+      />,
+    );
+    expect(screen.getByLabelText("account.form_currency_label")).toBeEnabled();
+  });
+});
+
 describe("AccountForm — country and wrapper (ACC-045, ACC-048)", () => {
   // ACC-045 — every country, searchable: the portfolio's first, named as such; a choice sets
   // the country through setCountry.

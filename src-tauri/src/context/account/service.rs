@@ -630,15 +630,16 @@ impl AccountService {
     }
 
     /// ACC-003/CFR-035 — stores a valid account under its id, refusing a rename into another
-    /// account's name.
+    /// account's name and a change of its currency (ACC-002A).
     async fn update_account(&self, account: Account) -> Result<Account, AccountError> {
+        let current = self.get_by_id(&account.id).await?;
+        if let Some(current) = &current {
+            account.keeps_currency_of(current)?;
+        }
         // CFR-035 — the uniqueness rule (ACC-003) binds the name being set: a name that
         // already clashes after a merge is accepted unchanged, a rename into another
         // account's name is rejected.
-        let name_changes = self
-            .get_by_id(&account.id)
-            .await?
-            .is_none_or(|current| !same_name(&current.name, &account.name));
+        let name_changes = current.is_none_or(|current| !same_name(&current.name, &account.name));
         if name_changes {
             if let Some(existing) =
                 find_account_by_name(&*self.account_repo, &account.name, &account.profile_id)
@@ -5251,6 +5252,40 @@ mod tests {
         ));
     }
 
+    // ACC-002A (owner, 2026-11-22, #921) — an account's currency is fixed once created: an
+    // update giving another currency is refused, and the account keeps its own.
+    #[tokio::test]
+    async fn acc_002a_an_update_refuses_another_currency() {
+        let svc = setup_service().await;
+        let created = svc
+            .create_classified(
+                "Courant".to_string(),
+                String::new(),
+                "EUR".to_string(),
+                false,
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+
+        let changed = svc
+            .update_classified(
+                created.id.clone(),
+                "Courant".to_string(),
+                String::new(),
+                "USD".to_string(),
+                false,
+                None,
+                None,
+            )
+            .await;
+
+        assert!(matches!(changed, Err(AccountError::CurrencyNotChangeable)));
+        let stored = svc.get_by_id(&created.id).await.unwrap().unwrap();
+        assert_eq!(stored.currency, "EUR");
+    }
+
     async fn enable_management_fees(svc: &AccountService, account: &Account) -> Account {
         svc.update(
             account.id.clone(),
@@ -8607,22 +8642,27 @@ mod tests {
     }
 
     // CFR-017 — apply_account writes the incoming content verbatim and stamps the rank,
-    // creating the account when this device has never seen it.
+    // creating the account when this device has never seen it; SYN-064C — it raises no
+    // AccountUpdated, the sync run's SyncCompleted announcing it.
     #[tokio::test]
     async fn apply_account_creates_the_record_and_stamps_the_incoming_rank() {
         let pool = make_pool().await;
         seed_cash_asset_row(&pool, "EUR").await;
+        let bus = Arc::new(SideEffectEventBus::new());
         let svc = AccountService::new(
             Box::new(SqliteAccountRepository::new(pool.clone())),
             Box::new(SqliteHoldingRepository::new(pool.clone())),
             Box::new(SqliteTransactionRepository::new(pool.clone())),
-        );
+        )
+        .with_event_bus(Arc::clone(&bus));
         let content = r#"{"id":"account-from-laptop","name":"Livret A","bank_name":"","currency":"EUR","update_frequency":"ManualMonth","management_fees_enabled":false}"#;
+        let mut rx = bus.subscribe();
         let mut conn = pool.acquire().await.unwrap();
         svc.apply_account(&mut conn, content, incoming_rank("laptop", 100))
             .await
             .expect("CFR-017: applying a never-seen account must succeed");
         drop(conn);
+        assert!(rx.drain().is_empty(), "SYN-064C: no AccountUpdated");
 
         let stamped: (String,) =
             sqlx::query_as("SELECT sync_device_id FROM accounts WHERE id = 'account-from-laptop'")

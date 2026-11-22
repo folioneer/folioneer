@@ -85,6 +85,8 @@ The record of one execution of the scheduled download. Runs accumulate as an aud
 
 **SPF-032 — Non-trading days produce no rows (backend)**: Weekends and market holidays have no close; the run writes nothing for those dates. This is not a skip or an error.
 
+**SPF-032A — A known symbol served no close (backend)**: When the provider serves a known symbol no close for the window, whatever days the window holds, the run writes nothing for it, and the asset is neither updated nor skipped (SPF-041).
+
 **SPF-033 — Markets still open at the trigger (backend)**: An asset whose trading day is not yet complete when the run executes contributes only closes up to its previous completed day. The in-progress day's close is written by the next run through the backfill window — the schedule self-corrects regardless of the chosen trigger time.
 
 **SPF-034 — Writes follow the established price-write model (backend)**: Every price written by a scheduled run uses the `(asset, date)` upsert (MKT-025, latest-write-wins per ADR-012), carries the provider source (MKT-102), and applies sub-unit normalization (MKT-125), and records closes as traded (MKT-193A).
@@ -97,8 +99,6 @@ The record of one execution of the scheduled download. Runs accumulate as an aud
 
 **SPF-038 — Per-pair silent skip (backend)**: A currency pair the rate provider cannot serve is silently skipped — nothing written, no error surfaced — and the run continues with the remaining pairs, mirroring SPF-041.
 
-**SPF-032A — A known symbol served no close (backend)**: When the provider serves a known symbol no close for the window, whatever days the window holds, the run writes nothing for it, and the asset is neither updated nor skipped (SPF-041).
-
 **SPF-039 — Price/rate failure independence (backend)**: Rate failures do not fail the price portion of the run, and vice versa: once a run passes the once-per-day guard (SPF-021) with an External provider chosen (SPF-072), its rates are refreshed whatever the price portion did.
 
 **SPF-039A — The run record states the price portion (backend)**: The run's outcome and counts are the price portion's. A rate failure — every External rate tier unreachable (FXR-070) — is logged and never recorded on the run.
@@ -109,7 +109,7 @@ The record of one execution of the scheduled download. Runs accumulate as an aud
 
 **SPF-040 — Scope mirrors the in-app fetch tasks (backend)**: The run's scope is every active holding across all accounts with a derivable provider symbol (MKT-110), excluding system cash assets (MKT-116) and assets whose price is typed by hand (MKT-151).
 
-**SPF-041 — Per-asset silent skip (backend)**: An in-scope asset is silently skipped — nothing written, no error surfaced — when its symbol cannot be derived, the provider reports the symbol unknown (a known symbol served no close is SPF-032A's), the provider call fails, or the write fails (same skip set as MKT-114); its reason is kept per MKT-220. The run continues with the remaining assets, and the skip is counted in the run record.
+**SPF-041 — Per-asset silent skip (backend)**: An in-scope asset is silently skipped — nothing written, no error surfaced — when the provider reports the symbol unknown (a known symbol served no close is SPF-032A's), the provider call fails, or the write fails; its reason is kept per MKT-220. The run continues with the remaining assets, and the skip is counted in the run record.
 
 **SPF-042 — Empty scope is a quiet success (backend)**: When the scope is empty, the run refreshes the rates (SPF-035, SPF-039), records a successful execution with zero updates and exits. Unlike the in-app rejection (MKT-111), no error is raised — there is no user watching a scheduled run.
 
@@ -159,7 +159,8 @@ Every day at trigger time (app open or closed)
         │    ├─ non-trading days: no row                                 (SPF-032)
         │    ├─ unfinished trading day: previous close only; next run
         │    │  completes it                                             (SPF-033)
-        │    └─ no data / failure: silent skip, counted                  (SPF-041)
+        │    ├─ no close served: nothing written, not counted            (SPF-032A)
+        │    └─ unknown symbol / failure: silent skip, counted           (SPF-041)
         ├─ record dated daily rates for all persisted pairs,
         │  backfilled like prices, whatever the prices did               (SPF-035–039B)
         ├─ record ScheduledFetchRun (outcome + counts)                   (SPF-050)

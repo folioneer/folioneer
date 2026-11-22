@@ -73,6 +73,7 @@ export function EditAccountModal({ isOpen, onClose, account }: EditAccountModalP
             profileMove ? profileMoveWarning(profileMove, t("profile.default_name")) : null
           }
           idPrefix="edit-account"
+          currencyLocked
         />
         {/* R13 — inline error, modal stays open */}
         {error && (

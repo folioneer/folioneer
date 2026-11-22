@@ -48,7 +48,7 @@ The user can pin a free-text note to a line they hold — a position `(account, 
 
 **HNO-042 — Note affordance (frontend)**: The holding row offers a "Note" action (icon button, non-cash rows, hidden in as-of view) opening the note modal: textarea, an "Alert me when the price crosses" toggle revealing direction (below/above) + amount (asset currency) fields, and — when a note already exists — a delete action. Save calls upsert (HNO-020); inline validation mirrors HNO-011; submit is disabled while saving; a backend rejection is shown inline (F27); success closes the modal, refreshes per HNO-022, and shows a snackbar.
 
-**HNO-043 — HoldingNoteUpdated event registration (frontend + backend)**: `HoldingNoteUpdated` is added to the event-bus enum, published by the `account` bounded context whenever a note is written or deleted on this device (HNO-020/021). The Account Details view re-fetches on receipt; a note applied from another device reaches it through `SyncCompleted` (SYN-064). The global store treats it as a locally-handled event (no global re-fetch). `ARCHITECTURE.md` registers it in the event-bus table.
+**HNO-043 — HoldingNoteUpdated event registration (frontend + backend)**: `HoldingNoteUpdated` is added to the event-bus enum, published by the `account` bounded context whenever a note is written or deleted on this device (HNO-020/021). The Account Details view re-fetches on receipt; a note applied from another device reaches it through `SyncCompleted` (SYN-064B). The global store treats it as a locally-handled event (no global re-fetch). `ARCHITECTURE.md` registers it in the event-bus table.
 
 ---
 

@@ -263,6 +263,9 @@ pub enum AccountError {
     /// Account name (case-insensitive) collides with an existing one of its profile (PFL-022).
     #[error("Account name already exists")]
     NameAlreadyExists,
+    /// ACC-002A — an update gives another currency than the account's own, fixed once created.
+    #[error("An account's currency cannot be changed")]
+    CurrencyNotChangeable,
     /// PFL-020 — a profile's name is empty or whitespace-only.
     #[error("Profile name cannot be empty")]
     ProfileNameEmpty,

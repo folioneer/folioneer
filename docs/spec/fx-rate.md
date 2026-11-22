@@ -154,7 +154,7 @@ This feature does not add fields to `HoldingDetail`; it changes the **conditions
 
 **FXR-055 — Declare-pair form behaviour (frontend)**: The "Add pair" form requires both `from_currency` and `to_currency` to be chosen; the submit action is disabled while either is empty or while the two are equal (the identity-pair guard, FXR-011). On backend rejection (invalid code, identity pair) the form stays open with an inline error and the user can correct and resubmit, consistent with FXR-029. Declaring a pair that already exists succeeds idempotently (FXR-054): no error is shown and no duplicate row appears — the view simply shows the existing pair (selecting it) so the user can proceed to add a rate.
 
-**FXR-056 — CurrencyPairUpdated event registration (frontend + backend)**: `CurrencyPairUpdated` is added to the event-bus enum, published by the `currency` bounded context whenever a pair is declared on this device (FXR-054). The Currency Rates view re-fetches its pair list on receipt; a pair applied or removed from another device reaches it through `SyncCompleted` (SYN-064). The global store treats it as a locally-handled event (no global re-fetch). `ARCHITECTURE.md` registers it in the event-bus table.
+**FXR-056 — CurrencyPairUpdated event registration (frontend + backend)**: `CurrencyPairUpdated` is added to the event-bus enum, published by the `currency` bounded context whenever a pair is declared on this device (FXR-054). The Currency Rates view re-fetches its pair list on receipt; a pair applied or removed from another device reaches it through `SyncCompleted` (SYN-064B). The global store treats it as a locally-handled event (no global re-fetch). `ARCHITECTURE.md` registers it in the event-bus table.
 
 ### Rate Refresh (070–089)
 
@@ -226,7 +226,7 @@ Historical valuations (yearly/monthly performance, as-of-date views) need a rate
 
 **FXR-125 — An unknown setting is kept (backend)**: A setting whose name this device does not know is kept as it arrived.
 
-**FXR-126 — A choice is announced (backend + frontend)**: Choosing the reference currency publishes `ReferenceCurrencyUpdated`; the portfolio total of the account table (ACC-030) and the global performance view (GPF-011) re-read on it, so every figure that spans accounts is given in the currency chosen; a price movement report already shown stays as it was (PMV-017), the next one is in the new currency. A device that receives the choice by sync re-reads the same views on the sync's own signal (SYN-064) and fetches the new pairs at its next rate refresh (FXR-015, FXR-071).
+**FXR-126 — A choice is announced (backend + frontend)**: Choosing the reference currency publishes `ReferenceCurrencyUpdated`; the portfolio total of the account table (ACC-030) and the global performance view (GPF-011) re-read on it, so every figure that spans accounts is given in the currency chosen; a price movement report already shown stays as it was (PMV-017), the next one is in the new currency. A device that receives the choice by sync re-reads the same views on the sync's own signal (SYN-064B) and fetches the new pairs at its next rate refresh (FXR-015, FXR-071).
 
 **FXR-127 — The choices (backend)**: Every ISO 4217 code is offered for the reference currency, in code order.
 

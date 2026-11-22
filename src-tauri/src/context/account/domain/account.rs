@@ -412,6 +412,15 @@ impl Account {
         self
     }
 
+    /// ACC-002A (owner, 2026-11-22) — an update keeps the stored account's currency, fixed
+    /// once the account is created.
+    pub fn keeps_currency_of(&self, current: &Account) -> StdResult<(), AccountError> {
+        if self.currency != current.currency {
+            return Err(AccountError::CurrencyNotChangeable);
+        }
+        Ok(())
+    }
+
     /// ACC-050 — the account in `holder`'s name, trimmed; an empty one is none.
     pub fn with_holder(mut self, holder: Option<String>) -> Self {
         self.holder = holder
