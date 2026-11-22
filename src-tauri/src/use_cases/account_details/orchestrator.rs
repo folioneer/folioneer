@@ -190,8 +190,9 @@ pub struct AccountDetailsResponse {
     /// account-currency micros (ACD-053). Negative when withdrawals exceed deposits.
     /// The as-of view counts only transactions dated on or before the as-of date.
     pub total_net_cash_input: i64,
-    /// ACD-058 — the capital brought in: the net cash input plus every opening balance at its
-    /// recorded cost, in account-currency micros; in the as-of view, up to that date.
+    /// ACD-058 — the capital brought in: the net cash input plus every opening balance and
+    /// transfer in at its recorded cost, less every transfer out at its cost, in
+    /// account-currency micros; in the as-of view, up to that date.
     pub total_capital_brought_in: i64,
     /// MKT-206 — how many active holdings have an outdated price (MKT-205); 0 in the
     /// read-only view of a past date.
@@ -302,7 +303,7 @@ impl AccountDetailsUseCase {
         let mut total_dividends_received: i64 = 0;
         // ACD-053 — net external cash input since inception: deposits − withdrawals.
         let mut total_net_cash_input: i64 = 0;
-        let mut opening_balances_cost: i64 = 0;
+        let mut positions_brought_in: i64 = 0;
         for t in &all_txs {
             match t.transaction_type {
                 TransactionType::Dividend => {
@@ -317,9 +318,13 @@ impl AccountDetailsUseCase {
                 TransactionType::Withdrawal => {
                     total_net_cash_input = total_net_cash_input.saturating_sub(t.total_amount);
                 }
-                // ACD-058 — an opening balance brings its positions in at their cost.
-                TransactionType::OpeningBalance => {
-                    opening_balances_cost = opening_balances_cost.saturating_add(t.total_amount);
+                // ACD-058 — an opening balance and a transfer in bring their positions in at
+                // their cost; a transfer out takes its cost out (TRF-026).
+                TransactionType::OpeningBalance | TransactionType::TransferIn => {
+                    positions_brought_in = positions_brought_in.saturating_add(t.total_amount);
+                }
+                TransactionType::TransferOut => {
+                    positions_brought_in = positions_brought_in.saturating_sub(t.total_amount);
                 }
                 _ => {}
             }
@@ -667,7 +672,7 @@ impl AccountDetailsUseCase {
             total_dividends_received,
             total_management_fees, // FEE-053/072
             total_net_cash_input,  // ACD-053
-            total_capital_brought_in: total_net_cash_input.saturating_add(opening_balances_cost), // ACD-058
+            total_capital_brought_in: total_net_cash_input.saturating_add(positions_brought_in), // ACD-058
             outdated_price_count, // MKT-206
         })
     }
@@ -770,7 +775,7 @@ impl AccountDetailsUseCase {
         let mut total_dividends_received: i64 = 0;
         // ACD-053 — net cash input as of the date: deposits − withdrawals dated ≤ as_of.
         let mut total_net_cash_input: i64 = 0;
-        let mut opening_balances_cost: i64 = 0;
+        let mut positions_brought_in: i64 = 0;
         for t in &all_txs {
             if t.date.as_str() > as_of_date {
                 continue;
@@ -788,9 +793,13 @@ impl AccountDetailsUseCase {
                 TransactionType::Withdrawal => {
                     total_net_cash_input = total_net_cash_input.saturating_sub(t.total_amount);
                 }
-                // ACD-058 — an opening balance brings its positions in at their cost.
-                TransactionType::OpeningBalance => {
-                    opening_balances_cost = opening_balances_cost.saturating_add(t.total_amount);
+                // ACD-058 — an opening balance and a transfer in bring their positions in at
+                // their cost; a transfer out takes its cost out (TRF-026).
+                TransactionType::OpeningBalance | TransactionType::TransferIn => {
+                    positions_brought_in = positions_brought_in.saturating_add(t.total_amount);
+                }
+                TransactionType::TransferOut => {
+                    positions_brought_in = positions_brought_in.saturating_sub(t.total_amount);
                 }
                 _ => {}
             }
@@ -1084,7 +1093,7 @@ impl AccountDetailsUseCase {
             total_dividends_received,
             total_management_fees, // FEE-053/072
             total_net_cash_input,  // ACD-053
-            total_capital_brought_in: total_net_cash_input.saturating_add(opening_balances_cost), // ACD-058
+            total_capital_brought_in: total_net_cash_input.saturating_add(positions_brought_in), // ACD-058
             outdated_price_count: 0, // MKT-206
         })
     }
@@ -3141,6 +3150,71 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(before_the_deposit.total_capital_brought_in, 50_000_000_000);
+    }
+
+    // #649 / ACD-058, TRF-026 (owner, 2026-10-25) — a transfer in brings its cost in, a
+    // transfer out takes its cost out: positions costing 1 000, 4 of 10 units sent, bring in
+    // 600 on the sending account and 400 on the receiving one, as PRF-035 counts them.
+    #[tokio::test]
+    async fn acd_058_capital_brought_in_counts_a_transfer_at_its_cost() {
+        let pool = make_pool().await;
+        let (account_svc, asset_svc) = setup(&pool).await;
+        let sending = make_eur_account(&account_svc).await;
+        let receiving = account_svc
+            .create(
+                "Receiving".to_string(),
+                String::new(),
+                "EUR".to_string(),
+                false,
+            )
+            .await
+            .unwrap();
+        let stock = make_stock(&asset_svc, "Moved EUR Stock", "EUR").await;
+        asset_svc.seed_cash_asset("EUR").await.unwrap();
+        let today = Local::now().date_naive();
+        account_svc
+            .open_holding(
+                &sending.id,
+                stock.clone(),
+                iso(today - chrono::Duration::days(30)),
+                from_surface(10_000_000),
+                1_000_000_000,
+            )
+            .await
+            .unwrap();
+        account_svc
+            .record_transfer(
+                &sending.id,
+                &receiving.id,
+                stock.clone(),
+                iso(today - chrono::Duration::days(10)),
+                from_surface(4_000_000),
+                from_surface(4_000_000),
+                1_000_000,
+                None,
+            )
+            .await
+            .unwrap();
+
+        let uc = AccountDetailsUseCase::new(
+            account_svc,
+            asset_svc,
+            make_currency_service_with_no_rate(),
+        );
+        let sent = uc.get_account_details(&sending.id, None).await.unwrap();
+        assert_eq!(sent.total_capital_brought_in, 600_000_000);
+        let received = uc.get_account_details(&receiving.id, None).await.unwrap();
+        assert_eq!(received.total_capital_brought_in, 400_000_000);
+        let before_the_transfer = uc
+            .get_account_details(&sending.id, Some(&iso(today - chrono::Duration::days(20))))
+            .await
+            .unwrap();
+        assert_eq!(before_the_transfer.total_capital_brought_in, 1_000_000_000);
+        let received_as_of = uc
+            .get_account_details(&receiving.id, Some(&iso(today - chrono::Duration::days(5))))
+            .await
+            .unwrap();
+        assert_eq!(received_as_of.total_capital_brought_in, 400_000_000);
     }
 
     // ACD-053 — total_net_cash_input sums deposits minus withdrawals since inception

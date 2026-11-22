@@ -361,7 +361,7 @@ What a holding is worth in the asset's own currency, with no exchange rate invol
 
 > Status: confirmed
 
-What the owner brought into an account, cash and positions together: deposits less withdrawals (the Net Cash Input), plus every opening balance at its recorded cost. An account opened with positions costing 50 000 and a deposit of 500 brings in 50 500, of which 500 is Net Cash Input (ACD-058; owner, 2026-10-18). Code: `total_capital_brought_in`. French: "Capital apporté".
+What the owner brought into an account, cash and positions together: deposits less withdrawals (the Net Cash Input), plus every opening balance and transfer in at its recorded cost, less every transfer out at its cost. An account opened with positions costing 50 000 and a deposit of 500 brings in 50 500, of which 500 is Net Cash Input (ACD-058; owner, 2026-10-18; transfers: owner, 2026-10-25, #649). Code: `total_capital_brought_in`. French: "Capital apporté".
 
 ### Weight
 

@@ -665,7 +665,7 @@ struct AccountDetailsResponse {
     total_dividends_received: i64,             // micros, account currency: sum of dividend cash across all the account's dividend transactions; 0 when none (DIV-073)
     total_management_fees: i64,                // micros, account currency: sum of per-holding management_fees across the account, closed holdings included, as-of cutoff in the as-of view; 0 when none (FEE-053)
     total_net_cash_input: i64,                 // micros, account currency: deposits minus withdrawals since inception; negative when more was withdrawn (ACD-053)
-    total_capital_brought_in: i64,             // micros, account currency: net cash input plus every opening balance at its cost (ACD-058)
+    total_capital_brought_in: i64,             // micros, account currency: net cash input plus every opening balance and transfer in at its cost, less every transfer out (ACD-058)
     outdated_price_count: i64,                 // active holdings whose price is outdated (MKT-205); 0 in a read with a date (MKT-206)
 }
 
@@ -939,6 +939,7 @@ struct AccountJournal {
 
 ## Changelog
 
+- 2026-11-22 — #649: `AccountDetailsResponse.total_capital_brought_in` counts a transfer in at its cost and takes a transfer out off (ACD-058, TRF-026). No command, argument or error changed.
 - 2026-11-21 — #734 (DIV-022A): `AccountError` gains `DividendRateNotOne`, a dividend given a rate other than 1 while its asset and its account share a currency, refused by `record_dividend`, `correct_transaction` and the dividend draft of `validate_transaction_draft`.
 - 2026-11-09 — #769 (ACC-050, ACC-051): `Account`, `CreateAccountDTO` and `AccountSummary` gain `holder`; new `set_account_holder`; `get_account_summaries` takes `holder: Option<String>` and `AccountSummaries` gains `holders`.
 - 2026-11-08 — #768 (PFL-055): new `get_profile_overview` and the `ProfileOverview` / `ProfileOverviewRow` types.

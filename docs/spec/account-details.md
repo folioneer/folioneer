@@ -60,18 +60,18 @@ Read projection for **closed** positions (`quantity = 0`). New DTO introduced by
 
 The top-level response returned by the `get_account_details(account_id)` Tauri command. Defined as a Rust struct with `#[derive(Type, Serialize)]`.
 
-| Field                      | Business meaning                                                                                                                                |
-| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `account_name`             | Display name of the account (per ACD-032).                                                                                                      |
-| `holdings`                 | Active holdings (`quantity > 0`), sorted per ACD-033.                                                                                           |
-| `closed_holdings`          | Closed holdings (`quantity = 0`), sorted per ACD-044. Empty list when none exist.                                                               |
-| `total_holding_count`      | Count of all holdings for the account regardless of quantity (used by ACD-034).                                                                 |
-| `total_cost_basis`         | Sum of `cost_basis` across all active holdings (per ACD-031).                                                                                   |
-| `total_realized_pnl`       | Sum of `total_realized_pnl` across **all** holdings (open + closed) in the account (per SEL-042/ACD-045).                                       |
-| `total_global_value`       | Cash + Σ(market value of non-cash active holdings); see CSH-094 for the formula and missing-price treatment. Account-currency micros (ADR-001). |
-| `total_net_cash_input`     | Deposits less withdrawals since inception, account-currency micros (ACD-053).                                                                   |
-| `total_capital_brought_in` | Net cash input plus every opening balance at its recorded cost, account-currency micros (ACD-058).                                              |
-| `total_management_fees`    | Sum of the account's management fee deductions, account-currency micros (FEE-053).                                                              |
+| Field                      | Business meaning                                                                                                                                        |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `account_name`             | Display name of the account (per ACD-032).                                                                                                              |
+| `holdings`                 | Active holdings (`quantity > 0`), sorted per ACD-033.                                                                                                   |
+| `closed_holdings`          | Closed holdings (`quantity = 0`), sorted per ACD-044. Empty list when none exist.                                                                       |
+| `total_holding_count`      | Count of all holdings for the account regardless of quantity (used by ACD-034).                                                                         |
+| `total_cost_basis`         | Sum of `cost_basis` across all active holdings (per ACD-031).                                                                                           |
+| `total_realized_pnl`       | Sum of `total_realized_pnl` across **all** holdings (open + closed) in the account (per SEL-042/ACD-045).                                               |
+| `total_global_value`       | Cash + Σ(market value of non-cash active holdings); see CSH-094 for the formula and missing-price treatment. Account-currency micros (ADR-001).         |
+| `total_net_cash_input`     | Deposits less withdrawals since inception, account-currency micros (ACD-053).                                                                           |
+| `total_capital_brought_in` | Net cash input plus every opening balance and transfer in at its recorded cost, less every transfer out at its cost, account-currency micros (ACD-058). |
+| `total_management_fees`    | Sum of the account's management fee deductions, account-currency micros (FEE-053).                                                                      |
 
 > **MKT extension**: `docs/spec/market-price.md` adds `total_unrealized_pnl: Option<i64>` to this response and six new fields to `HoldingDetail` (`asset_currency`, `current_price`, `current_price_date`, `unrealized_pnl`, `performance_pct`, `current_value`). See the MKT spec for definitions.
 
@@ -121,7 +121,7 @@ The top-level response returned by the `get_account_details(account_id)` Tauri c
 
 **ACD-053 — Net cash input since inception (backend)**: The account's details carry its net cash input — the deposits less the withdrawals across the account's whole transaction history, in account-currency micros; negative when withdrawals exceed deposits; `0` when no cash transactions exist. The as-of view counts only transactions dated on or before the as-of date. The window does not show it (the validated mock on #864); an AI agent reads it with the account's figures (AGT-040).
 
-**ACD-058 — Capital brought in (backend)**: The account's details carry the capital brought in — the net cash input (ACD-053) plus every `OpeningBalance` at its recorded cost, in account-currency micros: what the owner brought into the account, cash and positions together. An account opened with positions costing 50 000 and a deposit of 500 brings in 50 500, of which 500 is net cash input. It equals the total net invested of PRF-035 at the view's date: the same deposits, withdrawals and opening balances at their recorded cost (PRF-086). The as-of view counts only transactions dated on or before the as-of date. The window does not show it (the validated mock on #864); an AI agent reads it with the account's figures (AGT-040).
+**ACD-058 — Capital brought in (backend)**: The account's details carry the capital brought in — the net cash input (ACD-053) plus every `OpeningBalance` and every transfer in at its recorded cost, less every transfer out at its cost (TRF-026; owner, 2026-10-25, #649), in account-currency micros: what the owner brought into the account, cash and positions together. An account opened with positions costing 50 000 and a deposit of 500 brings in 50 500, of which 500 is net cash input. It equals the total net invested of PRF-035 at the view's date: the same deposits, withdrawals, opening balances and transfers at their recorded cost (PRF-086, TRF-026). The as-of view counts only transactions dated on or before the as-of date. The window does not show it (the validated mock on #864); an AI agent reads it with the account's figures (AGT-040).
 
 ### Windowed Position Performance
 
