@@ -2209,6 +2209,7 @@ pub fn refusal_from_account(error: &AccountError) -> Refusal {
         | AccountError::TradeOnCashAsset
         | AccountError::NoteOnUnheldAsset
         | AccountError::NameAlreadyExists
+        | AccountError::CurrencyNotChangeable
         | AccountError::ProfileNameEmpty
         | AccountError::ProfileNameAlreadyExists
         | AccountError::ProfileNotFound { .. }

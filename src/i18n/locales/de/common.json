@@ -1308,6 +1308,7 @@
     "Unknown": "Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut.",
     "DatabaseError": "Ein unerwarteter Datenbankfehler ist aufgetreten. Bitte versuchen Sie es erneut.",
     "NameEmpty": "Der Name darf nicht leer sein.",
+    "CurrencyNotChangeable": "Die Währung eines Kontos kann nach dem Anlegen nicht mehr geändert werden.",
     "NameAlreadyExists": "Ein Konto mit diesem Namen existiert bereits.",
     "InvalidCurrency": "„{{currency}}“ ist kein gültiger Währungscode.",
     "InvalidCountry": "{{country}} ist kein zweistelliger Ländercode.",

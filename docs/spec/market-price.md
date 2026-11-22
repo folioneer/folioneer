@@ -325,7 +325,7 @@ In all branches a class-share `/` separator in the reference is translated to Ya
 
 **MKT-113 — In-flight guard, one fetch at a time (backend)**: Only one fetch task may run at a time across all three paths (launch MKT-122, global refresh MKT-130, account refresh MKT-132). If a fetch task is already running, a subsequent task call is rejected with a specific error.
 
-**MKT-114 — Asset silently skipped on per-asset failure (backend)**: In a fetch task (launch MKT-122, global refresh MKT-130, account refresh MKT-132), an individual asset is silently skipped (no row written, no error surfaced during the task; its reason is kept per MKT-220) when either its symbol cannot be derived OR the provider fetch fails (network/HTTP/parse error, logged as warning). The task continues with the remaining assets.
+**MKT-114 — Asset silently skipped on per-asset failure (backend)**: In a fetch task (launch MKT-122, global refresh MKT-130, account refresh MKT-132), an individual asset is silently skipped (no row written, no error surfaced during the task; its reason is kept per MKT-220) when its symbol cannot be derived, the provider serves no price, the provider fetch fails (network/HTTP/parse error, logged as warning), or the price it served cannot be saved. The task continues with the remaining assets.
 
 **MKT-115 — Manual refresh feedback (frontend)**: For user-triggered fetch actions (global refresh MKT-130, account refresh MKT-131), the frontend surfaces feedback via snackbar:
 

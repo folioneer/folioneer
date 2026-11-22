@@ -369,6 +369,13 @@ mod tests {
         failed.failures = vec![SyncFailure::PortfolioReset];
         service.remember_run(&mut failed).await;
         assert_eq!(rx.drain(), vec![Event::SyncCompleted]);
+
+        // SYN-064A — the paused state alone differing is announced too.
+        let mut paused = quiet_report("2026-08-22T10:00:15Z");
+        paused.failures = vec![SyncFailure::PortfolioReset];
+        paused.status = SyncStatus::for_device(&paused_device(), None, vec![]);
+        service.remember_run(&mut paused).await;
+        assert_eq!(rx.drain(), vec![Event::SyncCompleted], "paused");
     }
 
     // #425 / SYN-064 — a sync that applied nothing but leaves a different number of changes

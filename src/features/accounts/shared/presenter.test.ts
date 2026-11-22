@@ -46,6 +46,7 @@ describe("accountMutationErrorToI18n", () => {
   it.each([
     "NameEmpty",
     "NameAlreadyExists",
+    "CurrencyNotChangeable",
     "DatabaseError",
   ] as const)("%s unit variant maps to its flat error key", (code) => {
     expect(accountMutationErrorToI18n({ code })).toEqual({ key: `error.${code}` });

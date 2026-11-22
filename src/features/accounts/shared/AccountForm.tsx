@@ -41,6 +41,8 @@ interface AccountFormProps {
   profiles?: ProfileSummary[] | null;
   /** #767 (the validated mock) — an edited account changes profile: it moves with its history. */
   profileMoveWarning?: I18nMessage | null;
+  /** ACC-002A — an edited account's currency, fixed once created, is shown read-only. */
+  currencyLocked?: boolean;
   idPrefix?: string;
 }
 
@@ -54,6 +56,7 @@ export function AccountForm({
   profiles = null,
   profileMoveWarning = null,
   idPrefix = "account",
+  currencyLocked = false,
 }: AccountFormProps) {
   const { t, i18n } = useTranslation();
   const hint =
@@ -130,6 +133,7 @@ export function AccountForm({
         placeholder={t("account.form_currency_placeholder")}
         value={formData.currency}
         onChange={handleChange}
+        disabled={currencyLocked}
       />
 
       {/* ACC-045, ACC-048 — the account's country, then its wrapper */}

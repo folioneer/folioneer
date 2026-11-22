@@ -1308,6 +1308,7 @@
     "Unknown": "Une erreur inattendue est survenue. Veuillez réessayer.",
     "DatabaseError": "Une erreur de base de données inattendue est survenue. Veuillez réessayer.",
     "NameEmpty": "Le nom ne peut pas être vide.",
+    "CurrencyNotChangeable": "La devise d'un compte ne peut plus être modifiée après sa création.",
     "NameAlreadyExists": "Un compte avec ce nom existe déjà.",
     "InvalidCurrency": "\"{{currency}}\" n'est pas un code de devise valide.",
     "InvalidCountry": "{{country}} n'est pas un code pays à deux lettres.",

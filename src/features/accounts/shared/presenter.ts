@@ -83,6 +83,8 @@ export function accountMutationErrorToI18n(err: AccountError): I18nMessage {
     case "NameEmpty":
     case "AccountNotFound":
     case "NameAlreadyExists":
+    // ACC-002A — an account's currency is fixed once created.
+    case "CurrencyNotChangeable":
     case "DatabaseError":
     // PFL-021 / PFL-031 / PFL-033 — the profile given, or a move it cannot make.
     case "ProfileNotFound":
