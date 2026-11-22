@@ -19,9 +19,11 @@ export function useHeaderConfig(): HeaderConfig {
   // /accounts/$accountId/transactions/$assetId
   const txAccountId = pathname.match(/^\/accounts\/([^/]+)\/transactions\/([^/]+)$/)?.[1];
   if (txAccountId) {
+    // TXL-015 — Back goes to the account the list's filter selected, else the route's.
+    const backAccountId = new URLSearchParams(searchStr).get("selectedAccountId") ?? txAccountId;
     return {
       title: t("transaction.list_title"),
-      onBack: () => navigate({ to: "/accounts/$accountId", params: { accountId: txAccountId } }),
+      onBack: () => navigate({ to: "/accounts/$accountId", params: { accountId: backAccountId } }),
     };
   }
 
