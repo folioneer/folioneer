@@ -364,13 +364,13 @@ describe("useAccountImport", () => {
   it("adds a mapper from a file", async () => {
     const { result } = await picked();
     gateway.addImportMapperFromFile.mockResolvedValueOnce(
-      refused({ code: "MapperFileInvalid", reason: "no date" }),
+      refused({ code: "MapperFileInvalid", problem: "MissingField", field: "date", line: 1 }),
     );
     await act(async () => result.current.addMapperFromFile());
     await waitFor(() =>
       expect(result.current.addRefusal).toEqual({
-        key: "account_import.error.mapper_file_invalid",
-        vars: { reason: "no date" },
+        key: "account_import.error.mapper_file_missing_field",
+        vars: { field: "date", line: 1 },
       }),
     );
     expect(result.current.canPreview).toBe(false);

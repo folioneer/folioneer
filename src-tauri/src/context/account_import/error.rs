@@ -1,3 +1,5 @@
+use crate::context::account_import::domain::MapperFileProblem;
+
 /// Single flat error enum for the `account_import` bounded context (gold error model).
 ///
 /// `#[serde(tag = "code")]` makes each variant serialize as `{ "code": "VariantName", ... }`
@@ -40,10 +42,14 @@ pub enum AccountImportError {
     MapperFileTooLarge,
 
     /// The file does not read as a mapper (IMP-020B).
-    #[error("The file does not read as an import mapper: {reason}")]
+    #[error("The file does not read as an import mapper: {problem:?}")]
     MapperFileInvalid {
-        /// Why, as the reader says it: what is wrong and where.
-        reason: String,
+        /// What is wrong, for the window to word (#722).
+        problem: MapperFileProblem,
+        /// The field named, with `MissingField` and `UnknownField`.
+        field: Option<String>,
+        /// The file's line where the problem sits, from 1.
+        line: u32,
     },
 
     /// The mappers folder cannot be read or written; the cause is logged, never sent. Apart from
@@ -126,10 +132,12 @@ mod tests {
         );
         assert_eq!(
             to_value(AccountImportError::MapperFileInvalid {
-                reason: "line 1".into()
+                problem: MapperFileProblem::MissingField,
+                field: Some("separator".into()),
+                line: 1,
             })
             .expect("serializes"),
-            json!({ "code": "MapperFileInvalid", "reason": "line 1" })
+            json!({ "code": "MapperFileInvalid", "problem": "MissingField", "field": "separator", "line": 1 })
         );
         assert_eq!(
             to_value(AccountImportError::HeaderNameRepeated {
