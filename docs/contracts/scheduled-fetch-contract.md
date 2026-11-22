@@ -35,7 +35,7 @@ struct ScheduledFetchRun {
     trigger_date: String,   // the calendar day this run settles (SPF-021, SPF-022)
     outcome: ScheduledFetchOutcome,
     updated_count: u32,     // assets whose prices were written (SPF-050)
-    skipped_count: u32,     // in-scope assets silently skipped (SPF-041)
+    skipped_count: u32,     // in-scope assets silently skipped (SPF-041, SPF-032B)
 }
 
 enum ScheduledFetchOutcome {
@@ -60,6 +60,7 @@ None — SPF-024: the scheduled run never live-notifies a running app (separate 
 
 ## Changelog
 
+- 2026-11-22 — #917 (SPF-032B): `skipped_count` also counts an asset the provider has stopped quoting — no close served, its latest price 7 days or more before the trigger day, or none.
 - 2026-07-12 — Added by `scheduled-price-fetch` spec: `configure_scheduled_fetch`, `get_scheduled_fetch_status`
 - 2026-07-12 — contract-reviewer fix: `ScheduledFetchStatus.last_run` → `Option<ScheduledFetchRun>` (fresh-install state)
 - 2026-07-12 — SPF-017: all three desktop platforms ship adapters; no platform-support flag needed on the wire

@@ -319,6 +319,23 @@ impl ScheduledFetchOrchestrator {
         }
     }
 
+    /// SPF-032A/B (owner, 2026-11-22, #917) — a known symbol served no close has stopped being
+    /// quoted when the asset's latest recorded price is 7 days or more before the run's day,
+    /// or it has none: a week always holds a trading day (MKT-196). A price that cannot be
+    /// read counts nothing, as a shorter gap does.
+    async fn quote_stopped(&self, asset_id: &str, run_day: NaiveDate) -> bool {
+        const QUOTE_STOPPED_DAYS: i64 = 7;
+        match self.asset_service.get_latest_price(asset_id).await {
+            Ok(None) => true,
+            Ok(Some(price)) => NaiveDate::parse_from_str(&price.date, "%Y-%m-%d")
+                .is_ok_and(|date| (run_day - date).num_days() >= QUOTE_STOPPED_DAYS),
+            Err(error) => {
+                tracing::warn!(target: crate::core::logger::BACKEND, asset_id = %asset_id, err = ?error, "scheduled run: latest price unreadable, an empty answer counts nothing");
+                false
+            }
+        }
+    }
+
     /// Persists a run record (SPF-050 — every path records).
     async fn record(&self, run: ScheduledFetchRun) -> Result<(), ScheduledFetchError> {
         self.repository.record_run(run).await.map_err(|error| {
@@ -407,6 +424,7 @@ impl ScheduledFetchOrchestrator {
         from: NaiveDate,
         to: NaiveDate,
     ) -> (ScheduledFetchOutcome, u32, u32) {
+        let run_day = to;
         let from = from.to_string();
         let to = to.to_string();
         let mut attempt: u32 = 0;
@@ -457,8 +475,18 @@ impl ScheduledFetchOrchestrator {
                         match recorded {
                             // SPF-032A/033 — an empty answer is a window with no close to give
                             // (no trading day, or a trading day still in progress): neither
-                            // an update nor a skip, and MKT-220 keeps what it had.
-                            Ok(_) if no_close => {}
+                            // an update nor a skip, and MKT-220 keeps what it had — unless the
+                            // asset has had no price for a week (#917): then the provider
+                            // stopped quoting it, a skip with no data.
+                            Ok(_) if no_close => {
+                                if self.quote_stopped(&asset.id, run_day).await {
+                                    skipped_count += 1;
+                                    outcomes.push((
+                                        asset.id.clone(),
+                                        Some(PriceFetchFailureReason::NoData),
+                                    ));
+                                }
+                            }
                             Ok(_) => {
                                 updated_count += 1;
                                 outcomes.push((asset.id.clone(), None));
@@ -1655,6 +1683,28 @@ mod tests {
     static EMPTY_ANSWER_SPLITS_KEPT: std::sync::atomic::AtomicUsize =
         std::sync::atomic::AtomicUsize::new(0);
 
+    /// An asset a sweep asks the provider for, its reference read from its id.
+    fn swept_asset(asset_id: &str) -> crate::context::asset::Asset {
+        crate::context::asset::Asset::restore(
+            asset_id.to_string(),
+            crate::context::asset::AssetKind::Custom,
+            "Test Asset".to_string(),
+            crate::context::asset::AssetClass::Stocks,
+            crate::context::asset::AssetCategory::from_storage(
+                crate::context::asset::SYSTEM_CATEGORY_ID.to_string(),
+                "generic.uncategorized".to_string(),
+            ),
+            "USD".to_string(),
+            1,
+            asset_id.trim_start_matches("asset-").to_uppercase(),
+            None,
+            false,
+            None,
+            false,
+            false,
+        )
+    }
+
     /// An orchestrator over one account holding 10 units of each of `references` — and
     /// nothing any more of a `CLOSED` asset — whose provider answers a symbol by `answer`
     /// and whose price writes fail for the asset `asset-writefail`.
@@ -1696,24 +1746,24 @@ mod tests {
         let mut asset_service = MockAssetServiceContract::new();
         asset_service
             .expect_get_asset_by_id()
+            .returning(|asset_id| Ok(Some(swept_asset(asset_id))));
+        // SPF-032A (#917) — RECENT was priced 6 days ago, STOPPED 7, UNPRICED never,
+        // UNREADABLE's price cannot be read; the others the day before.
+        asset_service
+            .expect_get_latest_price()
             .returning(|asset_id| {
-                Ok(Some(crate::context::asset::Asset::restore(
+                let days_ago = match asset_id {
+                    "asset-unpriced" => return Ok(None),
+                    "asset-unreadable" => return Err(anyhow::anyhow!("price unreadable")),
+                    "asset-recent" => 6,
+                    "asset-stopped" => 7,
+                    _ => 1,
+                };
+                Ok(Some(crate::context::asset::AssetPrice::restore(
                     asset_id.to_string(),
-                    crate::context::asset::AssetKind::Custom,
-                    "Test Asset".to_string(),
-                    crate::context::asset::AssetClass::Stocks,
-                    crate::context::asset::AssetCategory::from_storage(
-                        crate::context::asset::SYSTEM_CATEGORY_ID.to_string(),
-                        "generic.uncategorized".to_string(),
-                    ),
-                    "USD".to_string(),
-                    1,
-                    asset_id.trim_start_matches("asset-").to_uppercase(),
-                    None,
-                    false,
-                    None,
-                    false,
-                    false,
+                    (today() - chrono::Duration::days(days_ago)).to_string(),
+                    100_000_000,
+                    crate::context::asset::AssetPriceSource::YahooFinance,
                 )))
             });
         asset_service
@@ -1794,6 +1844,37 @@ mod tests {
         assert_eq!(run.outcome, ScheduledFetchOutcome::Succeeded);
         assert_eq!(run.updated_count, 1);
         assert_eq!(run.skipped_count, 3);
+    }
+
+    // SPF-032A/B (owner, 2026-11-22, #917) — a known symbol served no close counts nothing while
+    // its latest price is under 7 days old (a weekend, a holiday) or cannot be read; from 7
+    // days, or with no price at all, the provider has stopped quoting it: skipped, its reason
+    // no data (MKT-220).
+    #[tokio::test]
+    async fn spf_032a_a_week_without_a_price_skips_the_asset() {
+        use crate::use_cases::shared::price_fetch_failures::{
+            MockPriceFetchFailureRepository, PriceFetchFailureReason,
+        };
+        let mut failures = MockPriceFetchFailureRepository::new();
+        failures
+            .expect_record()
+            .withf(|asset_id, reason, _| {
+                ["asset-stopped", "asset-unpriced"].contains(&asset_id)
+                    && *reason == PriceFetchFailureReason::NoData
+            })
+            .times(2)
+            .returning(|_, _, _| Ok(()));
+        failures.expect_clear().never();
+
+        let run = sweeping_orchestrator(&["RECENT", "STOPPED", "UNPRICED", "UNREADABLE"], |_| {
+            Ok(Some(vec![]))
+        })
+        .with_fetch_failures(Arc::new(failures))
+        .run_scheduled_fetch()
+        .await
+        .unwrap();
+
+        assert_eq!((run.updated_count, run.skipped_count), (0, 2));
     }
 
     // MKT-230 / MKT-193B (#529) — a failed split reading skips the asset as a failed close
