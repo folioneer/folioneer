@@ -21,8 +21,8 @@ pub use domain::{
 };
 pub use domain::{
     AssetMatch, DateFormat, DecimalMark, Encoding, ImportMapper, ImportMapperDraft,
-    ImportMapperStore, MappedColumns, MapperChoiceRepository, MapperInfo, OperationLabel,
-    OperationType, Separator,
+    ImportMapperStore, MappedColumns, MapperChoiceRepository, MapperFileProblem, MapperInfo,
+    OperationLabel, OperationType, Separator,
 };
 pub use error::AccountImportError;
 pub use infrastructure::{built_in_presets, FsImportMapperStore, SqliteMapperChoiceRepository};

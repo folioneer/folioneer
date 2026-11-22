@@ -131,10 +131,13 @@ describe("AccountImportDialog", () => {
   // IMP-064 — the alert holds the reason; Preview is disabled.
   it("says why a mapper's file is refused", () => {
     show({
-      addRefusal: { key: "account_import.error.mapper_file_invalid", vars: { reason: "no date" } },
+      addRefusal: {
+        key: "account_import.error.mapper_file_missing_field",
+        vars: { field: "date", line: 1 },
+      },
       canPreview: false,
     });
-    expect(byId("account-import-add-refused")).toHaveTextContent("no date");
+    expect(byId("account-import-add-refused")).toHaveTextContent("mapper_file_missing_field");
     expect(byId("account-import-preview")).toBeDisabled();
   });
 

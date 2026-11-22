@@ -13,9 +13,9 @@ use folioneer_lib::context::account::{
 use folioneer_lib::context::account::{Transaction, TransactionType};
 use folioneer_lib::context::account_import::{
     built_in_presets, AccountImportError, AccountImportService, AssetMatch, DateFormat,
-    DecimalMark, Encoding, FsImportMapperStore, ImportMapperDraft, MappedColumns, MapperInfo,
-    OperationLabel, OperationType, ReadingChoices, RowRejection, Separator,
-    SqliteMapperChoiceRepository,
+    DecimalMark, Encoding, FsImportMapperStore, ImportMapperDraft, MappedColumns,
+    MapperFileProblem, MapperInfo, OperationLabel, OperationType, ReadingChoices, RowRejection,
+    Separator, SqliteMapperChoiceRepository,
 };
 use folioneer_lib::context::asset::{
     AssetClass, AssetService, CreateAssetDTO, SqliteAssetCategoryRepository,
@@ -1166,12 +1166,12 @@ async fn imp_020b_a_mapper_from_elsewhere_is_added_from_its_file() {
     ));
     let mut with_extra: serde_json::Value = serde_json::from_str(&shared).expect("JSON");
     with_extra["extra"] = serde_json::json!(1);
-    for (bad, what) in [
-        ("not json".to_string(), "not JSON"),
-        (with_extra.to_string(), "a field a mapper does not have"),
+    for (bad, expected) in [
+        ("not json".to_string(), MapperFileProblem::NotJson),
+        (with_extra.to_string(), MapperFileProblem::UnknownField),
         (
             r#"{"info":{"provider":"A"}}"#.to_string(),
-            "fields it needs missing",
+            MapperFileProblem::MissingField,
         ),
     ] {
         match ctx
@@ -1179,10 +1179,10 @@ async fn imp_020b_a_mapper_from_elsewhere_is_added_from_its_file() {
             .add_import_mapper_from(mapper_file(&bad).path())
             .await
         {
-            Err(AccountImportError::MapperFileInvalid { reason }) => {
-                assert!(!reason.is_empty(), "{what}")
+            Err(AccountImportError::MapperFileInvalid { problem, .. }) => {
+                assert_eq!(problem, expected)
             }
-            other => panic!("{what}: {other:?}"),
+            other => panic!("{expected:?}: {other:?}"),
         }
     }
     let mut no_column = english_mapper();

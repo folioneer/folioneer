@@ -13,8 +13,8 @@ pub use file::{
 pub use import_mapper::{
     built_in_id, folded, names_a_file, new_mapper_id, AssetMatch, DateFormat, DecimalMark,
     Encoding, ImportMapper, ImportMapperDraft, ImportMapperStore, MappedColumns,
-    MapperChoiceRepository, MapperInfo, OperationLabel, OperationType, PickedMapperFile, Separator,
-    LARGEST_MAPPER_FILE, MAPPER_TEXT_LENGTH,
+    MapperChoiceRepository, MapperFileProblem, MapperInfo, OperationLabel, OperationType,
+    PickedMapperFile, Separator, LARGEST_MAPPER_FILE, MAPPER_TEXT_LENGTH,
 };
 pub use row::{
     read_figure, read_rows, AssetRead, OperationRead, Row, RowFigures, RowFormat, RowRead,

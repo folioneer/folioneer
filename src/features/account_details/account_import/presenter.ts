@@ -8,6 +8,7 @@ import type {
   ImportMapper,
   ImportMapperDraft,
   MappedColumns,
+  MapperFileProblem,
   OperationType,
   Separator,
 } from "@/bindings";
@@ -173,6 +174,22 @@ export function mapperFileRefusalToI18n(error: AccountImportError): I18nMessage 
   }
 }
 
+const MAPPER_FILE_KEYS: Record<MapperFileProblem, string> = {
+  NotJson: "account_import.error.mapper_file_not_json",
+  MissingField: "account_import.error.mapper_file_missing_field",
+  UnknownField: "account_import.error.mapper_file_unknown_field",
+  InvalidValue: "account_import.error.mapper_file_invalid_value",
+};
+
+/** IMP-020H — a refused mapper file worded from its problem, its field and its line. */
+function mapperFileRefusal(
+  problem: MapperFileProblem,
+  field: string | null,
+  line: number,
+): I18nMessage {
+  return { key: MAPPER_FILE_KEYS[problem], vars: field === null ? { line } : { field, line } };
+}
+
 /** F27 — the i18n message of a backend refusal. */
 export function accountImportErrorToI18n(error: CsvImportError | AccountImportError): I18nMessage {
   switch (error.code) {
@@ -190,8 +207,9 @@ export function accountImportErrorToI18n(error: CsvImportError | AccountImportEr
       return { key: "account_import.error.mapper_file_unreadable" };
     case "MapperFileTooLarge":
       return { key: "account_import.error.mapper_file_too_large" };
+    // IMP-020H — the typed problem, its field and its line; never the reader's text.
     case "MapperFileInvalid":
-      return { key: "account_import.error.mapper_file_invalid", vars: { reason: error.reason } };
+      return mapperFileRefusal(error.problem, error.field, error.line);
     case "MapperFolderFailed":
       return { key: "account_import.error.mapper_folder_failed" };
     case "FileUnreadable":
