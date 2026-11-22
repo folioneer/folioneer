@@ -15,6 +15,7 @@ import {
   getSyncStatus,
   inspectSyncFolder,
   leaveSync,
+  onSyncCompleted,
   pauseSync,
   pickSyncFolder,
   renameSyncDevice,
@@ -123,6 +124,12 @@ export function useSyncSection(): UseSyncSectionResult {
 
   useEffect(() => {
     void refresh();
+    // SYN-064 — on SyncCompleted the status is read again: the last sync, the held-back
+    // count and the notices follow a sync without the section being reopened.
+    const unlisten = onSyncCompleted(() => void refresh());
+    return () => {
+      void unlisten.then((stop) => stop());
+    };
   }, [refresh]);
 
   const applyStatusResult = useCallback(
