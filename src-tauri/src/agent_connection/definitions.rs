@@ -345,7 +345,8 @@ pub fn definitions() -> Vec<ToolDefinition> {
                     "kind": { "type": "string", "description": "Listed, Crypto or Custom. Left out, it follows from the class and the ISIN." },
                     "class": { "type": "string", "description": "RealEstate, Stocks, Bonds, ETF, ETP, MutualFunds, DigitalAsset or Derivatives. Left out, the usual class of the kind: Stocks for Listed, DigitalAsset for Crypto, RealEstate for Custom." },
                     "isin": { "type": "string", "description": "Its ISIN: required for a listed asset, refused for the others." },
-                    "exchange": { "type": "string", "description": "The MIC code of its exchange (XPAR), for a listed asset. Optional." }
+                    "exchange": { "type": "string", "description": "The MIC code of its exchange (XPAR), for a listed asset. Optional." },
+                    "interest_bearing": { "type": "boolean", "description": "true when it bears interest — a euro fund, a savings line — so that record_interest credits it; never for a crypto asset. Default: false." }
                 },
                 "required": ["name", "reference", "currency"],
                 "additionalProperties": false
@@ -355,7 +356,7 @@ pub fn definitions() -> Vec<ToolDefinition> {
             name: "add_account",
             title: "Create an account",
             only_reads: false,
-            description: "Create an account the portfolio does not have yet — a brokerage account, a savings plan, a crypto wallet — so that it can be recorded in, as the window creates one: its cash line is created with it and its management fees are off. Look for it with list_accounts first: a name another account has is refused, case ignored. It is usable at once by its name and takes one place of the session's limit.",
+            description: "Create an account the portfolio does not have yet — a brokerage account, a savings plan, a crypto wallet — so that it can be recorded in, as the window creates one: its cash line is created with it, and its management fees are off unless management_fees is true. Look for it with list_accounts first: a name another account has is refused, case ignored. It is usable at once by its name and takes one place of the session's limit.",
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -363,7 +364,8 @@ pub fn definitions() -> Vec<ToolDefinition> {
                     "currency": { "type": "string", "description": "The ISO code of its currency: EUR, USD." },
                     "bank": { "type": "string", "description": "The bank or broker that holds it. Optional; at most 100 characters." },
                     "country": { "type": "string", "description": "Its country, two upper-case letters (FR, DE), when it is not the portfolio's. Optional." },
-                    "wrapper": { "type": "string", "description": "The identifier of its tax wrapper (fr_pea, brokerage), as list_accounts gives them. Optional." }
+                    "wrapper": { "type": "string", "description": "The identifier of its tax wrapper (fr_pea, brokerage), as list_accounts gives them. Optional." },
+                    "management_fees": { "type": "boolean", "description": "true when the account charges management fees as a share of what it holds — a life insurance account — so that record_management_fee is taken. Default: false." }
                 },
                 "required": ["name", "currency"],
                 "additionalProperties": false

@@ -81,6 +81,8 @@ pub struct NamedAsset {
     pub risk_level: Option<u8>,
     /// Category name; the system category when left out.
     pub category_name: Option<String>,
+    /// AST-024 — whether the asset bears interest (an agent may say so, AGT-064).
+    pub interest_bearing: bool,
 }
 
 /// An asset added by name, and what the user should know about it (CLI-026).

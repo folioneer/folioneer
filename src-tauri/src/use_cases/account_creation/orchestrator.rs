@@ -7,6 +7,23 @@ use crate::shared::infrastructure::uow::TransactionManager;
 use std::result::Result as StdResult;
 use std::sync::Arc;
 
+/// AGT-068 — what an agent asks for an account: the window's form, and the account's
+/// management-fees parameter (FEE-075, #874).
+pub struct AccountAskedByAgent {
+    /// Its name.
+    pub name: String,
+    /// Its bank, empty for none.
+    pub bank_name: String,
+    /// Its currency's ISO code.
+    pub currency: String,
+    /// Its own country, when not the portfolio's (ACC-041).
+    pub country: Option<String>,
+    /// Its wrapper's identifier (ACC-043).
+    pub wrapper: Option<String>,
+    /// Whether its management-fees parameter is on (FEE-075).
+    pub management_fees_enabled: bool,
+}
+
 /// Orchestrates account creation across the account and asset bounded contexts
 /// (ACC-025). Injects `AccountService` + `AssetService` per B18 / B24 —
 /// no `account` → `asset` import is introduced.
@@ -111,16 +128,17 @@ impl AccountCreationUseCase {
     /// line included (ACC-025), marked with the agent and its session (AGT-069).
     pub async fn create_by_agent(
         &self,
-        name: String,
-        bank_name: String,
-        currency: String,
-        country: Option<String>,
-        wrapper: Option<String>,
+        asked: AccountAskedByAgent,
         mark: AgentRecording,
     ) -> StdResult<Account, AccountError> {
-        let account = Account::new(name, bank_name, currency, false)?
-            .classified(country, wrapper, None)?
-            .with_implied_cost_basis();
+        let account = Account::new(
+            asked.name,
+            asked.bank_name,
+            asked.currency,
+            asked.management_fees_enabled,
+        )?
+        .classified(asked.country, asked.wrapper, None)?
+        .with_implied_cost_basis();
         self.create_with_cash(account, None, Some(mark)).await
     }
 

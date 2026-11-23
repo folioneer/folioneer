@@ -281,7 +281,7 @@ impl AssetService {
                 currency: named.currency,
                 category_id,
                 exchange,
-                interest_bearing: false,
+                interest_bearing: named.interest_bearing,
             })
             .await?;
         Ok(AddedAsset {
@@ -1670,6 +1670,7 @@ mod tests {
             exchange_code: None,
             risk_level: None,
             category_name: None,
+            interest_bearing: false,
         }
     }
 
