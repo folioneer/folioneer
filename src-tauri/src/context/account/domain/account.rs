@@ -1714,8 +1714,13 @@ impl Account {
 
     /// Applies a management fee deduction the application generated on its own (FEE-040):
     /// the same holding mechanics as `apply_management_fee`, recorded with the application
-    /// origin (CFR-016).
+    /// origin (CFR-016). A period whose deduction the account already holds — generated
+    /// again after a cursor that could not be saved, or by a schedule created again — is
+    /// settled: the held deduction is returned and nothing changes (FEE-048A).
     pub fn apply_generated_management_fee(&mut self, tx: Transaction) -> Result<Transaction> {
+        if let Some(held) = self.transactions.iter().find(|held| held.id == tx.id) {
+            return Ok(held.clone());
+        }
         self.deduct_management_fee(tx, AccountChange::TransactionGenerated)
     }
 
