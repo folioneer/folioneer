@@ -196,6 +196,7 @@ fn read(args: &[String]) -> Result<Invocation, Reason> {
                 exchange_code: options.get("--exchange").map(str::to_string),
                 risk_level: options.risk()?,
                 category_name: options.get("--category").map(str::to_string),
+                interest_bearing: false,
             })),
             json,
         });
@@ -661,6 +662,7 @@ mod tests {
                     exchange_code: None,
                     risk_level: None,
                     category_name: None,
+                    interest_bearing: false,
                 })),
                 json: true,
             })

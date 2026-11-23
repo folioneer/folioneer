@@ -2008,8 +2008,9 @@ fn refusal_from_interest(error: &InterestError) -> Refusal {
             code: code_of(task),
             message: match task {
                 InterestTask::AssetNotFound => "the asset no longer exists".to_string(),
+                // AGT-066A — the refusal says how to fix it.
                 InterestTask::InterestNotEligible => {
-                    "the asset bears no interest: only an interest-bearing asset or the cash is credited".to_string()
+                    "the asset bears no interest: the owner marks it interest-bearing when editing the asset in the window, or the interest goes to the cash".to_string()
                 }
                 InterestTask::AssetNotHeld => {
                     "nothing of this asset is held in the account".to_string()
@@ -2181,8 +2182,9 @@ pub fn refusal_from_account(error: &AccountError) -> Refusal {
         AccountError::ManagementFeeAmountInvalid => {
             "give either percent or resulting_quantity".to_string()
         }
+        // AGT-066A — the refusal says how to fix it.
         AccountError::ManagementFeesDisabled => {
-            "management fees are turned off for this account".to_string()
+            "management fees are turned off for this account: the owner turns them on when editing the account in the window".to_string()
         }
         AccountError::AccountNotFound { .. } => "the account no longer exists".to_string(),
         AccountError::DatabaseError | AccountError::ApplicationWriteOutranked => {

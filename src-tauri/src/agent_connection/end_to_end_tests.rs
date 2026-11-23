@@ -2799,6 +2799,137 @@ async fn agt_064_a_session_adds_an_asset_of_each_kind() {
     assert_eq!(past_the_limit.code, "SessionLimitReached");
 }
 
+// AGT-064 / AGT-066 / AGT-068 (#874) — an agent adds an insurance account with its
+// management fees on and a euro fund that bears interest, then records on them at once; the
+// two refusals they avoid say how to fix them, and a flag that is not true or false is refused.
+#[tokio::test]
+async fn agt_068_an_account_and_an_asset_carry_their_fees_and_their_interest_from_the_start() {
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let granted = session(&bench.connections).await;
+    let call = |tool: &'static str, arguments: Value| {
+        let (tools, granted) = (&bench.tools, &granted);
+        async move { tools.call(granted, tool, &arguments).await }
+    };
+
+    call(
+        "add_account",
+        json!({ "name": "Assurance vie", "currency": "EUR", "management_fees": true }),
+    )
+    .await
+    .expect("an account with its fees on");
+    call(
+        "add_asset",
+        json!({ "name": "Fonds euros", "reference": "FEURO", "currency": "EUR", "kind": "Custom", "class": "Bonds", "interest_bearing": true }),
+    )
+    .await
+    .expect("an asset that bears interest");
+    call(
+        "add_asset",
+        json!({ "name": "Actions", "reference": "UC1", "currency": "EUR", "kind": "Custom", "class": "Stocks" }),
+    )
+    .await
+    .expect("an asset that bears none");
+    call(
+        "record_deposit",
+        json!({ "account": "Assurance vie", "amount": 5000, "date": "2026-01-15" }),
+    )
+    .await
+    .expect("cash");
+    for reference in ["FEURO", "UC1"] {
+        call(
+            "record_purchase",
+            json!({ "account": "Assurance vie", "asset": reference, "quantity": 10, "price": 100, "date": "2026-02-01" }),
+        )
+        .await
+        .expect("bought");
+    }
+
+    call(
+        "record_management_fee",
+        json!({ "account": "Assurance vie", "asset": "UC1", "percent": 1, "date": "2026-03-01" }),
+    )
+    .await
+    .expect("a fee on an account created with its fees on");
+    call(
+        "record_interest",
+        json!({ "account": "Assurance vie", "asset": "FEURO", "percent": 2, "date": "2026-03-01" }),
+    )
+    .await
+    .expect("interest on an asset added as interest-bearing");
+
+    let not_eligible = call(
+        "record_interest",
+        json!({ "account": "Assurance vie", "asset": "UC1", "percent": 2, "date": "2026-03-01" }),
+    )
+    .await
+    .expect_err("an asset that bears no interest");
+    assert_eq!(not_eligible.code, "InterestNotEligible");
+    assert!(
+        not_eligible.message.contains("editing the asset"),
+        "says how to fix it: {}",
+        not_eligible.message
+    );
+    call(
+        "add_account",
+        json!({ "name": "Compte-titres", "currency": "EUR" }),
+    )
+    .await
+    .expect("an account with its fees off");
+    call(
+        "record_deposit",
+        json!({ "account": "Compte-titres", "amount": 5000, "date": "2026-01-15" }),
+    )
+    .await
+    .expect("cash");
+    call(
+        "record_purchase",
+        json!({ "account": "Compte-titres", "asset": "UC1", "quantity": 10, "price": 100, "date": "2026-02-01" }),
+    )
+    .await
+    .expect("bought");
+    let disabled = call(
+        "record_management_fee",
+        json!({ "account": "Compte-titres", "asset": "UC1", "percent": 1, "date": "2026-03-01" }),
+    )
+    .await
+    .expect_err("an account whose fees are off");
+    assert_eq!(disabled.code, "ManagementFeesDisabled");
+    assert!(
+        disabled.message.contains("editing the account"),
+        "says how to fix it: {}",
+        disabled.message
+    );
+
+    for (tool, arguments) in [
+        (
+            "add_account",
+            json!({ "name": "X", "currency": "EUR", "management_fees": "yes" }),
+        ),
+        (
+            "add_asset",
+            json!({ "name": "Y", "reference": "Y1", "currency": "EUR", "kind": "Custom", "interest_bearing": 1 }),
+        ),
+        // AST-037 — a crypto asset bears no interest, its kind given or decided by its class.
+        (
+            "add_asset",
+            json!({ "name": "Z", "reference": "Z1", "currency": "EUR", "kind": "Crypto", "interest_bearing": true }),
+        ),
+        (
+            "add_asset",
+            json!({ "name": "W", "reference": "W1", "currency": "EUR", "class": "DigitalAsset", "interest_bearing": true }),
+        ),
+    ] {
+        assert_eq!(
+            call(tool, arguments)
+                .await
+                .expect_err("not true or false")
+                .code,
+            "InvalidArguments"
+        );
+    }
+}
+
 // AGT-068 — a session creates the account a statement names, through the rules of the
 // window: usable at once by its name, with its cash line; the same name is refused twice,
 // each created account takes a place of the session's limit, and the window is told how

@@ -17,7 +17,7 @@ use crate::context::asset::{
 use crate::context::currency::CurrencyService;
 use crate::core::BACKEND;
 use crate::shared::domain::quantity::{stored_non_cash_quantity, FigureTextError};
-use crate::use_cases::account_creation::AccountCreationUseCase;
+use crate::use_cases::account_creation::{AccountAskedByAgent, AccountCreationUseCase};
 use crate::use_cases::account_details::AccountDetailsUseCase;
 use crate::use_cases::account_summary::AccountSummaryUseCase;
 use crate::use_cases::holding_transaction::{
@@ -581,7 +581,20 @@ impl AgentTools {
             exchange_code: optional_text(arguments, "exchange")?,
             risk_level: None,
             category_name: None,
+            interest_bearing: optional_flag(arguments, "interest_bearing")?,
         };
+        // AGT-064A — a crypto asset, its kind given or decided by the core (AST-034), bears no
+        // interest.
+        let crypto = named
+            .kind
+            .unwrap_or_else(|| AssetKind::of(&named.class, named.isin.as_deref()))
+            == AssetKind::Crypto;
+        if named.interest_bearing && crypto {
+            return Err(Refusal {
+                code: "InvalidArguments".to_string(),
+                message: "a crypto asset bears no interest: leave interest_bearing out".to_string(),
+            });
+        }
         if !granted.may_record_one_more() {
             return Err(session_limit_reached());
         }
@@ -630,6 +643,7 @@ impl AgentTools {
         let bank_name = optional_kept_text(arguments, "bank", ACCOUNT_TEXT_LENGTH)?;
         let country = optional_text(arguments, "country")?;
         let wrapper = optional_text(arguments, "wrapper")?;
+        let management_fees = optional_flag(arguments, "management_fees")?;
         if !granted.may_record_one_more() {
             return Err(session_limit_reached());
         }
@@ -643,11 +657,14 @@ impl AgentTools {
         let created = spawn_within_profile(async move {
             creation
                 .create_by_agent(
-                    name,
-                    bank_name.unwrap_or_default(),
-                    currency,
-                    country,
-                    wrapper,
+                    AccountAskedByAgent {
+                        name,
+                        bank_name: bank_name.unwrap_or_default(),
+                        currency,
+                        country,
+                        wrapper,
+                        management_fees_enabled: management_fees,
+                    },
                     mark,
                 )
                 .await
@@ -1458,6 +1475,19 @@ const NOTE_LENGTH: usize = 500;
 /// AGT-048A — the longest of any other text argument, in characters, so the core never
 /// reads an unbounded one.
 const TEXT_LENGTH: usize = 200;
+
+/// AGT-064 / AGT-068 — a flag: `true` or `false`, absent or null being `false`; anything
+/// else is refused.
+fn optional_flag(arguments: &Value, name: &str) -> Result<bool, Refusal> {
+    match arguments.get(name) {
+        None | Some(Value::Null) => Ok(false),
+        Some(Value::Bool(flag)) => Ok(*flag),
+        Some(_) => Err(Refusal {
+            code: "InvalidArguments".to_string(),
+            message: format!("{name} is not true or false"),
+        }),
+    }
+}
 
 /// An optional text argument: absent or null is none; anything but text is refused, never
 /// ignored — a date sent as a number must not become today.

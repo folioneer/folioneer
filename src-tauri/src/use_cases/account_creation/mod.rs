@@ -9,4 +9,4 @@ mod orchestrator;
 
 #[cfg(feature = "app")]
 pub use api::*;
-pub use orchestrator::AccountCreationUseCase;
+pub use orchestrator::{AccountAskedByAgent, AccountCreationUseCase};

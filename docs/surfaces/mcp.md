@@ -33,20 +33,23 @@ JSON pointer.
 ## add_asset
 
 AGT-064. Input: `name`, `reference` and `currency`; `kind` or `class`, at least one, read
-with case ignored; `isin` and `exchange` (a MIC code, case ignored), each optional.
+with case ignored; `isin` and `exchange` (a MIC code, case ignored), each optional;
+`interest_bearing`, `true` or `false`, optional, `false` when left out.
 `MissingArgument`: a name, a reference or a currency missing, empty or not text, or neither
 kind nor class. `InvalidArguments`: a kind, a class, an ISIN or an exchange that is not
 text, a kind or a class AGT-064 does not allow (`Cash` included), and every bound it sets on
-the text. Answer:
+the text, an `interest_bearing` that is not `true` or `false`, and `true` for a crypto
+asset (AGT-064A). Answer:
 `{ "status": "added", "asset": …, "reference_shared": … }`, the asset as `list_assets`
 gives it.
 
 ## add_account
 
-AGT-068. Input: `name` and `currency`; `bank`, `country` and `wrapper`, each optional.
+AGT-068. Input: `name` and `currency`; `bank`, `country` and `wrapper`, each optional;
+`management_fees`, `true` or `false`, optional, `false` when left out.
 `MissingArgument`: a name or a currency missing, empty, of spaces only or not text.
-`InvalidArguments`: a bank, a country or a wrapper that is not text, and every bound AGT-068
-sets on the text. Answer: `{ "status": "created", "account": … }`, the account as
+`InvalidArguments`: a bank, a country or a wrapper that is not text, every bound AGT-068
+sets on the text, and a `management_fees` that is not `true` or `false`. Answer: `{ "status": "created", "account": … }`, the account as
 `list_accounts` gives it.
 
 ## record_deposit, record_withdrawal
