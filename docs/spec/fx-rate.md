@@ -100,6 +100,8 @@ This feature does not add fields to `HoldingDetail`; it changes the **conditions
 
 **FXR-025 — Upsert by (from, to, date) (backend)**: If a rate already exists for the same `(from_currency, to_currency, date)`, it is overwritten with the new value regardless of either row's `source` (per ADR-012; latest-write-wins). Otherwise a new record is created. Transparent to the user; the form behaves identically for new and existing entries. The `source` written by this path is governed by FXR-101, and by FXR-103 for an AI agent's write.
 
+**FXR-025A — A rate's write creates its pair (backend)**: A rate written for a directed pair that is not yet persisted persists the pair first, as FXR-013 ensures one, and keeps it (FXR-014). This is the core's write, whoever makes it — the window's rate form (FXR-012, FXR-051) or an AI agent (AGT-104). It publishes `CurrencyRateUpdated` (FXR-026) and no `CurrencyPairUpdated` (FXR-056).
+
 **FXR-026 — CurrencyRateUpdated event (backend)**: After a successful upsert the backend publishes a bare `CurrencyRateUpdated` event on the event bus (no payload), consistent with `AssetPriceUpdated` and the other `*Updated` signals. It is published by the `currency` bounded context. The Tauri event discriminant string is `"CurrencyRateUpdated"`.
 
 **FXR-027 — In-flight state (frontend)**: While the upsert is in progress the submit button is disabled and shows a spinner to prevent double-submission.
@@ -269,7 +271,7 @@ Manual rate entry
     → Account Details / Performance re-fetch                            (FXR-036)
 
 AI agent's rate (AGT-104)
-    → same checks and upsert, the pair declared if new, source=Agent   (FXR-021–025, FXR-103)
+    → same checks and upsert, the pair created if new, source=Agent   (FXR-021–025A, FXR-103)
     → publish CurrencyRateUpdated                                       (FXR-026)
 
 Rate refresh at launch (FXR-075)

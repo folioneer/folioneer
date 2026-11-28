@@ -234,7 +234,7 @@ Two things are kept on the computer across restarts, and neither is synced to th
 
 ---
 
-### A session's profile (100–109)
+### A session's profile (100–102)
 
 **AGT-100 — A session works in one profile (backend)**: A session works in the profile in use at the moment the owner allows it (PFL-012); a later change of the profile in use leaves the session where it is. Every tool runs as if that profile were the profile in use: the lists and the figures read its accounts only (PFL-050, PFL-051), an account the AI agent names is looked for among them, and an account it creates goes into it (PFL-021) (owner, 2026-11-07, #770).
 
@@ -248,9 +248,11 @@ Two things are kept on the computer across restarts, and neither is synced to th
 
 **AGT-102 — The holder an AI agent reads (backend)**: An AI agent's list of accounts and its account summaries (AGT-040, ACC-051) give each account's holder, or none (ACC-050), and the summaries the list of holders (ACC-051).
 
+### Currency rates (103–109)
+
 **AGT-103 — The rate of a pair at a date (backend)**: A connected AI agent may read the rate the application holds for a directed pair of currencies at a date, today when none is given (`mcp.md § get_rate`): the rate of that date or the closest earlier one (FXR-035), with its own date and its source (FXR-100), as the Currency Rates view holds it. The reverse pair is never read in its place (FXR-010). A pair with no rate up to that date is answered so, with no rate: an answer, not a refusal. A currency that is not ISO 4217 and two equal currencies are refused with the rate's own errors (FXR-023), a date that is not a date or is in the future is refused, and so is a read that fails. It is a read: it says it only reads (AGT-013), each answered call counts as one of the session's reads (AGT-052), and it takes no place of the session's limit (AGT-047).
 
-**AGT-104 — A rate at a date (backend)**: A connected AI agent may record the rate of a directed pair at a date, today when none is given (`mcp.md § record_rate`). The figure and what is missing are read and refused as a recording's (AGT-048). The rate is written through the rules of the window's form (FXR-021–023), each refusal with the rate's own error; a pair not yet followed is declared by the write, as the window's rate form declares it, and kept (FXR-014), the write publishing `CurrencyRateUpdated` only (FXR-026); the latest write wins on that date (FXR-025); the source is `Agent` (FXR-103). It is answered with the rate as recorded, as AGT-103 reads one, and takes one place of the session's limit (AGT-047). A rate is no transaction, as a price is not (AGT-062): it is not counted in what the window is told of the session (AGT-052), the session's corrections and cancellations do not name it (AGT-050), and "Remove everything it recorded" leaves it (AGT-053) — the owner edits or deletes it in the Currency Rates view (FXR-052, FXR-053).
+**AGT-104 — A rate at a date (backend)**: A connected AI agent may record the rate of a directed pair at a date, today when none is given (`mcp.md § record_rate`). The figure and what is missing are read and refused as a recording's (AGT-048). The rate is written through the rules of the window's form (FXR-021–023), each refusal with the rate's own error; a pair not yet persisted is created by the write and kept (FXR-025A); the latest write wins on that date (FXR-025); the source is `Agent` (FXR-103). It is answered with the rate as recorded, as AGT-103 reads one, and takes one place of the session's limit (AGT-047). A rate is no transaction, as a price is not (AGT-062): it is not counted in what the window is told of the session (AGT-052), the session's corrections and cancellations do not name it (AGT-050), and "Remove everything it recorded" leaves it (AGT-053) — the owner edits or deletes it in the Currency Rates view (FXR-052, FXR-053).
 
 **AGT-105 — A pair's rate history (backend)**: A connected AI agent may read the rates the application holds for a directed pair (FXR-050), bounded by two optional dates, both included, one page at a time (`mcp.md § list_rates`), and writes nothing. The rates are answered as a price history is (AGT-075): oldest first, 100 to a page, the first page when none is asked, with how many rates the dates keep in all, the page and how many pages they make — none when they keep no rate; a page past the last holds none; dates in the future or a start after the end keep none and are not refused. Each rate is read as in AGT-103. A currency or a pair is refused as in AGT-103, a bound that is not a date and a page that is not a whole number from 1 are refused, and so is a read that fails. It is a read, as AGT-103 is.
 
@@ -317,7 +319,7 @@ header: "{agent} is connected" · Disconnect (AGT-033, AGT-034)
 - **MKT-104, MKT-072, MKT-100, CLI-011** — an AI agent reads an asset's price at a date as the core answers it, with its source, naming the asset as a recording does (AGT-071); and every price it holds over a period, oldest first (AGT-075, MKT-072).
 - **MKT-100, MKT-103, SYN-038** — a price an AI agent recorded carries the source `Agent`, a value of data format version 3 (AGT-062).
 - **FXR-010, FXR-035, FXR-050, FXR-100** — an AI agent reads a pair's rate at a date and its history, each rate with its source (AGT-103, AGT-105).
-- **FXR-021, FXR-022, FXR-023, FXR-025, FXR-054, FXR-103, SYN-038** — a rate an AI agent recorded carries the source `Agent`, a value of data format version 20 (AGT-104).
+- **FXR-021, FXR-022, FXR-023, FXR-025, FXR-025A, FXR-103, SYN-038** — a rate an AI agent recorded carries the source `Agent`, a value of data format version 20 (AGT-104).
 - **CLI-029** — the command line records a price by the same lookup and the same checks; both replace the price at that date; the command line's is the owner's own — source `Manual` — where an AI agent's is marked `Agent` (AGT-062).
 - **ADR-023** — the bridge holds no data and the channel is never a network port.
 
