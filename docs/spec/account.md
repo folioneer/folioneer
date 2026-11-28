@@ -108,7 +108,7 @@ The account section title is displayed in the application shell header, not in t
 
 **ACC-019A — The counts cannot be read (frontend)**: When the counts of ACC-020 cannot be read, no delete dialog opens and the failure is told above the table, where it can be dismissed.
 
-**ACC-020 — Pre-deletion count query (backend)** _(new)_: A backend command `get_account_deletion_summary(account_id)` returns the number of active holdings and the number of transactions associated with the account. Because this read spans `context/account/` (holdings) and `context/transaction/` (transactions), it must be implemented as a use case in `use_cases/` — not as a bounded-context command — per B18 and B24.
+**ACC-020 — Pre-deletion count query (backend)** _(new)_: A backend command `get_account_deletion_summary(account_id)` returns the number of the account's active holdings — those whose quantity is above zero, the cash line among them only when it holds a balance (unlike CSH-097's list, where the cash row always counts) — and the number of its transactions. Because this read spans `context/account/` (holdings) and `context/transaction/` (transactions), it must be implemented as a use case in `use_cases/` — not as a bounded-context command — per B18 and B24.
 
 **ACC-021 — Account summaries with global value (backend)** _(new)_: The account summaries are read: each account with its global value, in the account's own currency (CSH-094) — its cash plus, over its priced active non-cash holdings in its currency, each one's quantity times its latest price; a non-cash holding with no recorded price counts at its cost basis (PRF-022A); a foreign one with a price and no usable rate (FXR-041) contributes 0; an empty account's value is 0. Each summary also carries the mark of an account an AI agent created on this computer, or none (AGT-069). The summaries are those of the accounts of the profile in use (PFL-050).
 
@@ -222,6 +222,7 @@ Full-width table, default sort by Name ascending. Floating action button (bottom
 - **Empty**: message inviting the user to create their first account via the FAB (ACC-012)
 - **Loading**: loading indicator in the table (ACC-013)
 - **Load error**: error message + Retry button (ACC-013B)
+- **Counts not read**: the delete dialog does not open; the failure is told above the table, dismissable (ACC-019A)
 - **No search results**: message distinct from empty state (ACC-011)
 - **Filtering**: the portfolio total row is hidden while a search filter is active (ACC-032)
 - **Wrapper lists not read**: the form shows no Country or Wrapper, the column shows "—" (ACC-045, ACC-046, ACC-048)
