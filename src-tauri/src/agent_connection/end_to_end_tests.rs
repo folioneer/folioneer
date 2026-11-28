@@ -288,13 +288,13 @@ async fn agt_040_the_read_tools_answer_from_the_running_application() {
     assert_eq!(owner.await.expect("owner"), "claude-code");
     assert_eq!(
         result(&answered[1]),
-        json!([{ "name": "PEA", "currency": "EUR", "country": "FR", "wrapper": null, "holder": null, "cost_basis_method": "WeightedAverage" }])
+        json!([{ "name": "PEA", "currency": "EUR", "country": "FR", "wrapper": null, "holder": null, "cost_basis_method": "WeightedAverage", "management_fees": false }])
     );
     assert_eq!(
         result(&answered[2]),
         json!([{ "name": "Amundi MSCI World", "reference": "CW8", "kind": "Custom",
             "class": "ETF", "currency": "EUR", "isin": null, "exchange": null,
-            "archived": false }])
+            "archived": false, "interest_bearing": false }])
     );
     let summary = result(&answered[3]);
     assert_eq!(summary["summaries"][0]["name"], "PEA");
@@ -372,7 +372,7 @@ async fn agt_100_a_session_works_in_the_profile_in_use_when_allowed() {
     owner.await.expect("owner");
     assert_eq!(
         result(&answered[1]),
-        json!([{ "name": "Livret A", "currency": "EUR", "country": "FR", "wrapper": null, "holder": "Mum", "cost_basis_method": "WeightedAverage" }])
+        json!([{ "name": "Livret A", "currency": "EUR", "country": "FR", "wrapper": null, "holder": "Mum", "cost_basis_method": "WeightedAverage", "management_fees": false }])
     );
     // AGT-102 — the summaries give the holder too, of the session's profile only.
     let summary = result(&answered[4]);
@@ -2818,18 +2818,38 @@ async fn agt_068_an_account_and_an_asset_carry_their_fees_and_their_interest_fro
     )
     .await
     .expect("an account with its fees on");
-    call(
+    let added = call(
         "add_asset",
         json!({ "name": "Fonds euros", "reference": "FEURO", "currency": "EUR", "kind": "Custom", "class": "Bonds", "interest_bearing": true }),
     )
     .await
     .expect("an asset that bears interest");
+    // #944 — the answer gives the asset as list_assets does, its interest flag included.
+    assert_eq!(added["asset"]["interest_bearing"], true);
     call(
         "add_asset",
         json!({ "name": "Actions", "reference": "UC1", "currency": "EUR", "kind": "Custom", "class": "Stocks" }),
     )
     .await
     .expect("an asset that bears none");
+    // #944 — the reads give both settings back, under the names the recordings take.
+    let accounts = call("list_accounts", json!({}))
+        .await
+        .expect("the accounts");
+    assert_eq!(accounts[0]["name"], "Assurance vie");
+    assert_eq!(accounts[0]["management_fees"], true);
+    let assets = call("list_assets", json!({})).await.expect("the assets");
+    let bears = |reference: &str| {
+        assets
+            .as_array()
+            .expect("rows")
+            .iter()
+            .find(|row| row["reference"] == reference)
+            .expect("listed")["interest_bearing"]
+            .clone()
+    };
+    assert_eq!(bears("FEURO"), true);
+    assert_eq!(bears("UC1"), false);
     call(
         "record_deposit",
         json!({ "account": "Assurance vie", "amount": 5000, "date": "2026-01-15" }),
@@ -2953,7 +2973,7 @@ async fn agt_068_a_session_creates_an_account() {
     assert_eq!(created["status"], "created");
     assert_eq!(
         created["account"],
-        json!({ "name": "Hardware wallet", "currency": "EUR", "country": "DE", "wrapper": "brokerage", "holder": null, "cost_basis_method": "Fifo" })
+        json!({ "name": "Hardware wallet", "currency": "EUR", "country": "DE", "wrapper": "brokerage", "holder": null, "cost_basis_method": "Fifo", "management_fees": false })
     );
     let plain = call(
         "add_account",
@@ -3258,6 +3278,23 @@ async fn agt_077_the_rules_stated_are_the_ones_applied() {
         let example = rule
             .get("example")
             .unwrap_or_else(|| panic!("{} has no example", rule["topic"]));
+        // #944 — an example names only what the test builds it from: a field no tool takes
+        // (an old name of the fees parameter) fails here.
+        for key in example.as_object().expect("an object").keys() {
+            assert!(
+                [
+                    "account_country",
+                    "account_currency",
+                    "asset_currency",
+                    "management_fees",
+                    "calls",
+                    "answers"
+                ]
+                .contains(&key.as_str()),
+                "{}: unknown example field {key}",
+                rule["topic"]
+            );
+        }
         let dir = tempfile::tempdir().expect("tempdir");
         let bench = workbench(dir.path()).await;
         let granted = session(&bench.connections).await;
@@ -3267,9 +3304,12 @@ async fn agt_077_the_rules_stated_are_the_ones_applied() {
             async move { tools.call(granted, &tool, &arguments).await }
         };
         for name in ["Example", "Other"] {
+            // #944 — the example's fields are those `add_account` takes: one it does not
+            // know would leave the fees off and the example's figure wrong.
             call(
                 "add_account",
-                json!({ "name": name, "currency": example["account_currency"], "country": example["account_country"] }),
+                json!({ "name": name, "currency": example["account_currency"], "country": example["account_country"],
+                    "management_fees": example.get("management_fees").cloned().unwrap_or(Value::Bool(false)) }),
             )
             .await
             .expect("the example's accounts");
@@ -3286,15 +3326,23 @@ async fn agt_077_the_rules_stated_are_the_ones_applied() {
         )
         .await
         .expect("cash to buy with");
-        // What the owner turns on in the window, no tool of an agent's.
-        if example["management_fees_enabled"] == true {
-            sqlx::query("UPDATE accounts SET management_fees_enabled = 1")
-                .execute(&bench.pool)
-                .await
-                .expect("management fees on");
-        }
         let mut last = Value::Null;
         for step in example["calls"].as_array().expect("calls") {
+            // #944 — every argument an example's call passes is one its tool declares: a
+            // misnamed one would be ignored (AGT-040) and the example would say otherwise.
+            let tool = step["tool"].as_str().expect("a tool");
+            let declared = super::definitions::definitions()
+                .into_iter()
+                .find(|definition| definition.name == tool)
+                .unwrap_or_else(|| panic!("{}: no tool {tool}", rule["topic"]))
+                .input_schema;
+            for key in step["arguments"].as_object().expect("arguments").keys() {
+                assert!(
+                    declared["properties"].get(key).is_some(),
+                    "{}: {tool} takes no {key}",
+                    rule["topic"]
+                );
+            }
             last = call(
                 step["tool"].as_str().expect("a tool"),
                 step["arguments"].clone(),

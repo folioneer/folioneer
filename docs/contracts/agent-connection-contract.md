@@ -196,6 +196,7 @@ The mark of a transaction an AI agent recorded (AGT-045) reaches the window in t
 
 ## Changelog
 
+- 2026-11-28 — #944 (AGT-040): `list_accounts` gives each account's management-fees parameter as `management_fees` and `list_assets` each asset's `interest_bearing`, the names `add_account` and `add_asset` take; `describe_rules` examples name it `management_fees`. The core's field keeps its name, `management_fees_enabled` (FEE-075, the data export). No command or type changed.
 - 2026-11-15 — #826 (AGT-010, AGT-077): `describe_rules` gives the rules behind the figures, and `initialize`'s instructions say so. No command or type changed.
 - 2026-11-15 — #516 (AGT-076): `list_accounts` gives each account's cost basis method, and `list_lots` reads a holding's lots. No command or type changed.
 - 2026-11-09 — #770 (AGT-100–102): a session works in the profile in use when it is allowed; the tools read and write that profile only, and `list_accounts` gives each account's holder. No command or type changed; the window's consent text names the profile.

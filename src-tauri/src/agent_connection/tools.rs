@@ -7,8 +7,8 @@ use std::sync::Arc;
 use serde_json::Value;
 
 use crate::context::account::{
-    spawn_within_profile, within_profile, AccountError, AccountServiceContract, AgentRecording,
-    CostBasisMethod, Transaction, TransactionType, TransactionView, WriteOffReason,
+    spawn_within_profile, within_profile, Account, AccountError, AccountServiceContract,
+    AgentRecording, CostBasisMethod, Transaction, TransactionType, TransactionView, WriteOffReason,
 };
 use crate::context::asset::{
     Asset, AssetClass, AssetCreationDefaults, AssetError, AssetKind, AssetServiceContract,
@@ -63,6 +63,22 @@ struct AccountRow {
     holder: Option<String>,
     /// AGT-040 — its cost basis method (CBM-010).
     cost_basis_method: CostBasisMethod,
+    /// AGT-040 — its management-fees parameter (FEE-075), under the name `add_account` takes.
+    management_fees: bool,
+}
+
+impl From<Account> for AccountRow {
+    fn from(account: Account) -> Self {
+        Self {
+            country: account.effective_country().to_string(),
+            name: account.name,
+            currency: account.currency,
+            wrapper: account.wrapper,
+            holder: account.holder,
+            cost_basis_method: account.cost_basis_method,
+            management_fees: account.management_fees_enabled,
+        }
+    }
 }
 
 /// An asset as a tool names it.
@@ -76,6 +92,8 @@ struct AssetRow {
     isin: Option<String>,
     exchange: Option<String>,
     archived: bool,
+    /// AGT-040 — whether it bears interest (AST-024), under the name `add_asset` takes.
+    interest_bearing: bool,
 }
 
 impl From<Asset> for AssetRow {
@@ -89,6 +107,7 @@ impl From<Asset> for AssetRow {
             isin: asset.isin,
             exchange: asset.exchange.map(|exchange| exchange.code),
             archived: asset.is_archived,
+            interest_bearing: asset.interest_bearing,
         }
     }
 }
@@ -253,17 +272,7 @@ impl AgentTools {
                     .get_all_by_name()
                     .await
                     .map_err(|error| unreadable("list_accounts", &error))?;
-                let rows: Vec<AccountRow> = accounts
-                    .into_iter()
-                    .map(|account| AccountRow {
-                        country: account.effective_country().to_string(),
-                        name: account.name,
-                        currency: account.currency,
-                        wrapper: account.wrapper,
-                        holder: account.holder,
-                        cost_basis_method: account.cost_basis_method,
-                    })
-                    .collect();
+                let rows: Vec<AccountRow> = accounts.into_iter().map(AccountRow::from).collect();
                 as_json(&rows)
             }
             "list_assets" => {
@@ -697,14 +706,7 @@ impl AgentTools {
         tracing::info!(target: BACKEND, session = granted.session_id, account = %created.id, "agent created an account");
         as_json(&serde_json::json!({
             "status": "created",
-            "account": AccountRow {
-                country: created.effective_country().to_string(),
-                name: created.name,
-                currency: created.currency,
-                wrapper: created.wrapper,
-                holder: created.holder,
-                cost_basis_method: created.cost_basis_method,
-            },
+            "account": AccountRow::from(created),
         }))
     }
 
