@@ -32,10 +32,11 @@ fn example(country: &str, asset_currency: &str, calls: Vec<Value>, at: &str, val
     })
 }
 
-/// An example whose account has management fees turned on (FEE), as the owner sets it.
+/// An example whose account has management fees turned on (FEE-075), named as `add_account`
+/// takes it (#944).
 fn with_management_fees(mut example: Value) -> Value {
     if let Some(fields) = example.as_object_mut() {
-        fields.insert("management_fees_enabled".to_string(), Value::Bool(true));
+        fields.insert("management_fees".to_string(), Value::Bool(true));
     }
     example
 }

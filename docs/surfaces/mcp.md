@@ -9,7 +9,11 @@ them.
 ## list_accounts
 
 AGT-040, AGT-102, AGT-076. Answer: one object per account, by name — `name`, `currency`, `country`
-(two letters: its own, or the portfolio's, ACC-042), `wrapper` (an identifier, or `null`), `holder` (or `null`) and `cost_basis_method` (`WeightedAverage` or `Fifo`, CBM-010).
+(two letters: its own, or the portfolio's, ACC-042), `wrapper` (an identifier, or `null`), `holder` (or `null`), `cost_basis_method` (`WeightedAverage` or `Fifo`, CBM-010) and `management_fees` (`true` or `false`, FEE-075) — the name `add_account` takes.
+
+## list_assets
+
+AGT-040. Input: `archived`, `true` to list the archived assets too, optional. Answer: one object per asset, by name — `name`, `reference`, `kind`, `class`, `currency`, `isin` (or `null`), `exchange` (a MIC code, or `null`), `archived` and `interest_bearing` (`true` or `false`, AST-024) — the name `add_asset` takes.
 
 ## list_lots
 
@@ -26,7 +30,7 @@ entity (`docs/spec/cost-basis.md`): `acquired_on`, `quantity`, `cost`, `remainin
 AGT-077. Input: none. Answer: `{ "status": "described", "scope", "rules" }` — `scope` says
 what the rules are and that no tax is computed; each rule is `{ "rules", "topic",
 "statement", "example" }`: the spec rules it states, a few words, the statement, and an
-example — `account_country`, `account_currency`, `asset_currency` (the accounts Example and Other are of that country and currency), `management_fees_enabled` when the example needs the account's management fees on, the `calls` in order (each `{ "tool",
+example — `account_country`, `account_currency`, `asset_currency` (the accounts Example and Other are of that country and currency), `management_fees: true` when the example needs the account's management fees on, left out otherwise — the argument `add_account` takes — the `calls` in order (each `{ "tool",
 "arguments" }`) and `answers`: `{ "at", "value" }`, the figure the last call answers at that
 JSON pointer.
 

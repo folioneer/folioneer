@@ -34,14 +34,14 @@ pub fn definitions() -> Vec<ToolDefinition> {
             name: "list_accounts",
             title: "List accounts",
             only_reads: true,
-            description: "The accounts, by name, each with its currency, its country (two letters), the identifier of its tax wrapper, or null, and its holder, or null. An account is named by its name in the other tools.",
+            description: "The accounts, by name, each with its currency, its country (two letters), the identifier of its tax wrapper, or null, its holder, or null, its cost basis method, and management_fees: whether record_management_fee is taken on it. An account is named by its name in the other tools.",
             input_schema: nothing(),
         },
         ToolDefinition {
             name: "list_assets",
             title: "List assets",
             only_reads: true,
-            description: "The assets a holding can be of, by name: reference, kind, class, currency, ISIN and exchange code. Cash is not listed.",
+            description: "The assets a holding can be of, by name: reference, kind, class, currency, ISIN, exchange code, whether it is archived, and interest_bearing: whether record_interest is taken on it. Cash is not listed.",
             input_schema: json!({
                 "type": "object",
                 "properties": {
