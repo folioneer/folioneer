@@ -144,6 +144,57 @@ pub fn definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
+            name: "get_rate",
+            title: "Get a currency rate",
+            only_reads: true,
+            description: "The rate the application holds for a pair of currencies at a date, or the closest earlier one: how many units of `to` one unit of `from` is worth, with its own date and its source: Manual (typed by the owner), Agent (recorded by an agent), or the provider it was fetched from (Frankfurter, Ecb). The reverse pair is never read in its place. status no_rate, with rate null, when the pair has none up to that date.",
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "from": { "type": "string", "description": "The currency converted from, ISO 4217 (USD)." },
+                    "to": { "type": "string", "description": "The currency converted to, ISO 4217 (EUR)." },
+                    "date": { "type": "string", "description": "YYYY-MM-DD, today or earlier. Default: today." }
+                },
+                "required": ["from", "to"],
+                "additionalProperties": false
+            }),
+        },
+        ToolDefinition {
+            name: "list_rates",
+            title: "List a pair's currency rates over a period",
+            only_reads: true,
+            description: "The rates the application holds for a pair of currencies, oldest first, 100 to a page, between two dates, both included, or over its whole history: each with its date, the rate and its source, as get_rate gives one. total says how many rates the dates keep.",
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "from": { "type": "string", "description": "The currency converted from, ISO 4217." },
+                    "to": { "type": "string", "description": "The currency converted to, ISO 4217." },
+                    "from_date": { "type": "string", "description": "Only from this date on, YYYY-MM-DD." },
+                    "to_date": { "type": "string", "description": "Only up to this date, YYYY-MM-DD." },
+                    "page": { "type": "integer", "description": "The page, from 1. Default: 1." }
+                },
+                "required": ["from", "to"],
+                "additionalProperties": false
+            }),
+        },
+        ToolDefinition {
+            name: "record_rate",
+            title: "Record a currency rate",
+            only_reads: false,
+            description: "Record the rate of a pair of currencies on a date, as a statement gives it: how many units of `to` one unit of `from` is worth. It replaces the rate the pair already has on that date, typed or fetched, and is marked Agent. A pair the application did not follow yet is followed from then on. It takes one place of the session's limit; the owner edits or deletes it in the Currency Rates view.",
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "from": { "type": "string", "description": "The currency converted from, ISO 4217 (USD)." },
+                    "to": { "type": "string", "description": "The currency converted to, ISO 4217 (EUR)." },
+                    "rate": { "type": ["string", "number"], "description": "Units of `to` per one unit of `from`, above zero." },
+                    "date": { "type": "string", "description": "YYYY-MM-DD, today or earlier. Default: today." }
+                },
+                "required": ["from", "to", "rate"],
+                "additionalProperties": false
+            }),
+        },
+        ToolDefinition {
             name: "record_opening_balance",
             title: "Record an opening balance",
             only_reads: false,

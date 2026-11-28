@@ -41,13 +41,13 @@ Represents a directed currency pair the system follows for valuation. A durable 
 
 Represents the value of one currency expressed in another on a specific date — the rate that converts an amount in `from_currency` into `to_currency`.
 
-| Field           | Business meaning                                                                                                                                                                                                           |
-| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `from_currency` | ISO 4217 code of the source currency — the currency an amount is converted **from** (e.g. the asset's native currency `"USD"`).                                                                                            |
-| `to_currency`   | ISO 4217 code of the target currency — the currency an amount is converted **into** (e.g. the account's currency `"EUR"`).                                                                                                 |
-| `date`          | The calendar date this rate observation applies to (ISO 8601, e.g. `2026-05-16`). The user's local calendar date at write time.                                                                                            |
-| `rate`          | How many units of `to_currency` one unit of `from_currency` is worth, as i64 micros (ADR-001). Example: 1 USD = 0.92 EUR is stored as `920000` for the pair `(USD, EUR)`.                                                  |
-| `source`        | Provenance of this rate (see FXR-100 for variants). `Manual` for user-entered values; a provider name (`Frankfurter`, `Ecb`) for fetched values. Metadata for traceability; never a read/write precedence input (ADR-012). |
+| Field           | Business meaning                                                                                                                                                                                                                                                              |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `from_currency` | ISO 4217 code of the source currency — the currency an amount is converted **from** (e.g. the asset's native currency `"USD"`).                                                                                                                                               |
+| `to_currency`   | ISO 4217 code of the target currency — the currency an amount is converted **into** (e.g. the account's currency `"EUR"`).                                                                                                                                                    |
+| `date`          | The calendar date this rate observation applies to (ISO 8601, e.g. `2026-05-16`). The user's local calendar date at write time.                                                                                                                                               |
+| `rate`          | How many units of `to_currency` one unit of `from_currency` is worth, as i64 micros (ADR-001). Example: 1 USD = 0.92 EUR is stored as `920000` for the pair `(USD, EUR)`.                                                                                                     |
+| `source`        | Provenance of this rate (see FXR-100 for variants). `Manual` for user-entered values; a provider name (`Frankfurter`, `Ecb`) for fetched values; `Agent` for a rate an AI agent recorded (FXR-103). Metadata for traceability; never a read/write precedence input (ADR-012). |
 
 > The combination `(from_currency, to_currency, date)` is unique: only one rate per directed pair per day. Recording a second rate for the same key overwrites the first regardless of either row's `source` (FXR-025, per ADR-012). The reverse pair `(to_currency, from_currency, date)` is a **separate** row and is not derived automatically.
 
@@ -98,7 +98,9 @@ This feature does not add fields to `HoldingDetail`; it changes the **conditions
 
 **FXR-024 — i64 storage (backend)**: The rate is stored as i64 micro-units per ADR-001. The frontend transmits the human-readable decimal; the backend converts to micros at the IPC boundary.
 
-**FXR-025 — Upsert by (from, to, date) (backend)**: If a rate already exists for the same `(from_currency, to_currency, date)`, it is overwritten with the new value regardless of either row's `source` (per ADR-012; latest-write-wins). Otherwise a new record is created. Transparent to the user; the form behaves identically for new and existing entries. The `source` written by this path is governed by FXR-101.
+**FXR-025 — Upsert by (from, to, date) (backend)**: If a rate already exists for the same `(from_currency, to_currency, date)`, it is overwritten with the new value regardless of either row's `source` (per ADR-012; latest-write-wins). Otherwise a new record is created. Transparent to the user; the form behaves identically for new and existing entries. The `source` written by this path is governed by FXR-101, and by FXR-103 for an AI agent's write.
+
+**FXR-025A — A rate's write creates its pair (backend)**: A rate written for a directed pair that is not yet persisted persists the pair first, as FXR-013 ensures one, and keeps it (FXR-014). This is the core's write, whoever makes it — the window's rate form (FXR-012, FXR-051) or an AI agent (AGT-104). It publishes `CurrencyRateUpdated` (FXR-026) and no `CurrencyPairUpdated` (FXR-056).
 
 **FXR-026 — CurrencyRateUpdated event (backend)**: After a successful upsert the backend publishes a bare `CurrencyRateUpdated` event on the event bus (no payload), consistent with `AssetPriceUpdated` and the other `*Updated` signals. It is published by the `currency` bounded context. The Tauri event discriminant string is `"CurrencyRateUpdated"`.
 
@@ -206,11 +208,13 @@ Historical valuations (yearly/monthly performance, as-of-date views) need a rate
 
 ### Source Field on CurrencyRate (100–109)
 
-**FXR-100 — CurrencyRateSource enum (backend)**: `CurrencyRate.source` is of type `CurrencyRateSource` with variants `Manual | Frankfurter | Ecb` (ADR-009), persisted as a SQLite text discriminant matching the variant name (consistent with `AssetPrice.source`). Exposed on the frontend wire surface.
+**FXR-100 — CurrencyRateSource enum (backend)**: `CurrencyRate.source` is of type `CurrencyRateSource` with variants `Manual | Frankfurter | Ecb` (ADR-009, the provider tiers) and `Agent` (FXR-103), persisted as a SQLite text discriminant matching the variant name (consistent with `AssetPrice.source`). Exposed on the frontend wire surface.
 
-**FXR-101 — source: Manual on user-driven paths (backend)**: Every user-driven write (manual record FXR-025, any manual edit FXR-052) sets `source = Manual`. A fetched row edited by the user therefore becomes `Manual`. The frontend never passes a source value.
+**FXR-101 — source: Manual on user-driven paths (backend)**: Every write the owner makes (manual record FXR-025, any manual edit FXR-052) sets `source = Manual`. A fetched row edited by the user therefore becomes `Manual`. The frontend never passes a source value.
 
 **FXR-102 — source: provider on fetched paths (backend)**: A write produced by the Frankfurter tier sets `source = Frankfurter`; a write produced by the ECB XML fallback sets `source = Ecb` (FXR-070).
+
+**FXR-103 — source: Agent on an AI agent's write (backend)**: A rate an AI agent records (AGT-104) sets `source = Agent`, which is its mark: it shows wherever a rate's source does, on this computer and on the owner's others. It upserts as any rate (FXR-025): the latest write wins, whatever the source of the rate it replaces, and the owner's next edit makes it `Manual` (FXR-101).
 
 ### Portfolio Settings and the Reference Currency (120–139)
 
@@ -265,6 +269,10 @@ Manual rate entry
              → upsert (from,to,date), latest-write-wins, source=Manual (FXR-025/101)
              → publish CurrencyRateUpdated                              (FXR-026)
     → Account Details / Performance re-fetch                            (FXR-036)
+
+AI agent's rate (AGT-104)
+    → same checks and upsert, the pair created if new, source=Agent   (FXR-021–025A, FXR-103)
+    → publish CurrencyRateUpdated                                       (FXR-026)
 
 Rate refresh at launch (FXR-075)
     → ensure a pair exists for each active foreign holding              (FXR-013)

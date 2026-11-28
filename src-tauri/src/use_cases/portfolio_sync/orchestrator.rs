@@ -147,16 +147,19 @@ impl PortfolioSyncOrchestrator {
             return Ok(true);
         }
         // A declared pair alone is no user data: the rebuild replaces it (SYN-083). A rate
-        // the user typed is.
+        // the user typed is, and so is one an AI agent recorded (FXR-103); a fetched one
+        // is not.
         for pair in self.currency_service.list_currency_pairs().await? {
             let rates = self
                 .currency_service
                 .list_currency_rates(pair.from_currency, pair.to_currency)
                 .await?;
-            if rates
-                .iter()
-                .any(|rate| rate.source == CurrencyRateSource::Manual)
-            {
+            if rates.iter().any(|rate| {
+                matches!(
+                    rate.source,
+                    CurrencyRateSource::Manual | CurrencyRateSource::Agent
+                )
+            }) {
                 return Ok(true);
             }
         }
@@ -625,6 +628,34 @@ mod tests {
             holds_user_data().await,
             "a rate the user typed is user data"
         );
+    }
+
+    // SYN-014 (#887) — a rate an AI agent recorded is user data, as a typed one is.
+    #[tokio::test]
+    async fn syn_014_a_rate_an_agent_recorded_is_user_data() {
+        let pool = make_pool().await;
+        let dir = tempfile::tempdir().unwrap();
+        let ctx = build_ctx_with_state_repo(
+            &pool,
+            Arc::new(SqliteSyncStateRepository::new(pool.clone())),
+            Arc::new(crate::context::sync::FsFolderStore::new(dir.path())),
+        );
+        ctx.orchestrator
+            .currency_service
+            .record_currency_rate_by_agent(
+                "USD".to_string(),
+                "EUR".to_string(),
+                "2024-01-02".to_string(),
+                920_000,
+            )
+            .await
+            .unwrap();
+        let state = ctx
+            .orchestrator
+            .inspect_sync_folder(dir.path().to_string_lossy().to_string())
+            .await
+            .expect("inspect_sync_folder never rejects");
+        assert!(state.installation_holds_user_data);
     }
 
     // SYN-019 — a fresh installation and a missing folder: the problem is reported, never

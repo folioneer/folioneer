@@ -97,3 +97,39 @@ transfer as TRF-060 reads it. `TransactionChanged`: one of the four changed, or 
 would move another cost, between the check and the write; `TransactionNotFound`: one removed
 in that gap; `DatabaseError`: a write that fails, or, its reason saying the transfer was
 recorded, a transfer that could not be read back.
+
+## get_rate
+
+AGT-103. Input: `from` and `to`, two currency codes, case ignored; `date`, `YYYY-MM-DD`,
+optional, today when left out. `MissingArgument`: `from` or `to` missing, empty or not text.
+`InvalidCurrency`: a code that is not ISO 4217. `IdentityPair`: two equal codes.
+`InvalidDate`: a date that is not a date, not text included, or in the future.
+`DatabaseError`: a read that fails. Answer: `{ "status", "from", "to", "date", "rate" }` —
+`status` `rated`, or `no_rate` with `rate` `null`; the codes in capitals; the date asked;
+`rate`, the rate of that date or the closest earlier one, `{ "date", "rate", "source" }`:
+its own date, the rate as decimal text and its source, `Manual`, `Frankfurter`, `Ecb` or
+`Agent`.
+
+## record_rate
+
+AGT-104. Input: `from` and `to`, two currency codes, case ignored; `rate`, a figure (text or
+a JSON number, AGT-048), `to` per one `from`; `date`, `YYYY-MM-DD`, optional, today when
+left out. `MissingArgument`: `from`, `to` or `rate` missing or empty, or `from` or `to` not
+text. `InvalidFigure`: a rate that is not a figure. `InvalidArguments`: a date that is not
+text. The rate's own refusals (FXR-021–023): `InvalidCurrency` for a code that is not
+ISO 4217, `IdentityPair` for two equal codes, `NotPositive` for a rate not above zero,
+`RateOutOfRange` past the bound, `DateInFuture`, `InvalidDateFormat`. `SessionLimitReached`
+(AGT-047). Answer: `{ "status": "recorded", "from", "to", "rate" }`, the rate as `get_rate`
+gives one, its source `Agent`.
+
+## list_rates
+
+AGT-105. Input: `from` and `to`, two currency codes, case ignored; `from_date` and
+`to_date`, optional, `YYYY-MM-DD`, both included; `page`, a JSON whole number from 1,
+optional, the first when left out. `MissingArgument`, `InvalidCurrency`, `IdentityPair` and
+`DatabaseError` as `get_rate`'s. `InvalidDate`: a bound that is not a date, not text
+included — a bound in the future, or a start after the end, keeps no rate and is not
+refused. `InvalidArguments`: a page that is not a whole number from 1, text of digits
+included. Answer: `{ "status": "listed", "from", "to", "total", "page", "pages", "rates" }`
+— the rates oldest first, 100 to a page, each as `get_rate` gives one; `pages` 0 when
+`total` is 0.

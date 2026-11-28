@@ -1277,6 +1277,7 @@
     "source_manual": "Manuel",
     "source_frankfurter": "Frankfurter",
     "source_ecb": "BCE",
+    "source_agent": "Agent IA",
     "error": {
       "from_required": "La devise source est requise.",
       "to_required": "La devise cible est requise.",

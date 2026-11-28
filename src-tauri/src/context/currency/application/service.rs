@@ -323,13 +323,86 @@ impl CurrencyService {
         date: String,
         rate_micros: i64,
     ) -> StdResult<CurrencyRate, CurrencyError> {
-        let rate = CurrencyRate::new(
+        self.write_rate(
             from_currency,
             to_currency,
             date,
             rate_micros,
             CurrencyRateSource::Manual,
-        )?;
+        )
+        .await
+    }
+
+    /// AGT-104 — records the rate an AI agent gave, as the window's form records one,
+    /// with the source `Agent` (FXR-103).
+    pub async fn record_currency_rate_by_agent(
+        &self,
+        from_currency: String,
+        to_currency: String,
+        date: String,
+        rate_micros: i64,
+    ) -> StdResult<CurrencyRate, CurrencyError> {
+        self.write_rate(
+            from_currency,
+            to_currency,
+            date,
+            rate_micros,
+            CurrencyRateSource::Agent,
+        )
+        .await
+    }
+
+    /// AGT-103 — the rate a pair holds on `as_of` or the closest earlier one (FXR-035),
+    /// with its own date and its source; the pair's codes checked first (FXR-023).
+    pub async fn rate_as_of(
+        &self,
+        from_currency: &str,
+        to_currency: &str,
+        as_of: &str,
+    ) -> StdResult<Option<CurrencyRate>, CurrencyError> {
+        CurrencyPair::new(from_currency.to_string(), to_currency.to_string())?;
+        self.rate_repo
+            .latest_rate_on_or_before(from_currency, to_currency, as_of)
+            .await
+            .map_err(|e| {
+                tracing::error!(target: BACKEND, err = ?e, "rate_as_of: repository failure");
+                CurrencyError::DatabaseError
+            })
+    }
+
+    /// AGT-105 — the rates of a pair whose dates the two optional bounds keep, both
+    /// included, oldest first (FXR-050); the pair's codes checked first (FXR-023).
+    pub async fn rates_between(
+        &self,
+        from_currency: &str,
+        to_currency: &str,
+        from_date: Option<&str>,
+        to_date: Option<&str>,
+    ) -> StdResult<Vec<CurrencyRate>, CurrencyError> {
+        CurrencyPair::new(from_currency.to_string(), to_currency.to_string())?;
+        let mut kept: Vec<CurrencyRate> = self
+            .list_currency_rates(from_currency.to_string(), to_currency.to_string())
+            .await?
+            .into_iter()
+            .filter(|rate| {
+                from_date.is_none_or(|from| rate.date.as_str() >= from)
+                    && to_date.is_none_or(|to| rate.date.as_str() <= to)
+            })
+            .collect();
+        kept.sort_by(|a, b| a.date.cmp(&b.date));
+        Ok(kept)
+    }
+
+    /// FXR-025 / FXR-013 — validates and upserts a rate with its source, ensuring its pair.
+    async fn write_rate(
+        &self,
+        from_currency: String,
+        to_currency: String,
+        date: String,
+        rate_micros: i64,
+        source: CurrencyRateSource,
+    ) -> StdResult<CurrencyRate, CurrencyError> {
+        let rate = CurrencyRate::new(from_currency, to_currency, date, rate_micros, source)?;
 
         // The rate's currencies are already validated by `CurrencyRate::new`, so the
         // pair is reconstructed without re-validation (FXR-013 ensure-pair side-effect).

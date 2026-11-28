@@ -82,9 +82,10 @@ struct CurrencyRate {
 
 // CurrencyRateSource (FXR-100) — text discriminant matching the variant name, like AssetPriceSource.
 enum CurrencyRateSource {
-    Manual,        // user-driven write (record/update) — FXR-101
+    Manual,        // a write the owner makes (record/update) — FXR-101
     Frankfurter,   // Frankfurter fetch tier — FXR-102
     Ecb,           // ECB XML fallback fetch tier — FXR-102
+    Agent,         // recorded by an AI agent the owner allowed — FXR-103, AGT-104
 }
 
 // Row returned by get_currency_pairs (FXR-051): a pair enriched with its most-recent rate
@@ -104,11 +105,11 @@ struct CurrencyPairSummary {
 
 ### Published
 
-| Event                      | Payload | Rule                                                                                                                                                    |
-| -------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `CurrencyRateUpdated`      | —       | FXR-026 (record), FXR-052 (edit), FXR-053 (delete), FXR-074 (fetch) — bare signal, discriminant `"CurrencyRateUpdated"`, published by the `currency` BC |
-| `CurrencyPairUpdated`      | —       | FXR-054 (declare) — bare signal, discriminant `"CurrencyPairUpdated"`, published by the `currency` BC                                                   |
-| `ReferenceCurrencyUpdated` | —       | FXR-126 (choose) — bare signal, discriminant `"ReferenceCurrencyUpdated"`, published by the `currency` BC                                               |
+| Event                      | Payload | Rule                                                                                                                                                                                   |
+| -------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CurrencyRateUpdated`      | —       | FXR-026 (record), FXR-052 (edit), FXR-053 (delete), FXR-074 (fetch), AGT-104 (an AI agent's write) — bare signal, discriminant `"CurrencyRateUpdated"`, published by the `currency` BC |
+| `CurrencyPairUpdated`      | —       | FXR-054 (declare) — bare signal, discriminant `"CurrencyPairUpdated"`, published by the `currency` BC                                                                                  |
+| `ReferenceCurrencyUpdated` | —       | FXR-126 (choose) — bare signal, discriminant `"ReferenceCurrencyUpdated"`, published by the `currency` BC                                                                              |
 
 ### Subscribed (frontend re-fetch triggers)
 
@@ -132,6 +133,7 @@ struct CurrencyPairSummary {
 
 ## Changelog
 
+- 2026-11-28 — #887 (FXR-100, FXR-103): `CurrencyRateSource` gains `Agent`, the source of a rate an AI agent records (AGT-104); it reaches the window through `get_currency_rates` and `get_currency_pairs` (`latest_rate_source`). No command changed.
 - 2026-11-07 — #748 (FXR-021, SYN-034): `CurrencyError` gains `RateOutOfRange`, a rate above a trillion, refused by `record_currency_rate` and `update_currency_rate`.
 - 2026-10-18 — TODO-032 (FXR-120–129): `get_reference_currency`, `set_reference_currency`, type `ReferenceCurrency`, event `ReferenceCurrencyUpdated`.
 - 2026-10-18 — TODO-032 (FXR-015): the rate commands also ensure each account's pair to the reference currency. No signature changed.
