@@ -202,10 +202,11 @@ pub enum Outcome {
         /// A notice to raise, when this outcome is reportable (CFR-060).
         notice: Option<NoticeDraft>,
     },
-    /// The change is dropped — its account stands removed (CFR-032). Always reportable.
+    /// The change is dropped — its account stands removed (CFR-032). Reportable when the
+    /// user made it (CFR-060).
     Drop {
-        /// The notice raised on the device whose change is dropped.
-        notice: NoticeDraft,
+        /// The notice raised on the device whose change is dropped, when the user made it.
+        notice: Option<NoticeDraft>,
     },
     /// The change refers to something this device has not received yet (SYN-041).
     HoldBack {
@@ -422,10 +423,28 @@ pub fn decide_seen(
         }
         _ => resolve_seen(incoming, current, based_on_received),
     };
-    let identical = current_content.is_some() && current_content == incoming.content.as_deref();
+    let identical = current_content.is_some_and(|content| {
+        same_content(
+            incoming.record_kind,
+            Some(content),
+            incoming.content.as_deref(),
+        )
+    });
     let mut notices: Vec<NoticeDraft> = notice_for(&outcome).into_iter().collect();
     if let (Some(RecordState::Live(current_rank)), Some(content)) = (current, current_content) {
-        if incoming.operation == Operation::Created && incoming.based_on.is_none() {
+        // CFR-034 / CFR-050 — an observation's or a catch-up position's same identity is
+        // never a collision: they merge by their own rules.
+        let merged_by_own_rule = matches!(
+            incoming.record_kind,
+            RecordKind::AssetPrice
+                | RecordKind::ReportedSplit
+                | RecordKind::CurrencyRate
+                | RecordKind::FeeCatchUpPosition
+        );
+        if incoming.operation == Operation::Created
+            && incoming.based_on.is_none()
+            && !merged_by_own_rule
+        {
             let held = Change {
                 device_id: current_rank.device_id.clone(),
                 record_kind: incoming.record_kind,
@@ -441,7 +460,9 @@ pub fn decide_seen(
             }
         }
     }
-    if identical {
+    // CFR-021 identical changes, and CFR-060 a portfolio setting chosen apart: the later
+    // choice wins silently.
+    if identical || incoming.record_kind == RecordKind::PortfolioSetting {
         notices.clear();
     }
     let outcome = match outcome {
@@ -617,17 +638,25 @@ fn drop_if_parent_tombstoned(
     match parent_state {
         Some(RecordState::Tombstone(removal)) if change.operation != Operation::Removed => {
             Some(Outcome::Drop {
-                notice: NoticeDraft {
+                notice: reported_when_dropped(change.record_kind).then(|| NoticeDraft {
                     kind: ConflictNoticeKind::DroppedChild,
                     record_kind: change.record_kind,
                     record_identity: change.record_identity.clone(),
                     other_device_id: removal.device_id.clone(),
                     raised_on_device_id: change.device_id.clone(),
-                },
+                }),
             })
         }
         _ => None,
     }
+}
+
+/// CFR-032 / CFR-060 — whether losing a child of a removed account is reported: a
+/// transaction, a holding note or a fee schedule is; a fee schedule's catch-up position,
+/// which merges by its own rule (CFR-044), is dropped silently. Both paths ask it: a child arriving on a removed account, and an account's
+/// removal arriving over its children.
+pub fn reported_when_dropped(kind: RecordKind) -> bool {
+    kind != RecordKind::FeeCatchUpPosition
 }
 
 /// CFR-034 — a natural-key collision: an incoming creation (`based_on` absent) for an
@@ -639,7 +668,11 @@ pub fn collision_notice(incoming: &Change, current: &Change) -> Option<(NoticeDr
     if incoming.based_on.is_some()
         || incoming.origin != Origin::User
         || current.origin != Origin::User
-        || incoming.content == current.content
+        || same_content(
+            incoming.record_kind,
+            incoming.content.as_deref(),
+            current.content.as_deref(),
+        )
     {
         return None;
     }
@@ -651,6 +684,28 @@ pub fn collision_notice(incoming: &Change, current: &Change) -> Option<(NoticeDr
         raised_on_device_id: raised_on.device_id.clone(),
     };
     Some((draft(current, incoming), draft(incoming, current)))
+}
+
+/// CFR-021 — two contents are the same record's same state: equal, or for a fee schedule —
+/// identified by its holding (FEE-031) — equal but for the id each device gave it.
+fn same_content(kind: RecordKind, left: Option<&str>, right: Option<&str>) -> bool {
+    if left == right {
+        return true;
+    }
+    if kind != RecordKind::FeeSchedule {
+        return false;
+    }
+    let without_id = |content: Option<&str>| {
+        content
+            .and_then(|text| serde_json::from_str::<serde_json::Value>(text).ok())
+            .map(|mut value| {
+                if let Some(fields) = value.as_object_mut() {
+                    fields.remove("id");
+                }
+                value
+            })
+    };
+    matches!((without_id(left), without_id(right)), (Some(a), Some(b)) if a == b)
 }
 
 /// CFR-035 — two accounts or categories left with the same display name after a merge:
@@ -679,7 +734,7 @@ pub fn duplicate_name_notice(
 pub fn notice_for(outcome: &Outcome) -> Option<NoticeDraft> {
     match outcome {
         Outcome::Apply { notice } | Outcome::Ignore { notice } => notice.clone(),
-        Outcome::Drop { notice } => Some(notice.clone()),
+        Outcome::Drop { notice } => notice.clone(),
         Outcome::HoldBack { .. } | Outcome::MergeMax => None,
     }
 }
@@ -1301,6 +1356,142 @@ mod tests {
         );
     }
 
+    // CFR-011 (#731) — the spec's scenario: Desktop ignored Laptop's automatic update (its
+    // own edit outranks it); Laptop's user then renames, based on that update. Desktop does
+    // not wait for the update it ignored: the rename is concurrent with Desktop's edit, the
+    // later prevails, and Desktop — whose edit lost — is told.
+    #[test]
+    fn cfr_011_a_change_based_on_an_ignored_state_overrules_and_tells_the_device() {
+        let desktop_edit = RecordState::Live(rank("desktop", Origin::User, 1_000));
+        let laptop_rename = change(
+            "laptop",
+            RecordKind::Account,
+            "account-pea",
+            Operation::Updated,
+            Origin::User,
+            1_010,
+            Some(1_005),
+            Some("{\"name\":\"PEA Bourso\"}"),
+        );
+        let decision = decide_seen(
+            &laptop_rename,
+            Some(&desktop_edit),
+            Some("{\"name\":\"PEA Boursorama\"}"),
+            true,
+        );
+        assert!(
+            matches!(decision.outcome, Outcome::Apply { .. }),
+            "{:?}",
+            decision.outcome
+        );
+        assert_eq!(decision.notices.len(), 1, "{:?}", decision.notices);
+        let notice = &decision.notices[0];
+        assert_eq!(notice.kind, ConflictNoticeKind::OverruledEdit);
+        assert_eq!(notice.raised_on_device_id, "desktop");
+        assert_eq!(notice.other_device_id, "laptop");
+    }
+
+    // CFR-050 / CFR-034 (#731) — two user-typed prices for one asset and date are
+    // observations: the later wins and nothing is reported, never a collision.
+    #[test]
+    fn cfr_050_two_user_prices_on_one_date_raise_no_collision() {
+        let laptop_price = change(
+            "laptop",
+            RecordKind::AssetPrice,
+            "asset-cw8:2026-03-02",
+            Operation::Created,
+            Origin::User,
+            1_010,
+            None,
+            Some("{\"price\":510000000}"),
+        );
+        let held = RecordState::Live(rank("desktop", Origin::User, 1_000));
+        let decision = decide(&laptop_price, Some(&held), Some("{\"price\":500000000}"));
+        assert!(decision.notices.is_empty(), "{:?}", decision.notices);
+    }
+
+    // CFR-060 (#731) — two devices choosing a portfolio setting apart: the later choice wins
+    // silently, whether both created it or one changed it.
+    #[test]
+    fn cfr_060_a_portfolio_setting_chosen_apart_is_never_reported() {
+        let held = RecordState::Live(rank("desktop", Origin::User, 1_000));
+        let created = change(
+            "laptop",
+            RecordKind::PortfolioSetting,
+            "reference_currency",
+            Operation::Created,
+            Origin::User,
+            1_010,
+            None,
+            Some("{\"value\":\"USD\"}"),
+        );
+        let decision = decide(&created, Some(&held), Some("{\"value\":\"EUR\"}"));
+        assert!(decision.notices.is_empty(), "{:?}", decision.notices);
+        let changed = change(
+            "laptop",
+            RecordKind::PortfolioSetting,
+            "reference_currency",
+            Operation::Updated,
+            Origin::User,
+            990,
+            Some(980),
+            Some("{\"value\":\"USD\"}"),
+        );
+        let decision = decide(&changed, Some(&held), Some("{\"value\":\"EUR\"}"));
+        assert!(decision.notices.is_empty(), "{:?}", decision.notices);
+    }
+
+    // CFR-021 (#731) — two fee schedules for one holding with the same settings are the same
+    // content, each carrying its own id: no collision.
+    #[test]
+    fn cfr_021_identical_fee_schedules_with_their_own_ids_are_no_collision() {
+        let laptop_schedule = change(
+            "laptop",
+            RecordKind::FeeSchedule,
+            "account-av:asset-uc1",
+            Operation::Created,
+            Origin::User,
+            1_010,
+            None,
+            Some("{\"id\":\"schedule-laptop\",\"rate\":750000,\"frequency\":\"Monthly\"}"),
+        );
+        let held = RecordState::Live(rank("desktop", Origin::User, 1_000));
+        let decision = decide(
+            &laptop_schedule,
+            Some(&held),
+            Some("{\"id\":\"schedule-desktop\",\"rate\":750000,\"frequency\":\"Monthly\"}"),
+        );
+        assert!(decision.notices.is_empty(), "{:?}", decision.notices);
+    }
+
+    // CFR-032 / CFR-060 (#731) — a catch-up position on a removed account is dropped
+    // silently, on both paths; every child CFR-032 lists is reported.
+    #[test]
+    fn cfr_032_a_catch_up_position_is_dropped_without_a_notice() {
+        let account_tombstone = RecordState::Tombstone(rank("desktop", Origin::User, 1_030));
+        let position = change(
+            "laptop",
+            RecordKind::FeeCatchUpPosition,
+            "account-old-av:asset-uc1",
+            Operation::Updated,
+            Origin::Application,
+            1_010,
+            None,
+            Some("{\"account_id\":\"account-old-av\"}"),
+        );
+        let outcome =
+            drop_if_parent_tombstoned(&position, Some(&account_tombstone)).expect("dropped");
+        assert_eq!(notice_for(&outcome), None);
+        assert!(!reported_when_dropped(RecordKind::FeeCatchUpPosition));
+        for kind in [
+            RecordKind::Transaction,
+            RecordKind::HoldingNote,
+            RecordKind::FeeSchedule,
+        ] {
+            assert!(reported_when_dropped(kind), "{kind:?}");
+        }
+    }
+
     // CFR-032 — a child of a removed account is dropped and reported: Laptop's buy on an
     // account Desktop deleted is dropped on Desktop, and Laptop's own buy is removed with
     // the account it lost — reported on Laptop only.
@@ -1321,7 +1512,9 @@ mod tests {
             drop_if_parent_tombstoned(&laptop_buy_on_deleted_account, Some(&account_tombstone))
                 .expect("a child of a tombstoned account must be dropped");
         match outcome {
-            Outcome::Drop { notice } => {
+            Outcome::Drop {
+                notice: Some(notice),
+            } => {
                 assert_eq!(notice.other_device_id, "desktop");
                 assert_eq!(notice.kind, ConflictNoticeKind::DroppedChild);
             }
@@ -1703,13 +1896,13 @@ mod tests {
         assert!(notice_for(&overruled_edit).is_some());
 
         let dropped_child = Outcome::Drop {
-            notice: NoticeDraft {
+            notice: Some(NoticeDraft {
                 kind: ConflictNoticeKind::DroppedChild,
                 record_kind: RecordKind::Transaction,
                 record_identity: "tx-1".into(),
                 other_device_id: "desktop".into(),
                 raised_on_device_id: "laptop".into(),
-            },
+            }),
         };
         assert!(notice_for(&dropped_child).is_some());
 

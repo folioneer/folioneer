@@ -290,8 +290,8 @@ mod tests {
         pair_repo
             .expect_upsert_pair()
             .times(1)
-            .withf(|pair| pair.from_currency == "USD" && pair.to_currency == "EUR")
-            .returning(Ok);
+            .withf(|pair, _| pair.from_currency == "USD" && pair.to_currency == "EUR")
+            .returning(|pair, _| Ok(pair));
         pair_repo
             .expect_list_pairs_with_latest_rate()
             .returning(|| Ok(vec![]));

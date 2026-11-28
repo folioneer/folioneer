@@ -658,7 +658,7 @@ mod tests {
     /// which these runs accept; no rate is fetched without a history provider.
     fn make_currency_service() -> Arc<CurrencyService> {
         let mut pair_repo = MockCurrencyPairRepository::new();
-        pair_repo.expect_upsert_pair().returning(Ok);
+        pair_repo.expect_upsert_pair().returning(|pair, _| Ok(pair));
         pair_repo
             .expect_list_pairs_with_latest_rate()
             .returning(|| Ok(vec![]));
@@ -672,7 +672,7 @@ mod tests {
     /// once: its pair list is read by that refresh, and checked when the run is dropped.
     fn currency_service_refreshing_rates_once() -> Arc<CurrencyService> {
         let mut pair_repo = MockCurrencyPairRepository::new();
-        pair_repo.expect_upsert_pair().returning(Ok);
+        pair_repo.expect_upsert_pair().returning(|pair, _| Ok(pair));
         pair_repo
             .expect_list_pairs_with_latest_rate()
             .times(1)
@@ -1546,7 +1546,7 @@ mod tests {
                 }]))
             });
         let mut pair_repo = MockCurrencyPairRepository::new();
-        pair_repo.expect_upsert_pair().returning(Ok);
+        pair_repo.expect_upsert_pair().returning(|pair, _| Ok(pair));
         pair_repo
             .expect_list_pairs_with_latest_rate()
             .returning(|| Ok(vec![]));
@@ -1645,7 +1645,7 @@ mod tests {
                 }]))
             });
         let mut pair_repo = MockCurrencyPairRepository::new();
-        pair_repo.expect_upsert_pair().returning(Ok);
+        pair_repo.expect_upsert_pair().returning(|pair, _| Ok(pair));
         pair_repo
             .expect_list_pairs_with_latest_rate()
             .returning(|| Ok(vec![]));
@@ -1780,7 +1780,7 @@ mod tests {
             .expect_fetch_daily_closes()
             .returning(move |symbol, _, _| answer(symbol));
         let mut pair_repo = MockCurrencyPairRepository::new();
-        pair_repo.expect_upsert_pair().returning(Ok);
+        pair_repo.expect_upsert_pair().returning(|pair, _| Ok(pair));
         pair_repo
             .expect_list_pairs_with_latest_rate()
             .returning(|| Ok(vec![]));

@@ -1280,6 +1280,63 @@ mod tests {
         assert_eq!(report.applied_changes, 1, "the user's rename prevails");
     }
 
+    // CFR-032 / CFR-060 (#731) — an account's removal arrives over its children this device
+    // last edited: the transaction lost is reported, its catch-up position goes silently.
+    #[tokio::test]
+    async fn an_accounts_removal_reports_a_lost_transaction_not_a_catch_up_position() {
+        let pool = make_pool().await;
+        seed_sync_device(&pool, "desktop-device").await;
+        let state_repo: Arc<dyn SyncStateRepository> =
+            Arc::new(SqliteSyncStateRepository::new(pool.clone()));
+        // Sequential: based on the state this device holds, so only the children are told.
+        let removal = SegmentChange {
+            operation: Operation::Removed,
+            based_on: Some(format!("{:020}", 5)),
+            content: None,
+            ..laptop_change(RecordKind::Account, "account-1", "{}")
+        };
+        let folder_store = folder_with_laptop_segment(removal);
+        let own_rank = crate::shared::domain::Rank {
+            origin: Origin::User,
+            logical_timestamp: crate::shared::domain::LogicalTimestamp::new(5),
+            device_id: "desktop-device".into(),
+        };
+        let mut applier = MockChangeApplier::new();
+        let account_rank = own_rank.clone();
+        applier.expect_live_record().returning(move |_, _, _| {
+            Ok(Some(crate::shared::domain::SyncedRecord {
+                rank: Some(account_rank.clone()),
+                content: r#"{"id":"account-1","name":"Courant","currency":"EUR"}"#.into(),
+            }))
+        });
+        let child_rank = own_rank.clone();
+        applier.expect_children_of_account().returning(move |_, _| {
+            Ok(vec![
+                crate::shared::domain::SyncedChild {
+                    record_kind: RecordKind::Transaction,
+                    record_identity: "tx-1".into(),
+                    rank: Some(child_rank.clone()),
+                },
+                crate::shared::domain::SyncedChild {
+                    record_kind: RecordKind::FeeCatchUpPosition,
+                    record_identity: "account-1:asset-1".into(),
+                    rank: Some(child_rank.clone()),
+                },
+            ])
+        });
+        applier
+            .expect_clashing_name()
+            .returning(|_, _, _, _| Ok(None));
+        applier.expect_write().returning(|_, _| Ok(()));
+        let run = run_over(&pool, Arc::clone(&state_repo), folder_store);
+
+        let report = run.run(&device(), &applier).await.expect("run");
+        assert_eq!(
+            report.notices_raised, 1,
+            "the transaction, not the position"
+        );
+    }
+
     // SYN-065 — a full run applies another device's segment through the applier, counts
     // it, and advances that device's cursor in the same transaction.
     #[tokio::test]
