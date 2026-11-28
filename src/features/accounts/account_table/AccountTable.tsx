@@ -79,6 +79,8 @@ export function AccountTable({ searchTerm, onAccountClick }: AccountTableProps) 
     hasNoSearchResults,
     deleteData,
     deleteSummary,
+    deleteDialog,
+    deleteError,
     fetchingSummaryFor,
     editData,
     actionError,
@@ -92,7 +94,7 @@ export function AccountTable({ searchTerm, onAccountClick }: AccountTableProps) 
     onAccountClick,
   );
 
-  // ACC-032 — the portfolio total shows only while every account is listed.
+  // ACC-032 — the portfolio total, every account's, hides while a search filters the list.
   const showPortfolioTotal =
     !loading &&
     !isEmpty &&
@@ -218,7 +220,7 @@ export function AccountTable({ searchTerm, onAccountClick }: AccountTableProps) 
   );
   return (
     <div className="m3-table-container flex-1">
-      {/* R13 — inline action error with dismiss */}
+      {/* ACC-019A — a failure before any dialog opens, told above the table, dismissable */}
       {actionError && (
         <div
           role="alert"
@@ -392,16 +394,9 @@ export function AccountTable({ searchTerm, onAccountClick }: AccountTableProps) 
                 </span>
               </td>
             </tr>
-          ) : isEmpty ? (
-            // R11 — empty state distinct from no-search-results
-            <tr>
-              <td colSpan={8} className="m3-td text-center py-12 text-m3-on-surface-variant italic">
-                {t("account.empty")}
-              </td>
-            </tr>
           ) : fetchError ? (
-            // R12 — error state with retry (only shown when accounts exist but failed to reload)
-            <tr>
+            // ACC-013B — a failed read, the first one included, shows the error and its Retry
+            <tr id="account-table-error">
               <td colSpan={8} className="m3-td text-center py-12">
                 <div className="flex flex-col items-center gap-3">
                   <span className="text-m3-error text-sm">{t("account.error_load")}</span>
@@ -411,8 +406,15 @@ export function AccountTable({ searchTerm, onAccountClick }: AccountTableProps) 
                 </div>
               </td>
             </tr>
+          ) : isEmpty ? (
+            // ACC-012 — empty state distinct from no-search-results
+            <tr>
+              <td colSpan={8} className="m3-td text-center py-12 text-m3-on-surface-variant italic">
+                {t("account.empty")}
+              </td>
+            </tr>
           ) : hasNoSearchResults ? (
-            // R10 — no search results (filter active, no match)
+            // ACC-011 — no search results (filter active, no match)
             <tr>
               <td colSpan={8} className="m3-td text-center py-12 text-m3-on-surface-variant italic">
                 {t("account.no_search_results")}
@@ -486,9 +488,9 @@ export function AccountTable({ searchTerm, onAccountClick }: AccountTableProps) 
 
       <EditAccountModal isOpen={!!editData} onClose={handleEditClose} account={editData} />
 
-      {/* ACC-018 — standard confirmation dialog for accounts with no holdings */}
+      {/* ACC-018 — standard confirmation dialog for an account never used */}
       <ConfirmationDialog
-        isOpen={!!deleteData && (deleteSummary?.holding_count ?? 0) === 0}
+        isOpen={deleteDialog === "standard"}
         onCancel={handleDeleteCancel}
         onConfirm={handleDeleteConfirm}
         title={t("account.delete_confirm_title")}
@@ -498,10 +500,12 @@ export function AccountTable({ searchTerm, onAccountClick }: AccountTableProps) 
         confirmLabel={t("action.delete")}
         cancelLabel={t("action.cancel")}
         variant="danger"
+        confirmId="confirm-delete-account"
+        error={deleteError && t(deleteError.key, deleteError.vars)}
       />
-      {/* ACC-019 — reinforced confirmation dialog for accounts with active holdings */}
+      {/* ACC-019 — reinforced confirmation dialog for an account with a transaction */}
       <ConfirmationDialog
-        isOpen={!!deleteData && (deleteSummary?.holding_count ?? 0) > 0}
+        isOpen={deleteDialog === "reinforced"}
         onCancel={handleDeleteCancel}
         onConfirm={handleDeleteConfirm}
         title={t("account.delete_confirm_title")}
@@ -513,6 +517,8 @@ export function AccountTable({ searchTerm, onAccountClick }: AccountTableProps) 
         confirmLabel={t("action.delete")}
         cancelLabel={t("action.cancel")}
         variant="danger"
+        confirmId="confirm-delete-account"
+        error={deleteError && t(deleteError.key, deleteError.vars)}
       />
     </div>
   );

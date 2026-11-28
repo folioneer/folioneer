@@ -462,6 +462,29 @@ describe("AccountTable — portfolio total row (ACC-027–032)", () => {
 });
 
 // ACC-046 — the accounts list by wrapper.
+// ACC-013B (#446) — a first read that fails, before any account is known, shows the error
+// and its Retry, never the empty state.
+describe("AccountTable — a failed first read (ACC-013B)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockIsLoading.mockReturnValue(false);
+    mockTotal.mockReturnValue(null);
+  });
+  afterEach(() => {
+    mockError.mockReturnValue(null);
+  });
+
+  it("shows the error and Retry instead of the empty state", () => {
+    mockSummaries.mockReturnValue([]);
+    mockError.mockReturnValue({ key: "error.DatabaseError" });
+    render(<AccountTable searchTerm="" onAccountClick={vi.fn()} />);
+    expect(screen.getByText("account.error_load")).toBeInTheDocument();
+    expect(screen.queryByText("account.empty")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "action.retry" }));
+    expect(mockRefetch).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("AccountTable — wrapper (ACC-046)", () => {
   beforeEach(() => {
     vi.clearAllMocks();

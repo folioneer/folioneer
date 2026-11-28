@@ -143,7 +143,7 @@ The Price column says where the price of an asset of that kind is expected to co
 | Status    | "Archived" badge if `is_archived = true`; "Managed by Folioneer" on a Cash Asset (CSH-015) | No       |
 | Actions   | See AST-013, AST-019, AST-020                                                              | No       |
 
-The table displays only active assets (`is_archived = false`) by default. A page header shows the title "Assets" and the total active asset count.
+The table displays only active assets (`is_archived = false`) by default. A page header shows the title "Assets".
 
 **AST-016 (was R16) — Fuzzy search (frontend)**: A search field in the header filters the list in real time on name, reference, class, and category. The search applies only to assets currently displayed: active assets only if the AST-019 toggle is off, both active and archived if the toggle is on. If no result matches, the table displays "No results for this search."
 
@@ -161,9 +161,9 @@ The table displays only active assets (`is_archived = false`) by default. A page
 
 **AST-013 (was R13) — Asset archival (frontend)**: The Archive button opens a confirmation dialog stating that the asset will be removed from active lists and will no longer receive new prices, but that all historical data is preserved. Confirmation triggers archival (AST-006).
 
-**AST-014 (was R14) — Backend errors (frontend)**: The modal stays open during the backend call and only closes on success. Any failure displays an inline error message in the active modal or dialog. In the asset dialogs the message sits beside the actions, always in view.
+**AST-014 (was R14) — Backend errors (frontend)**: The modal or confirmation dialog — archive and unarchive included (AST-013, AST-020) — stays open during the backend call and only closes on success. Any failure displays an inline error message in the active modal or dialog. In the asset dialogs the message sits beside the actions, always in view.
 
-**AST-015 (was R15) — Load error state (frontend)**: If the initial list load fails, the table displays an error message with a Retry button.
+**AST-015 (was R15) — Load error state (frontend)**: If a list read fails — the first one included, before any asset is known — the table displays an error message with a Retry button, never the empty state.
 
 **AST-019 (was R19) — Archived assets toggle (frontend)**: The header exposes a "Show archived" toggle. When on, archived assets appear in the table with a dimmed visual style on the entire row (not only the badge), making it immediately clear which assets are active vs archived. The Archive button is replaced by an Unarchive button on archived rows; the Edit button is disabled.
 

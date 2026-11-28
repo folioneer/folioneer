@@ -88,9 +88,13 @@ The account section title is displayed in the application shell header, not in t
 
 **ACC-012 — Empty state (frontend)** _(formerly R11)_: If no `Account` exists, the table displays an explicit empty state inviting the user to create their first account via the FAB.
 
-**ACC-013 — Loading and error states (frontend)** _(formerly R12)_: The account table exposes a loading state while any read is in progress, the first one and every re-read (ACC-033), and an error state with a Retry button when a read fails.
+**ACC-013 — Loading state (frontend)** _(formerly R12)_: The account table shows a loading state for its first read, for a change of the holder the table is read for (ACC-051A) and for a Retry (ACC-013B).
 
-**ACC-014 — Inline backend errors (frontend)** _(formerly R13)_: The create modal and the edit modal remain open on backend error and only signal success (close + refresh) after a positive response. Any failure (duplicate, network error, backend error) displays an inline error message inside the active modal or dialog.
+**ACC-013A — A re-read keeps the rows (frontend)**: Every re-read after a change — of an account, an asset, a transaction, a price, a rate (ACC-033), the profile in use or a sync — keeps the listed accounts on screen, with no loading state (F29).
+
+**ACC-013B — A failed read (frontend)**: When a read fails — the first one included, before any account is known — the table shows an error state with a Retry button, never the empty state (ACC-012).
+
+**ACC-014 — Inline backend errors (frontend)** _(formerly R13)_: The create modal, the edit modal and the delete dialogs (ACC-018, ACC-019) remain open on backend error and only signal success (close + refresh) after a positive response. Any failure (duplicate, network error, backend error) displays an inline error message inside the active modal or dialog.
 
 ### Mutations
 
@@ -98,13 +102,13 @@ The account section title is displayed in the application shell header, not in t
 
 **ACC-017 — Edit (frontend)** _(formerly R15)_: The Edit button opens a modal with the Name field pre-filled, and the account's Country and Wrapper as the account has them, a wrapper from another country's list or one this device does not know included (ACC-043, ACC-048). After saving, the modal closes and the table refreshes. On backend error, an inline error message is shown per ACC-014.
 
-**ACC-018 — Delete empty account (frontend)** _(formerly R16)_: If the `Account` has no `Holding`, the Delete button opens a standard confirmation dialog. Confirmation triggers deletion (ACC-005, ACC-006); after deletion the dialog closes and the table refreshes.
+**ACC-018 — Delete an account never used (frontend)** _(formerly R16)_: If the `Account` has no transaction (ACC-020), the Delete button opens a standard confirmation dialog. Confirmation triggers deletion (ACC-005, ACC-006); after deletion the dialog closes and the table refreshes.
 
-**ACC-019 — Delete non-empty account (frontend)** _(formerly R17)_: If the `Account` has at least one `Holding`, the Delete button opens a reinforced confirmation dialog stating the number of holdings and transactions that will be permanently deleted. Counts are retrieved via the backend command defined in ACC-020. Confirmation triggers deletion and cascade (ACC-005, ACC-006); after deletion the dialog closes and the table refreshes.
+**ACC-019 — Delete an account with history (frontend)** _(formerly R17)_: If the `Account` has at least one transaction — every position closed included (owner, 2026-11-28) — the Delete button opens a reinforced confirmation dialog stating the number of its active holdings — the cash line included when it holds a balance — and of its transactions, the counts of ACC-020, and that every holding and transaction of the account is permanently deleted. Confirmation triggers deletion and cascade (ACC-005, ACC-006); after deletion the dialog closes and the table refreshes.
 
-> ⚠️ **Dependency**: ACC-019 depends on ACC-020 (pre-deletion count command), which crosses the `account/` and `transaction/` bounded contexts and requires a dedicated use case. Until ACC-020 is implemented, ACC-018 applies for all deletions (standard dialog without counts).
+**ACC-019A — The counts cannot be read (frontend)**: When the counts of ACC-020 cannot be read, no delete dialog opens and the failure is told above the table, where it can be dismissed.
 
-**ACC-020 — Pre-deletion count query (backend)** _(new)_: A backend command `get_account_deletion_summary(account_id)` returns the number of active holdings and the number of transactions associated with the account. Because this read spans `context/account/` (holdings) and `context/transaction/` (transactions), it must be implemented as a use case in `use_cases/` — not as a bounded-context command — per B18 and B24.
+**ACC-020 — Pre-deletion count query (backend)** _(new)_: A backend command `get_account_deletion_summary(account_id)` returns the number of the account's active holdings — those whose quantity is above zero, the cash line among them only when it holds a balance (unlike CSH-097's list, where the cash row always counts) — and the number of its transactions. Because this read spans `context/account/` (holdings) and `context/transaction/` (transactions), it must be implemented as a use case in `use_cases/` — not as a bounded-context command — per B18 and B24.
 
 **ACC-021 — Account summaries with global value (backend)** _(new)_: The account summaries are read: each account with its global value, in the account's own currency (CSH-094) — its cash plus, over its priced active non-cash holdings in its currency, each one's quantity times its latest price; a non-cash holding with no recorded price counts at its cost basis (PRF-022A); a foreign one with a price and no usable rate (FXR-041) contributes 0; an empty account's value is 0. Each summary also carries the mark of an account an AI agent created on this computer, or none (AGT-069). The summaries are those of the accounts of the profile in use (PFL-050).
 
@@ -130,7 +134,7 @@ The account section title is displayed in the application shell header, not in t
 
 **ACC-031 — Where the total row sits (frontend)**: The total row stays below every account whatever the sort column and direction (ACC-009). It is not an account row: it cannot be focused, clicked, or used to open Account Details (ACC-010).
 
-**ACC-032 — When the total row is shown (frontend)**: The total row is shown only when every account is listed: it is hidden while a search filter is active (ACC-011), and absent while any read, first or re-read (ACC-013, ACC-033), is in progress, when a read fails (ACC-013), or when no account exists (ACC-012).
+**ACC-032 — When the total row is shown (frontend)**: The total row, every account's whatever the holder chosen (ACC-051A), is hidden while a search filter is active (ACC-011), and absent while the loading state shows (ACC-013), when a read fails (ACC-013B), or when no account exists (ACC-012).
 
 **ACC-033 — The account table follows rate changes (frontend)**: The account table re-reads its summaries when a currency rate is recorded, edited or removed, or a currency pair is declared, applied or removed, or the reference currency is chosen (FXR-126), so the converted figures, the portfolio total and its incomplete marker reflect the rates in force.
 
@@ -196,8 +200,8 @@ Within a profile, an account names whose name it is in; nothing is computed from
           │            → Saved → modal closed → table refreshed
           │
           └─ [Delete]
-              ├─ Empty account → Standard dialog (ACC-018) → Confirm → Delete (ACC-005, ACC-006)
-              └─ Non-empty account → Reinforced dialog (ACC-019, holding + tx count)
+              ├─ Account never used → Standard dialog (ACC-018) → Confirm → Delete (ACC-005, ACC-006)
+              └─ Account with history (a transaction) → Reinforced dialog (ACC-019, holding + tx count)
                                      → Confirm → Delete + cascade (ACC-005, ACC-006)
 ```
 
@@ -217,14 +221,15 @@ Full-width table, default sort by Name ascending. Floating action button (bottom
 
 - **Empty**: message inviting the user to create their first account via the FAB (ACC-012)
 - **Loading**: loading indicator in the table (ACC-013)
-- **Load error**: error message + Retry button (ACC-013)
+- **Load error**: error message + Retry button (ACC-013B)
+- **Counts not read**: the delete dialog does not open; the failure is told above the table, dismissable (ACC-019A)
 - **No search results**: message distinct from empty state (ACC-011)
 - **Filtering**: the portfolio total row is hidden while a search filter is active (ACC-032)
 - **Wrapper lists not read**: the form shows no Country or Wrapper, the column shows "—" (ACC-045, ACC-046, ACC-048)
 - **Total incomplete**: "partial" beside the total's label when an unconvertible account hides a figure (ACC-028, ACC-030)
 - **Inline error**: message displayed inside the active modal or dialog (ACC-014)
-- **Delete empty account confirmation**: standard confirmation dialog (ACC-018)
-- **Delete non-empty account confirmation**: reinforced dialog — "This account contains X holding(s) and Y transaction(s). All data will be permanently deleted." (ACC-019)
+- **Delete an account never used**: standard confirmation dialog (ACC-018)
+- **Delete an account with history**: reinforced dialog — "This account contains X holding(s) and Y transaction(s). All data will be permanently deleted." (ACC-019)
 - **Mutation success**: silent today (modal/dialog closes, table refreshes); snackbar feedback planned (see Future Improvements)
 
 ### User flow
@@ -233,8 +238,8 @@ Full-width table, default sort by Name ascending. Floating action button (bottom
 2. User clicks a row → navigates to Account Details for the selected account (ACC-010).
 3. User clicks FAB → modal → enters name, bank, country and wrapper → submits → account created.
 4. User clicks Edit → pre-filled modal → modifies → saves → modal closes.
-5. User clicks Delete (empty account) → standard dialog → confirms → account deleted.
-6. User clicks Delete (account with positions) → reinforced dialog → confirms → account + positions + transactions deleted.
+5. User clicks Delete (account never used) → standard dialog → confirms → account deleted.
+6. User clicks Delete (account with a transaction) → reinforced dialog → confirms → account + positions + transactions deleted.
 
 ---
 

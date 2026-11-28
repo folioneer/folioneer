@@ -228,7 +228,7 @@ describe("useAccountTable", () => {
     expect(result.current.deleteSummary).toEqual(makeEmptySummary());
   });
 
-  // ACC-019 — non-empty account: summary has holdings, dialog carries counts
+  // ACC-019 — an account with history: the dialog carries the counts
   it("handleDeleteClick sets non-empty deleteSummary for reinforced dialog (ACC-019)", async () => {
     const summary = makeNonEmptySummary(3, 7);
     const getSummary = vi.fn().mockResolvedValue({ data: summary, error: null });
@@ -245,9 +245,10 @@ describe("useAccountTable", () => {
     expect(result.current.deleteSummary?.transaction_count).toBe(7);
   });
 
-  // ACC-018/019 — summary fetch error: dialog does not open, actionError is set
+  // ACC-019A — the counts cannot be read: no dialog opens, the failure is told above the table
   it("handleDeleteClick shows actionError and does not open dialog when summary fetch fails", async () => {
-    const getSummary = vi.fn().mockResolvedValue({ data: null, error: "error.Unknown" });
+    const failure = { key: "error.Unknown" };
+    const getSummary = vi.fn().mockResolvedValue({ data: null, error: failure });
     const { result } = renderHook(() =>
       useAccountTable(accounts, "", noopDelete, getSummary, noopAccountClick),
     );
@@ -257,7 +258,66 @@ describe("useAccountTable", () => {
     });
 
     expect(result.current.deleteData).toBeNull();
-    expect(result.current.actionError).toBe("error.Unknown");
+    expect(result.current.actionError).toEqual(failure);
+    expect(result.current.deleteDialog).toBeNull();
+
+    act(() => result.current.setActionError(null));
+    expect(result.current.actionError).toBeNull();
+  });
+
+  // ACC-018 / ACC-019 (owner, 2026-11-28, #446) — the reinforced dialog opens as soon as the
+  // account has a transaction, every position closed included; the standard one only for an
+  // account never used.
+  it("opens the reinforced dialog for an account with transactions and no open position", async () => {
+    const getSummary = vi.fn().mockResolvedValue({ data: makeNonEmptySummary(0, 4), error: null });
+    const { result } = renderHook(() =>
+      useAccountTable(accounts, "", noopDelete, getSummary, noopAccountClick),
+    );
+
+    await act(async () => {
+      await result.current.handleDeleteClick(makeMouseEvent(), "2", "Beta");
+    });
+
+    expect(result.current.deleteDialog).toBe("reinforced");
+  });
+
+  it("opens the standard dialog for an account never used", async () => {
+    const getSummary = vi.fn().mockResolvedValue({ data: makeEmptySummary(), error: null });
+    const { result } = renderHook(() =>
+      useAccountTable(accounts, "", noopDelete, getSummary, noopAccountClick),
+    );
+    expect(result.current.deleteDialog).toBeNull();
+
+    await act(async () => {
+      await result.current.handleDeleteClick(makeMouseEvent(), "1", "Alpha");
+    });
+
+    expect(result.current.deleteDialog).toBe("standard");
+  });
+
+  // ACC-014 (#446) — a refused delete keeps its dialog open and is told inside it, not in
+  // the table's alert behind it; cancelling clears it.
+  it("keeps the dialog open with the refusal inside it when the delete fails", async () => {
+    const refused = { key: "error.DatabaseError" };
+    const deleteAccount = vi.fn().mockResolvedValue({ error: refused });
+    const getSummary = vi.fn().mockResolvedValue({ data: makeEmptySummary(), error: null });
+    const { result } = renderHook(() =>
+      useAccountTable(accounts, "", deleteAccount, getSummary, noopAccountClick),
+    );
+
+    await act(async () => {
+      await result.current.handleDeleteClick(makeMouseEvent(), "1", "Alpha");
+    });
+    await act(async () => {
+      await result.current.handleDeleteConfirm();
+    });
+
+    expect(result.current.deleteData).toEqual({ id: "1", name: "Alpha" });
+    expect(result.current.deleteError).toEqual(refused);
+    expect(result.current.actionError).toBeNull();
+
+    act(() => result.current.handleDeleteCancel());
+    expect(result.current.deleteError).toBeNull();
   });
 
   it("handleDeleteCancel clears deleteData and deleteSummary", async () => {
