@@ -378,8 +378,8 @@ export function HoldingRow({
                   onClick={handleSplit}
                 />
               )}
-              {/* HNO-042 — Note action (non-cash active rows; hidden for archived assets) */}
-              {onNote && !isArchived && (
+              {/* HNO-042 — Note action (non-cash rows, archived ones included) */}
+              {onNote && (
                 <IconButton
                   icon={<StickyNote size={16} />}
                   size="sm"

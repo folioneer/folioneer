@@ -107,6 +107,13 @@ describe("formatRateMicros", () => {
   it("formats 160_000_000 micros as 160.00", () => {
     expect(formatRateMicros(160_000_000)).toBe("160.00");
   });
+
+  // NUM-013 (#812) — a rate's thousands are grouped with the language's mark.
+  it("groups the thousands of a large rate", () => {
+    expect(formatRateMicros(25_000_000_000)).toBe("25,000.00");
+    setDisplayLocale("fr");
+    expect(formatRateMicros(25_000_000_000)).toBe("25\u202f000,00");
+  });
 });
 
 // ---------------------------------------------------------------------------

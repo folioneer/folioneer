@@ -261,7 +261,6 @@ export function useAccountDetailsView(accountId: string) {
       setSplitTarget({
         assetId: holding.asset_id,
         assetName: holding.asset_name,
-        currentPriceMicro: holding.current_price,
         prefill,
       });
     },

@@ -53,7 +53,8 @@ export function AccountJournalPage() {
     const { error: deleteError } = await cancelTransaction(deletingTransactionId, txAccountId);
     setDeletingTransactionId(null);
     if (deleteError) {
-      showSnackbar(t("transaction.error_generic"), "error");
+      // CSH-080 / DIV-045 — a refused cancellation says why, with its own message.
+      showSnackbar(t(deleteError.key, deleteError.vars), "error");
     } else {
       showSnackbar(t("transaction.success_deleted"), "success");
       await refresh();

@@ -167,6 +167,23 @@ describe("useWebLookupModal", () => {
     expect(result.current.modalStep.step).toBe("search");
   });
 
+  // WEB-047 / AST-040 (#812) — changing the kind on a pre-filled form keeps the result chosen
+  // and the way back to the search; choosing Listed still returns to the search.
+  it("keeps the way back to the search when the kind changes on a pre-filled form", () => {
+    const { result } = renderHook(() => useWebLookupModal());
+    act(() => result.current.selectResult(appleResult));
+    expect(result.current.canGoBack).toBe(true);
+
+    act(() => result.current.selectKind("Custom"));
+    expect(result.current.kind).toBe("Custom");
+    expect(result.current.modalStep.step).toBe("form-prefilled");
+    expect(result.current.canGoBack).toBe(true);
+
+    act(() => result.current.back());
+    expect(result.current.kind).toBe("Listed");
+    expect(result.current.modalStep.step).toBe("search");
+  });
+
   // WEB-047 — back IS available from form-prefilled
   it("canGoBack is true when in form-prefilled step", async () => {
     mockLookupAsset.mockResolvedValue({ status: "ok", data: [appleResult] });

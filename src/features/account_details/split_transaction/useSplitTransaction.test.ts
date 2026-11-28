@@ -48,14 +48,11 @@ const TODAY = todayIso();
 
 const fakeSubmit = { preventDefault: vi.fn() } as unknown as React.FormEvent;
 
-// A holding whose latest price is 150.00.
+// The holding split; whether a price is carried across the split is the core's answer.
 const target = {
   assetId: "asset-equity-1",
   assetName: "Alphabet Inc",
-  currentPriceMicro: 150_000_000,
 };
-
-const unpricedTarget = { ...target, currentPriceMicro: null };
 
 const BASE_PROPS = {
   accountId: "account-1",
@@ -263,13 +260,12 @@ describe("useSplitTransaction — create mode (SPL-061/062/040)", () => {
     await waitFor(() => expect(logger.warn).toHaveBeenCalled());
   });
 
-  // SPL-040 — without a price there is nothing to prefill nor to record.
-  it("starts unchecked with an empty price and skips the record when the asset has no price", async () => {
+  // SPL-040 (#812) — without a price before the split date — none at all, or a split dated
+  // before the first one — there is nothing to prefill nor to record.
+  it("starts unchecked with an empty price and skips the record without a price to carry", async () => {
     mockValidateStockSplitDraft.mockResolvedValue(answer({ price_after_split: null }));
     mockRecordSplit.mockResolvedValue({ status: "ok", data: {} });
-    const { result } = renderHook(() =>
-      useSplitTransaction({ ...BASE_PROPS, target: unpricedTarget }),
-    );
+    const { result } = renderHook(() => useSplitTransaction(BASE_PROPS));
     await waitFor(() => expect(result.current.isFormValid).toBe(true));
     expect(result.current.recordPrice).toBe(false);
     expect(result.current.priceInput).toBe("");
@@ -277,6 +273,34 @@ describe("useSplitTransaction — create mode (SPL-061/062/040)", () => {
     await act(async () => result.current.handleSubmit(fakeSubmit));
 
     expect(mockRecordAssetPrice).not.toHaveBeenCalled();
+  });
+
+  // SPL-040A (#812) — the box and the prefill keep the last answer while the next check is
+  // pending: no flicker as the owner types (F29).
+  it("keeps the box checked while a new check is pending", async () => {
+    const { result } = renderHook(() => useSplitTransaction(BASE_PROPS));
+    await waitFor(() => expect(result.current.recordPrice).toBe(true));
+    mockValidateStockSplitDraft.mockReturnValue(new Promise(() => {}));
+    act(() => result.current.handleChange("date", "2024-01-15"));
+    expect(result.current.recordPrice).toBe(true);
+    expect(result.current.priceInput).toBe("75.000");
+  });
+
+  it("keeps the box unticked by hand after the next check answers", async () => {
+    const { result } = renderHook(() => useSplitTransaction(BASE_PROPS));
+    await waitFor(() => expect(result.current.recordPrice).toBe(true));
+    act(() => result.current.setRecordPrice(false));
+    act(() => result.current.handleChange("date", "2024-01-15"));
+    await waitFor(() => expect(mockValidateStockSplitDraft).toHaveBeenCalledTimes(2));
+    expect(result.current.recordPrice).toBe(false);
+  });
+
+  it("keeps the owner's choice once the box was ticked by hand", async () => {
+    mockValidateStockSplitDraft.mockResolvedValue(answer({ price_after_split: null }));
+    const { result } = renderHook(() => useSplitTransaction(BASE_PROPS));
+    await waitFor(() => expect(result.current.isFormValid).toBe(true));
+    act(() => result.current.setRecordPrice(true));
+    expect(result.current.recordPrice).toBe(true);
   });
 
   it("records the user-edited price instead of the prefill", async () => {

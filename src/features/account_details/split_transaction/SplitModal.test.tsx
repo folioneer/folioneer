@@ -30,7 +30,6 @@ const TODAY = todayIso();
 const target = {
   assetId: "asset-equity-1",
   assetName: "Alphabet Inc",
-  currentPriceMicro: 150_000_000,
 };
 
 const makeHookReturn = (overrides: Record<string, unknown> = {}) => ({
@@ -52,7 +51,6 @@ const makeHookReturn = (overrides: Record<string, unknown> = {}) => ({
   isSubmitting: false,
   isFormValid: true,
   isEditMode: false,
-  hasCurrentPrice: true,
   recordPrice: true,
   setRecordPrice: vi.fn(),
   priceInput: "75.000",

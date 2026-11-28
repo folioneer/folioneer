@@ -77,5 +77,6 @@ problem (SEL-012, SEL-021), and a position that cannot be read makes the check f
 corrected, or any draft that has a problem. The dialog shows the
 line when a figure is returned and hides it otherwise.
 
-**TDI-032 — Sign-coloured**: a gain renders in the success colour, a loss in the
-error colour, consistent with the realized-P&L column elsewhere (SEL-043).
+**TDI-032 — Sign-coloured (frontend)**: a gain renders in the success colour and a loss in
+the error colour, as in the realized-P&L column (SEL-043); a zero — neither — shows its
+figure in the neutral colour.
