@@ -36,3 +36,43 @@ describe("Dialog — stable ids (F25)", () => {
     expect(document.querySelector("#confirm-delete-x")).not.toBeNull();
   });
 });
+
+// ACC-014 / AST-014 (#446) — a refused confirmation is told inside the dialog that asked,
+// beside its actions.
+describe("ConfirmationDialog — a refusal inside the dialog", () => {
+  it("shows the error inside the dialog, with a stable id", () => {
+    render(
+      <ConfirmationDialog
+        isOpen
+        onCancel={vi.fn()}
+        onConfirm={vi.fn()}
+        title="T"
+        message="M"
+        confirmLabel="OK"
+        cancelLabel="No"
+        confirmId="confirm-delete-x"
+        error="Refused"
+      />,
+    );
+    const error = document.querySelector("#confirm-delete-x-error");
+    expect(error?.textContent).toBe("Refused");
+    expect(error?.getAttribute("role")).toBe("alert");
+    expect(document.querySelector("#confirm-delete-x-dialog")?.contains(error ?? null)).toBe(true);
+  });
+
+  it("shows no error element without an error", () => {
+    render(
+      <ConfirmationDialog
+        isOpen
+        onCancel={vi.fn()}
+        onConfirm={vi.fn()}
+        title="T"
+        message="M"
+        confirmLabel="OK"
+        cancelLabel="No"
+        confirmId="confirm-delete-x"
+      />,
+    );
+    expect(document.querySelector("#confirm-delete-x-error")).toBeNull();
+  });
+});

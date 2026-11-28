@@ -3,6 +3,7 @@ import type React from "react";
 import { useId } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../button";
+import { FormProblem } from "./FormProblem";
 import { useModalStack } from "./useModalStack";
 
 interface DialogProps {
@@ -97,6 +98,8 @@ interface ConfirmationDialogProps {
   cancelLabel: string;
   variant?: "default" | "danger";
   confirmId?: string;
+  /** Why the confirmed action was refused, told beside the actions (`{confirmId}-error`). */
+  error?: string | null;
 }
 
 export function ConfirmationDialog({
@@ -109,9 +112,11 @@ export function ConfirmationDialog({
   cancelLabel,
   variant = "default",
   confirmId,
+  error,
 }: ConfirmationDialogProps) {
   const actions = (
-    <div className="flex items-center justify-end gap-3">
+    <div className="flex w-full items-center justify-end gap-3">
+      <FormProblem idPrefix={confirmId ?? "confirmation"} error={error ?? undefined} />
       <Button variant="ghost" onClick={onCancel}>
         {cancelLabel}
       </Button>

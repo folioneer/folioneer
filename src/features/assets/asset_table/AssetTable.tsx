@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { Archive, ArchiveRestore, Edit2, ShoppingCart, X } from "lucide-react";
+import { Archive, ArchiveRestore, Edit2, ShoppingCart } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { logger } from "@/lib/logger";
@@ -22,7 +22,6 @@ export function AssetTable({ searchTerm, showArchived }: AssetTableProps) {
   const navigate = useNavigate();
   const { archiveAsset, unarchiveAsset, assets, loading, fetchError, fetchAssets } = useAssets();
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<I18nMessage | null>(null);
 
   useEffect(() => {
     logger.info("[AssetTable] mounted");
@@ -45,40 +44,43 @@ export function AssetTable({ searchTerm, showArchived }: AssetTableProps) {
     name: string;
   } | null>(null);
 
-  const handleArchiveConfirm = async () => {
-    if (!assetToArchive) return;
-    const result = await archiveAsset(assetToArchive.id);
+  // AST-014 — a refused archive or unarchive is told inside its dialog, which stays open.
+  const [dialogError, setDialogError] = useState<I18nMessage | null>(null);
+
+  const closeArchiveDialog = () => {
     setIsArchiveDialogOpen(false);
     setAssetToArchive(null);
-    if (result.error) setActionError(result.error);
+    setDialogError(null);
+  };
+
+  const closeUnarchiveDialog = () => {
+    setIsUnarchiveDialogOpen(false);
+    setAssetToUnarchive(null);
+    setDialogError(null);
+  };
+
+  const handleArchiveConfirm = async () => {
+    if (!assetToArchive) return;
+    setDialogError(null);
+    const result = await archiveAsset(assetToArchive.id);
+    if (result.error) setDialogError(result.error);
+    else closeArchiveDialog();
   };
 
   const handleUnarchiveConfirm = async () => {
     if (!assetToUnarchive) return;
+    setDialogError(null);
     const result = await unarchiveAsset(assetToUnarchive.id);
-    setIsUnarchiveDialogOpen(false);
-    setAssetToUnarchive(null);
-    if (result.error) setActionError(result.error);
+    if (result.error) setDialogError(result.error);
+    else closeUnarchiveDialog();
   };
+
+  const dialogErrorText = dialogError && t(dialogError.key, dialogError.vars);
 
   const isSearching = searchTerm.trim().length > 0;
 
   return (
     <div className="m3-table-container flex-1">
-      {actionError && (
-        <div
-          role="alert"
-          className="mb-3 flex items-center justify-between gap-2 text-sm text-m3-error px-2"
-        >
-          <span>{t(actionError.key, actionError.vars)}</span>
-          <IconButton
-            icon={<X size={14} />}
-            size="sm"
-            aria-label={t("action.close")}
-            onClick={() => setActionError(null)}
-          />
-        </div>
-      )}
       <table className="w-full border-collapse">
         <thead className="sticky top-0 bg-m3-surface-container z-10">
           <tr>
@@ -140,14 +142,9 @@ export function AssetTable({ searchTerm, showArchived }: AssetTableProps) {
                 </span>
               </td>
             </tr>
-          ) : assets.length === 0 ? (
-            <tr>
-              <td colSpan={8} className="m3-td text-center py-12 text-m3-on-surface-variant italic">
-                {t("asset.empty")}
-              </td>
-            </tr>
           ) : fetchError ? (
-            <tr>
+            // AST-015 — a failed read, the first one included, shows the error and its Retry
+            <tr id="asset-table-error">
               <td colSpan={8} className="m3-td text-center py-12">
                 <div className="flex flex-col items-center gap-3">
                   <span className="text-m3-error text-sm">{t("asset.error_load")}</span>
@@ -155,6 +152,12 @@ export function AssetTable({ searchTerm, showArchived }: AssetTableProps) {
                     {t("action.retry")}
                   </Button>
                 </div>
+              </td>
+            </tr>
+          ) : assets.length === 0 ? (
+            <tr>
+              <td colSpan={8} className="m3-td text-center py-12 text-m3-on-surface-variant italic">
+                {t("asset.empty")}
               </td>
             </tr>
           ) : sortedAndFilteredAssets.length === 0 ? (
@@ -307,34 +310,32 @@ export function AssetTable({ searchTerm, showArchived }: AssetTableProps) {
         </tbody>
       </table>
 
-      {/* Archive Confirmation Dialog — R13 */}
+      {/* AST-013 — archive confirmation; AST-014 — a refusal told inside it */}
       <ConfirmationDialog
         isOpen={isArchiveDialogOpen}
-        onCancel={() => {
-          setIsArchiveDialogOpen(false);
-          setAssetToArchive(null);
-        }}
+        onCancel={closeArchiveDialog}
         onConfirm={handleArchiveConfirm}
         title={t("asset.archive_confirm_title")}
         message={t("asset.archive_confirm_message")}
         confirmLabel={t("asset.action_archive")}
         cancelLabel={t("action.cancel")}
         variant="default"
+        confirmId="confirm-archive-asset"
+        error={dialogErrorText}
       />
 
-      {/* Unarchive Confirmation Dialog — R20 */}
+      {/* AST-020 — unarchive confirmation; AST-014 — a refusal told inside it */}
       <ConfirmationDialog
         isOpen={isUnarchiveDialogOpen}
-        onCancel={() => {
-          setIsUnarchiveDialogOpen(false);
-          setAssetToUnarchive(null);
-        }}
+        onCancel={closeUnarchiveDialog}
         onConfirm={handleUnarchiveConfirm}
         title={t("asset.unarchive_confirm_title")}
         message={t("asset.unarchive_confirm_message")}
         confirmLabel={t("asset.action_unarchive")}
         cancelLabel={t("action.cancel")}
         variant="default"
+        confirmId="confirm-unarchive-asset"
+        error={dialogErrorText}
       />
     </div>
   );

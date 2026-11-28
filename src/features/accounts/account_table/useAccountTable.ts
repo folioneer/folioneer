@@ -32,6 +32,8 @@ export function useAccountTable(
   const [fetchingSummaryFor, setFetchingSummaryFor] = useState<string | null>(null);
   const [editData, setEditData] = useState<Account | null>(null);
   const [actionError, setActionError] = useState<I18nMessage | null>(null);
+  // ACC-014 — a refused delete is told inside its dialog, which stays open.
+  const [deleteError, setDeleteError] = useState<I18nMessage | null>(null);
 
   const handleSort = useCallback((key: SortConfig["key"]) => {
     setSortConfig((prev) => ({
@@ -145,6 +147,7 @@ export function useAccountTable(
       e.stopPropagation();
       setFetchingSummaryFor(id);
       setActionError(null);
+      setDeleteError(null);
       const result = await getAccountDeletionSummary(id);
       setFetchingSummaryFor(null);
       if (result.error) {
@@ -164,14 +167,16 @@ export function useAccountTable(
   const handleDeleteCancel = useCallback(() => {
     setDeleteData(null);
     setDeleteSummary(null);
+    setDeleteError(null);
   }, []);
 
   const handleDeleteConfirm = useCallback(async () => {
     if (!deleteData) return;
+    setDeleteError(null);
     const result = await deleteAccount(deleteData.id);
     if (result.error) {
-      // R13 — keep dialog open, show inline error
-      setActionError(result.error);
+      // ACC-014 — the dialog stays open and tells the refusal itself.
+      setDeleteError(result.error);
     } else {
       setDeleteData(null);
       setDeleteSummary(null);
@@ -225,10 +230,19 @@ export function useAccountTable(
     });
   }, [accounts, searchTerm, sortConfig, bankNameByAccountId]);
 
-  // R11 — no accounts exist and no search is active
+  // ACC-018 / ACC-019 — an account with a transaction, every position closed included,
+  // gets the reinforced dialog; one never used, the standard one.
+  const deleteDialog: "standard" | "reinforced" | null =
+    deleteData && deleteSummary
+      ? deleteSummary.transaction_count > 0
+        ? "reinforced"
+        : "standard"
+      : null;
+
+  // ACC-012 — no accounts exist and no search is active
   const isEmpty = accounts.length === 0 && searchTerm.trim().length === 0;
 
-  // R10 — search is active but no results match
+  // ACC-011 — search is active but no results match
   const hasNoSearchResults = searchTerm.trim().length > 0 && sortedAndFilteredAccounts.length === 0;
 
   return {
@@ -249,6 +263,8 @@ export function useAccountTable(
     hasNoSearchResults,
     deleteData,
     deleteSummary,
+    deleteDialog,
+    deleteError,
     fetchingSummaryFor,
     editData,
     actionError,

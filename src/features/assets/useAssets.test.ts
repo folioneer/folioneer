@@ -86,13 +86,6 @@ describe("useAssets", () => {
     });
   });
 
-  // ── activeCount ───────────────────────────────────────────────────────────────
-
-  it("activeCount excludes archived assets", () => {
-    const { result } = renderHook(() => useAssets());
-    expect(result.current.activeCount).toBe(1);
-  });
-
   // ── addAsset ──────────────────────────────────────────────────────────────────
 
   it("addAsset calls gateway, fetches assets, and shows snackbar on success", async () => {

@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import type { CreateAssetDTO, UpdateAssetDTO } from "@/bindings";
 import { logger } from "@/lib/logger";
@@ -108,11 +108,8 @@ export function useAssets() {
     [fetchAssets, showSnackbar, t],
   );
 
-  const activeCount = useMemo(() => assets.filter((a) => !a.is_archived).length, [assets]);
-
   return {
     assets,
-    activeCount,
     loading,
     fetchError,
     addAsset,

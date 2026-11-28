@@ -395,4 +395,21 @@ describe("useAccountSummaries — bulk-fetch coalescing (MKT-181)", () => {
     expect(mockGetAccountSummaries).toHaveBeenCalledWith("Claire");
     expect(result.current.holders).toEqual(["Claire", "Marc"]);
   });
+
+  // ACC-013 (#446) — a change of the holder the table is read for shows the loading state.
+  it("shows the loading state while another holder's accounts are read", async () => {
+    mockGetAccountSummaries.mockResolvedValue({
+      status: "ok",
+      data: { summaries: [], total: null, holders: ["Claire", "Marc"] },
+    });
+    const { result, rerender } = renderHook(({ holder }) => useAccountSummaries(holder), {
+      initialProps: { holder: null as string | null },
+    });
+    await act(async () => {});
+    expect(result.current.isLoading).toBe(false);
+
+    mockGetAccountSummaries.mockReturnValue(new Promise(() => {}));
+    rerender({ holder: "Marc" });
+    expect(result.current.isLoading).toBe(true);
+  });
 });

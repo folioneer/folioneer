@@ -12,7 +12,6 @@ vi.mock("../useAssets", () => ({
   useAssets: () => ({
     addAsset: mockAddAsset,
     assets: [] as Asset[],
-    activeCount: 0,
     loading: false,
     fetchError: null,
     fetchAssets: vi.fn(),
