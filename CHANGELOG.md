@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.23.0] - 2026-11-28
+
+### Added
+
+- [agent] an AI agent reads an account's or the portfolio's performance by period
+- [agent] an AI agent reads a currency rate, lists a pair's rates and records one, marked as its own
+
+### Fixed
+
+- [sync] sync no longer reports a price, a setting or a catch-up position as a conflict
+- [agent] an AI agent reads whether an account takes management fees and whether an asset bears interest
+- rates are grouped by thousands, a refused cancellation says why, an archived holding keeps its note
+- an unreadable list of accounts or assets offers Retry, and a refused delete or archive says why
+
 ## [0.22.0] - 2026-11-23
 
 ### Added
