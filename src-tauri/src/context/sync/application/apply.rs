@@ -11,8 +11,9 @@ use sqlx::SqliteConnection;
 
 use crate::context::sync::domain::{
     account_parent, cascade_child_tombstones, decide_seen, display_name, duplicate_name_notice,
-    parent_references, reference_outcome, removed_child_notice, upgraded_content, Change,
-    ChangeApplier, ChangeLogRepository, NoticeDraft, Outcome, RecordState, Tombstone, WaitingFor,
+    parent_references, reference_outcome, removed_child_notice, reported_when_dropped,
+    upgraded_content, Change, ChangeApplier, ChangeLogRepository, NoticeDraft, Outcome,
+    RecordState, Tombstone, WaitingFor,
 };
 use crate::context::sync::error::SyncError;
 use crate::shared::domain::{Operation, RecordKind};
@@ -86,7 +87,7 @@ pub async fn apply_change(
             note_received(conn, change_log, change).await?;
             return Ok(ApplyResult {
                 applied: Applied::Dropped,
-                notices: own_notices(vec![notice], own_device_id),
+                notices: own_notices(notice.into_iter().collect(), own_device_id),
             });
         }
         Some(Outcome::HoldBack { waiting_for }) => {
@@ -128,7 +129,7 @@ pub async fn apply_change(
         }
         Outcome::Ignore { .. } => Applied::Ignored,
         Outcome::Drop { notice } => {
-            notices.push(notice);
+            notices.extend(notice);
             Applied::Dropped
         }
         Outcome::HoldBack { waiting_for } => Applied::HeldBack(waiting_for),
@@ -212,7 +213,12 @@ async fn write(
                         },
                     )
                     .await?;
-                if let Some(child_rank) = &child.rank {
+                // CFR-032 / CFR-060 — a catch-up position goes silently (#731).
+                if let Some(child_rank) = child
+                    .rank
+                    .as_ref()
+                    .filter(|_| reported_when_dropped(child.record_kind))
+                {
                     notices.push(removed_child_notice(
                         child.record_kind,
                         &child.record_identity,

@@ -1,6 +1,6 @@
 use super::currency_rate::CurrencyRate;
 use crate::context::currency::error::CurrencyError;
-use crate::shared::domain::{Rank, RecordKind, SyncedRecord};
+use crate::shared::domain::{Origin, Rank, RecordKind, SyncedRecord};
 use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -75,8 +75,10 @@ pub struct CurrencyPairSummary {
 #[async_trait]
 pub trait CurrencyPairRepository: Send + Sync {
     /// Idempotently ensures the pair exists in the database (FXR-013/054).
-    /// Returns the pair (existing or newly created).
-    async fn upsert_pair(&self, pair: CurrencyPair) -> Result<CurrencyPair>;
+    /// Returns the pair (existing or newly created). A new pair's change carries `origin`:
+    /// the user's for a declaration or a rate's write, the application's for a pair a rate
+    /// refresh follows on its own (CFR-016).
+    async fn upsert_pair(&self, pair: CurrencyPair, origin: Origin) -> Result<CurrencyPair>;
 
     /// Returns all pairs enriched with their most-recent rate (FXR-051/035).
     async fn list_pairs_with_latest_rate(&self) -> Result<Vec<CurrencyPairSummary>>;

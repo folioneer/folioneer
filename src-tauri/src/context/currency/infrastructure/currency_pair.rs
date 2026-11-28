@@ -91,7 +91,7 @@ impl CurrencyPairRepository for SqliteCurrencyPairRepository {
         Ok(stamped)
     }
 
-    async fn upsert_pair(&self, pair: CurrencyPair) -> Result<CurrencyPair> {
+    async fn upsert_pair(&self, pair: CurrencyPair, origin: Origin) -> Result<CurrencyPair> {
         let mut tx = self
             .pool
             .begin()
@@ -114,7 +114,7 @@ impl CurrencyPairRepository for SqliteCurrencyPairRepository {
                     &[&pair.from_currency, &pair.to_currency],
                 ),
                 Operation::Created,
-                Origin::User,
+                origin,
                 None,
                 Some(serde_json::to_string(&pair)?),
             );
@@ -431,9 +431,12 @@ mod tests {
     async fn stamp_sync_rank_stamps_unranked_pairs_and_rates_once() {
         let pool = setup_pool().await;
         let repo = SqliteCurrencyPairRepository::new(pool.clone());
-        repo.upsert_pair(CurrencyPair::from_storage("USD".into(), "EUR".into()))
-            .await
-            .unwrap();
+        repo.upsert_pair(
+            CurrencyPair::from_storage("USD".into(), "EUR".into()),
+            Origin::User,
+        )
+        .await
+        .unwrap();
         insert_rate(&pool, "USD", "EUR", "2026-08-01", 920_000).await;
 
         let rank = Rank {
@@ -462,7 +465,10 @@ mod tests {
     async fn upsert_pair_inserts_and_returns() {
         let repo = SqliteCurrencyPairRepository::new(setup_pool().await);
         let pair = repo
-            .upsert_pair(CurrencyPair::from_storage("USD".into(), "EUR".into()))
+            .upsert_pair(
+                CurrencyPair::from_storage("USD".into(), "EUR".into()),
+                Origin::User,
+            )
             .await
             .unwrap();
         assert_eq!(pair.from_currency, "USD");
@@ -476,12 +482,18 @@ mod tests {
     #[tokio::test]
     async fn upsert_pair_is_idempotent() {
         let repo = SqliteCurrencyPairRepository::new(setup_pool().await);
-        repo.upsert_pair(CurrencyPair::from_storage("USD".into(), "EUR".into()))
-            .await
-            .unwrap();
-        repo.upsert_pair(CurrencyPair::from_storage("USD".into(), "EUR".into()))
-            .await
-            .unwrap();
+        repo.upsert_pair(
+            CurrencyPair::from_storage("USD".into(), "EUR".into()),
+            Origin::User,
+        )
+        .await
+        .unwrap();
+        repo.upsert_pair(
+            CurrencyPair::from_storage("USD".into(), "EUR".into()),
+            Origin::User,
+        )
+        .await
+        .unwrap();
 
         let pairs = repo.list_pairs_with_latest_rate().await.unwrap();
         assert_eq!(pairs.len(), 1, "no duplicate pair");
@@ -499,9 +511,12 @@ mod tests {
     #[tokio::test]
     async fn list_pairs_with_latest_rate_pair_without_rate() {
         let repo = SqliteCurrencyPairRepository::new(setup_pool().await);
-        repo.upsert_pair(CurrencyPair::from_storage("GBP".into(), "EUR".into()))
-            .await
-            .unwrap();
+        repo.upsert_pair(
+            CurrencyPair::from_storage("GBP".into(), "EUR".into()),
+            Origin::User,
+        )
+        .await
+        .unwrap();
 
         let pairs = repo.list_pairs_with_latest_rate().await.unwrap();
         assert_eq!(pairs.len(), 1);
@@ -516,9 +531,12 @@ mod tests {
     async fn list_pairs_with_latest_rate_resolves_most_recent() {
         let pool = setup_pool().await;
         let repo = SqliteCurrencyPairRepository::new(pool.clone());
-        repo.upsert_pair(CurrencyPair::from_storage("USD".into(), "EUR".into()))
-            .await
-            .unwrap();
+        repo.upsert_pair(
+            CurrencyPair::from_storage("USD".into(), "EUR".into()),
+            Origin::User,
+        )
+        .await
+        .unwrap();
         insert_rate(&pool, "USD", "EUR", "2026-01-01", 910_000).await;
         insert_rate(&pool, "USD", "EUR", "2026-01-03", 930_000).await;
         insert_rate(&pool, "USD", "EUR", "2026-01-02", 920_000).await;
@@ -580,9 +598,12 @@ mod tests {
         let recorder = Arc::new(SqliteChangeRecorder::new(pool.clone()));
         let repo = SqliteCurrencyPairRepository::new(pool.clone()).with_change_recorder(recorder);
 
-        repo.upsert_pair(CurrencyPair::from_storage("USD".into(), "EUR".into()))
-            .await
-            .unwrap();
+        repo.upsert_pair(
+            CurrencyPair::from_storage("USD".into(), "EUR".into()),
+            Origin::User,
+        )
+        .await
+        .unwrap();
 
         assert_eq!(changes_with_operation(&pool, "Created").await, 1);
         let row = sqlx::query!(
@@ -603,12 +624,18 @@ mod tests {
         let recorder = Arc::new(SqliteChangeRecorder::new(pool.clone()));
         let repo = SqliteCurrencyPairRepository::new(pool.clone()).with_change_recorder(recorder);
 
-        repo.upsert_pair(CurrencyPair::from_storage("USD".into(), "EUR".into()))
-            .await
-            .unwrap();
-        repo.upsert_pair(CurrencyPair::from_storage("USD".into(), "EUR".into()))
-            .await
-            .unwrap();
+        repo.upsert_pair(
+            CurrencyPair::from_storage("USD".into(), "EUR".into()),
+            Origin::User,
+        )
+        .await
+        .unwrap();
+        repo.upsert_pair(
+            CurrencyPair::from_storage("USD".into(), "EUR".into()),
+            Origin::User,
+        )
+        .await
+        .unwrap();
 
         assert_eq!(
             changes_with_operation(&pool, "Created").await,

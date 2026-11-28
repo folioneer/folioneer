@@ -11,7 +11,7 @@ use crate::context::currency::domain::{
 };
 use crate::context::currency::error::CurrencyError;
 use crate::core::{Event, SideEffectEventBus, BACKEND};
-use crate::shared::domain::{Rank, RecordKind, SyncedRecord};
+use crate::shared::domain::{Origin, Rank, RecordKind, SyncedRecord};
 use sqlx::SqliteConnection;
 use std::result::Result as StdResult;
 use std::sync::Arc;
@@ -184,7 +184,7 @@ impl CurrencyService {
         to_currency: String,
     ) -> StdResult<CurrencyPair, CurrencyError> {
         let pair = CurrencyPair::new(from_currency, to_currency)?;
-        let pair = self.pair_repo.upsert_pair(pair).await.map_err(|e| {
+        let pair = self.pair_repo.upsert_pair(pair, Origin::User).await.map_err(|e| {
             tracing::error!(target: BACKEND, err = ?e, "declare_currency_pair: repository failure");
             CurrencyError::DatabaseError
         })?;
@@ -407,7 +407,7 @@ impl CurrencyService {
         // The rate's currencies are already validated by `CurrencyRate::new`, so the
         // pair is reconstructed without re-validation (FXR-013 ensure-pair side-effect).
         let pair = CurrencyPair::from_storage(rate.from_currency.clone(), rate.to_currency.clone());
-        self.pair_repo.upsert_pair(pair).await.map_err(|e| {
+        self.pair_repo.upsert_pair(pair, Origin::User).await.map_err(|e| {
             tracing::error!(target: BACKEND, err = ?e, "record_currency_rate: pair upsert failure");
             CurrencyError::DatabaseError
         })?;
@@ -589,10 +589,14 @@ impl CurrencyService {
     /// lists the persisted pairs.
     async fn ensure_pairs(&self, scope_pairs: Vec<CurrencyPair>) -> StdResult<(), CurrencyError> {
         for pair in scope_pairs {
-            self.pair_repo.upsert_pair(pair).await.map_err(|e| {
-                tracing::error!(target: BACKEND, err = ?e, "ensure_pairs: pair ensure failure");
-                CurrencyError::DatabaseError
-            })?;
+            // CFR-016 — a pair the refresh follows on its own is the application's.
+            self.pair_repo
+                .upsert_pair(pair, Origin::Application)
+                .await
+                .map_err(|e| {
+                    tracing::error!(target: BACKEND, err = ?e, "ensure_pairs: pair ensure failure");
+                    CurrencyError::DatabaseError
+                })?;
         }
         Ok(())
     }
@@ -917,7 +921,7 @@ mod tests {
     #[tokio::test]
     async fn declare_currency_pair_returns_pair_on_first_declaration() {
         let mut pair_repo = MockCurrencyPairRepository::new();
-        pair_repo.expect_upsert_pair().returning(Ok);
+        pair_repo.expect_upsert_pair().returning(|pair, _| Ok(pair));
         let rate_repo = MockCurrencyRateRepository::new();
 
         let svc = make_service(pair_repo, rate_repo);
@@ -938,7 +942,7 @@ mod tests {
         pair_repo
             .expect_upsert_pair()
             .times(2)
-            .returning(|_| Ok(make_pair("USD", "EUR")));
+            .returning(|_, _| Ok(make_pair("USD", "EUR")));
         let rate_repo = MockCurrencyRateRepository::new();
         let svc = make_service(pair_repo, rate_repo);
 
@@ -993,7 +997,7 @@ mod tests {
         let mut pair_repo = MockCurrencyPairRepository::new();
         pair_repo
             .expect_upsert_pair()
-            .returning(|_| Err(anyhow::anyhow!("db exploded")));
+            .returning(|_, _| Err(anyhow::anyhow!("db exploded")));
         let rate_repo = MockCurrencyRateRepository::new();
         let svc = make_service(pair_repo, rate_repo);
 
@@ -1013,7 +1017,7 @@ mod tests {
     #[tokio::test]
     async fn record_currency_rate_upserts_with_source_manual() {
         let mut pair_repo = MockCurrencyPairRepository::new();
-        pair_repo.expect_upsert_pair().returning(Ok);
+        pair_repo.expect_upsert_pair().returning(|pair, _| Ok(pair));
         let mut rate_repo = MockCurrencyRateRepository::new();
         rate_repo.expect_upsert_rate().returning(Ok);
 
@@ -1037,7 +1041,12 @@ mod tests {
     #[tokio::test]
     async fn record_currency_rate_ensures_pair_exists_before_writing_rate() {
         let mut pair_repo = MockCurrencyPairRepository::new();
-        pair_repo.expect_upsert_pair().times(1).returning(Ok);
+        // CFR-016 (#731) — a pair a rate's write creates is the user's, as the rate is.
+        pair_repo
+            .expect_upsert_pair()
+            .times(1)
+            .withf(|_, origin| *origin == Origin::User)
+            .returning(|pair, _| Ok(pair));
         let mut rate_repo = MockCurrencyRateRepository::new();
         rate_repo.expect_upsert_rate().returning(Ok);
 
@@ -1058,7 +1067,7 @@ mod tests {
     #[tokio::test]
     async fn record_currency_rate_publishes_currency_rate_updated_event() {
         let mut pair_repo = MockCurrencyPairRepository::new();
-        pair_repo.expect_upsert_pair().returning(Ok);
+        pair_repo.expect_upsert_pair().returning(|pair, _| Ok(pair));
         let mut rate_repo = MockCurrencyRateRepository::new();
         rate_repo.expect_upsert_rate().returning(Ok);
 
@@ -1519,7 +1528,9 @@ mod tests {
     #[tokio::test]
     async fn record_currency_rate_maps_pair_upsert_failure_to_database_error() {
         let mut pair_repo = MockCurrencyPairRepository::new();
-        pair_repo.expect_upsert_pair().returning(|_| Err(db_err()));
+        pair_repo
+            .expect_upsert_pair()
+            .returning(|_, _| Err(db_err()));
         let rate_repo = MockCurrencyRateRepository::new();
 
         let err = make_service(pair_repo, rate_repo)
@@ -1533,7 +1544,7 @@ mod tests {
     #[tokio::test]
     async fn record_currency_rate_maps_rate_upsert_failure_to_database_error() {
         let mut pair_repo = MockCurrencyPairRepository::new();
-        pair_repo.expect_upsert_pair().returning(Ok);
+        pair_repo.expect_upsert_pair().returning(|pair, _| Ok(pair));
         let mut rate_repo = MockCurrencyRateRepository::new();
         rate_repo.expect_upsert_rate().returning(|_| Err(db_err()));
 
@@ -1919,7 +1930,7 @@ mod tests {
         use std::collections::HashMap;
 
         let mut pair_repo = MockCurrencyPairRepository::new();
-        pair_repo.expect_upsert_pair().returning(Ok);
+        pair_repo.expect_upsert_pair().returning(|pair, _| Ok(pair));
         pair_repo
             .expect_list_pairs_with_latest_rate()
             .times(1)
@@ -1983,7 +1994,7 @@ mod tests {
         use std::collections::HashMap;
 
         let mut pair_repo = MockCurrencyPairRepository::new();
-        pair_repo.expect_upsert_pair().returning(Ok);
+        pair_repo.expect_upsert_pair().returning(|pair, _| Ok(pair));
         pair_repo
             .expect_list_pairs_with_latest_rate()
             .times(1)
@@ -2034,7 +2045,7 @@ mod tests {
         use crate::context::currency::domain::rate_provider::MockRateProvider;
 
         let mut pair_repo = MockCurrencyPairRepository::new();
-        pair_repo.expect_upsert_pair().returning(Ok);
+        pair_repo.expect_upsert_pair().returning(|pair, _| Ok(pair));
         pair_repo
             .expect_list_pairs_with_latest_rate()
             .times(1)
@@ -2080,8 +2091,11 @@ mod tests {
         pair_repo
             .expect_upsert_pair()
             .times(1)
-            .withf(|p: &CurrencyPair| p.from_currency == "CHF" && p.to_currency == "EUR")
-            .returning(Ok);
+            // CFR-016 (#731) — a pair the refresh follows on its own is the application's.
+            .withf(|p: &CurrencyPair, origin| {
+                p.from_currency == "CHF" && p.to_currency == "EUR" && *origin == Origin::Application
+            })
+            .returning(|pair, _| Ok(pair));
         pair_repo
             .expect_list_pairs_with_latest_rate()
             .times(1)
@@ -2146,7 +2160,7 @@ mod tests {
         use std::collections::HashMap;
 
         let mut pair_repo = MockCurrencyPairRepository::new();
-        pair_repo.expect_upsert_pair().returning(Ok);
+        pair_repo.expect_upsert_pair().returning(|pair, _| Ok(pair));
         pair_repo
             .expect_list_pairs_with_latest_rate()
             .times(1)
@@ -2211,7 +2225,7 @@ mod tests {
         use crate::context::currency::domain::rate_provider::MockRateHistoryProvider;
 
         let mut pair_repo = MockCurrencyPairRepository::new();
-        pair_repo.expect_upsert_pair().returning(Ok);
+        pair_repo.expect_upsert_pair().returning(|pair, _| Ok(pair));
         pair_repo
             .expect_list_pairs_with_latest_rate()
             .times(1)
@@ -2265,7 +2279,7 @@ mod tests {
         use crate::context::currency::domain::rate_provider::MockRateHistoryProvider;
 
         let mut pair_repo = MockCurrencyPairRepository::new();
-        pair_repo.expect_upsert_pair().returning(Ok);
+        pair_repo.expect_upsert_pair().returning(|pair, _| Ok(pair));
         pair_repo
             .expect_list_pairs_with_latest_rate()
             .times(1)
@@ -2310,7 +2324,7 @@ mod tests {
         use std::collections::HashMap;
 
         let mut pair_repo = MockCurrencyPairRepository::new();
-        pair_repo.expect_upsert_pair().returning(Ok);
+        pair_repo.expect_upsert_pair().returning(|pair, _| Ok(pair));
         pair_repo
             .expect_list_pairs_with_latest_rate()
             .times(1)
@@ -2360,7 +2374,7 @@ mod tests {
         use crate::context::currency::domain::rate_provider::MockRateHistoryProvider;
 
         let mut pair_repo = MockCurrencyPairRepository::new();
-        pair_repo.expect_upsert_pair().returning(Ok);
+        pair_repo.expect_upsert_pair().returning(|pair, _| Ok(pair));
         pair_repo
             .expect_list_pairs_with_latest_rate()
             .times(1)
@@ -2638,7 +2652,7 @@ mod tests {
     #[tokio::test]
     async fn declare_currency_pair_publishes_currency_pair_updated() {
         let mut pair_repo = MockCurrencyPairRepository::new();
-        pair_repo.expect_upsert_pair().returning(Ok);
+        pair_repo.expect_upsert_pair().returning(|pair, _| Ok(pair));
         let bus = Arc::new(SideEffectEventBus::new());
         let mut rx = bus.subscribe();
         let svc = make_service(pair_repo, MockCurrencyRateRepository::new())

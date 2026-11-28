@@ -46,8 +46,8 @@ pub use received_change::{check_received_change, MalformedChange, TEXT_BOUND};
 pub use resolution::{
     account_parent, cascade_child_tombstones, collision_notice, decide_seen, display_name,
     duplicate_name_notice, local_write_allowed, notice_for, parent_references, reference_outcome,
-    removed_child_notice, replay_order, resolve_observation, upgraded_content, Change, Concurrency,
-    Decision, NoticeDraft, Outcome, RecordState, WaitingFor,
+    removed_child_notice, replay_order, reported_when_dropped, resolve_observation,
+    upgraded_content, Change, Concurrency, Decision, NoticeDraft, Outcome, RecordState, WaitingFor,
 };
 pub use snapshot::{PortfolioRecord, PortfolioSnapshot};
 pub use status::{
