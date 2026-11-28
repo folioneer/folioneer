@@ -870,6 +870,8 @@ struct Workbench {
     pool: sqlx::SqlitePool,
     /// The units of work of the window's account creation (ADR-006).
     transactions: Arc<dyn crate::shared::infrastructure::uow::TransactionManager>,
+    /// The window's currency rates, which the owner types (FXR-025).
+    currencies: Arc<crate::context::currency::CurrencyService>,
 }
 
 async fn workbench(data_dir: &Path) -> Workbench {
@@ -905,6 +907,7 @@ async fn workbench(data_dir: &Path) -> Workbench {
         ),
         pool,
         transactions: container.transactions,
+        currencies: container.currency_service,
     }
 }
 
@@ -5665,7 +5668,7 @@ async fn agt_080_a_portfolio_that_cannot_be_read_is_a_database_error() {
     });
     let request = removal_waiting(&bench.connections).await;
 
-    for table in ["transactions", "asset_prices"] {
+    for table in ["transactions", "asset_prices", "currency_rates"] {
         sqlx::query(&format!("ALTER TABLE {table} RENAME TO {table}_unreadable"))
             .execute(&bench.pool)
             .await
@@ -5684,6 +5687,9 @@ async fn agt_080_a_portfolio_that_cannot_be_read_is_a_database_error() {
         ("list_transactions", json!({ "account": "PEA" })),
         ("get_price", json!({ "asset": "CW8", "date": "2026-01-02" })),
         ("list_prices", json!({ "asset": "CW8" })),
+        // AGT-103 / AGT-105 (#887) — a rate read that fails.
+        ("get_rate", json!({ "from": "USD", "to": "EUR" })),
+        ("list_rates", json!({ "from": "USD", "to": "EUR" })),
         ("request_removal", json!({ "transaction": deposit.id })),
     ] {
         let refused = bench
@@ -8076,6 +8082,16 @@ async fn agt_014_no_answer_carries_a_figure_as_a_number() {
         ("list_transactions", json!({ "account": "PEA" })),
         ("get_price", json!({ "asset": "CW8", "date": "2019-05-01" })),
         ("list_prices", json!({ "asset": "CW8" })),
+        // AGT-103–105 (#887) — a rate is decimal text too.
+        (
+            "record_rate",
+            json!({ "from": "USD", "to": "EUR", "rate": 0.92, "date": "2019-05-01" }),
+        ),
+        (
+            "get_rate",
+            json!({ "from": "USD", "to": "EUR", "date": "2019-05-01" }),
+        ),
+        ("list_rates", json!({ "from": "USD", "to": "EUR" })),
     ] {
         let answer = bench
             .tools
@@ -8222,4 +8238,278 @@ async fn agt_014_a_percentage_reads_as_its_decimal() {
     assert!(held.get("fee_rate_percent_micros").is_none());
     // 120 held of 5,120 with the 5,000 of cash the seed deposited.
     assert_eq!(held["weight_pct"], "2.34375", "{held}");
+}
+
+// AGT-103 / AGT-104 (#887) — an agent reads a pair's rate at a date, as the Currency Rates
+// view holds it, and records one marked `Agent`; the pair it names is followed from then on.
+#[tokio::test]
+async fn agt_103_104_an_agent_reads_and_records_a_currency_rate() {
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let granted = session(&bench.connections).await;
+    let call = |tool: &'static str, arguments: Value| {
+        let (tools, granted) = (&bench.tools, &granted);
+        async move { tools.call(granted, tool, &arguments).await }
+    };
+    bench
+        .currencies
+        .record_currency_rate(
+            "USD".to_string(),
+            "EUR".to_string(),
+            "2026-03-02".to_string(),
+            920_000,
+        )
+        .await
+        .expect("the owner's rate");
+
+    // The rate of the date or the closest earlier one, with its own date and its source.
+    let read = call(
+        "get_rate",
+        json!({ "from": "usd", "to": "eur", "date": "2026-03-10" }),
+    )
+    .await
+    .expect("read");
+    assert_eq!(
+        read,
+        json!({ "status": "rated", "from": "USD", "to": "EUR", "date": "2026-03-10",
+            "rate": { "date": "2026-03-02", "rate": "0.92", "source": "Manual" } })
+    );
+    // Before the first rate, and for the reverse pair: an answer, not a refusal.
+    let before = call(
+        "get_rate",
+        json!({ "from": "USD", "to": "EUR", "date": "2026-03-01" }),
+    )
+    .await
+    .expect("read");
+    assert_eq!(
+        (before["status"].clone(), before["rate"].clone()),
+        (json!("no_rate"), Value::Null)
+    );
+    let reverse = call(
+        "get_rate",
+        json!({ "from": "EUR", "to": "USD", "date": "2026-03-10" }),
+    )
+    .await
+    .expect("read");
+    assert_eq!(reverse["status"], "no_rate");
+
+    // The agent's rate wins on its date and is marked `Agent`.
+    let recorded = call(
+        "record_rate",
+        json!({ "from": "usd", "to": "eur", "rate": "0.93", "date": "2026-03-02" }),
+    )
+    .await
+    .expect("recorded");
+    assert_eq!(
+        recorded,
+        json!({ "status": "recorded", "from": "USD", "to": "EUR",
+            "rate": { "date": "2026-03-02", "rate": "0.93", "source": "Agent" } })
+    );
+    // A pair no one followed is declared by the write.
+    call(
+        "record_rate",
+        json!({ "from": "CHF", "to": "EUR", "rate": 1.05, "date": "2026-03-02" }),
+    )
+    .await
+    .expect("a new pair");
+    let pairs = bench.currencies.list_currency_pairs().await.expect("pairs");
+    assert!(pairs
+        .iter()
+        .any(|pair| pair.from_currency == "CHF" && pair.to_currency == "EUR"));
+
+    // The rate's own refusals, and a read's.
+    for (tool, arguments, code) in [
+        ("get_rate", json!({ "from": "USD" }), "MissingArgument"),
+        (
+            "get_rate",
+            json!({ "from": "XXQ", "to": "EUR" }),
+            "InvalidCurrency",
+        ),
+        (
+            "get_rate",
+            json!({ "from": "EUR", "to": "eur" }),
+            "IdentityPair",
+        ),
+        (
+            "get_rate",
+            json!({ "from": "USD", "to": "EUR", "date": "2999-01-01" }),
+            "InvalidDate",
+        ),
+        (
+            "record_rate",
+            json!({ "from": "USD", "to": "EUR", "rate": "0" }),
+            "NotPositive",
+        ),
+        (
+            "record_rate",
+            json!({ "from": "USD", "to": "EUR", "rate": "abc" }),
+            "InvalidFigure",
+        ),
+        (
+            "record_rate",
+            json!({ "from": "USD", "to": "USD", "rate": "1" }),
+            "IdentityPair",
+        ),
+        (
+            "record_rate",
+            json!({ "from": "USD", "to": "EUR", "rate": "1", "date": "2999-01-01" }),
+            "DateInFuture",
+        ),
+        (
+            "record_rate",
+            json!({ "from": "USD", "to": "EUR", "rate": "1", "date": "2026-13-01" }),
+            "InvalidDateFormat",
+        ),
+        (
+            "record_rate",
+            json!({ "from": "USD", "to": "EUR" }),
+            "MissingArgument",
+        ),
+        (
+            "record_rate",
+            json!({ "from": "USD", "to": "EUR", "rate": "1", "date": 20260301 }),
+            "InvalidArguments",
+        ),
+        (
+            "record_rate",
+            json!({ "from": "XXQ", "to": "EUR", "rate": "1" }),
+            "InvalidCurrency",
+        ),
+        (
+            "record_rate",
+            json!({ "from": "USD", "to": "EUR", "rate": "2000000000000" }),
+            "RateOutOfRange",
+        ),
+        (
+            "get_rate",
+            json!({ "from": "USD", "to": "EUR", "date": 20260301 }),
+            "InvalidDate",
+        ),
+    ] {
+        let refusal = call(tool, arguments.clone()).await.expect_err("refused");
+        assert_eq!(refusal.code, code, "{tool} {arguments}");
+    }
+
+    // AGT-052 — an answered read counts as one of the session's reads; a rate is no
+    // transaction, so the window is told of none.
+    let reads = bench.connections.sessions().remove(0).reads;
+    call("get_rate", json!({ "from": "USD", "to": "EUR" }))
+        .await
+        .expect("read");
+    let session = bench.connections.sessions().remove(0);
+    assert_eq!(session.reads, reads + 1);
+    assert_eq!(session.recordings, 0);
+
+    // AGT-047 — the two rates took two places of the session's limit: the rest filled, the
+    // next rate is refused.
+    for _ in 2..super::connections::MAX_RECORDINGS {
+        granted.count_recording();
+    }
+    let past_the_limit = call(
+        "record_rate",
+        json!({ "from": "USD", "to": "EUR", "rate": "0.9", "date": "2026-03-03" }),
+    )
+    .await
+    .expect_err("refused");
+    assert_eq!(past_the_limit.code, "SessionLimitReached");
+}
+
+// AGT-105 (#887) — a pair's rates over a period, oldest first, one page at a time.
+#[tokio::test]
+async fn agt_105_an_agent_lists_a_pairs_rates_over_a_period() {
+    use super::tools::RATES_PER_PAGE;
+
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let granted = session(&bench.connections).await;
+    let call = |tool: &'static str, arguments: Value| {
+        let (tools, granted) = (&bench.tools, &granted);
+        async move { tools.call(granted, tool, &arguments).await }
+    };
+    let none = call("list_rates", json!({ "from": "USD", "to": "EUR" }))
+        .await
+        .expect("answered");
+    assert_eq!(
+        (
+            none["total"].clone(),
+            none["pages"].clone(),
+            none["rates"].clone()
+        ),
+        (json!(0), json!(0), json!([]))
+    );
+
+    let first_day = chrono::NaiveDate::from_ymd_opt(2020, 1, 1).expect("a day");
+    let days: Vec<String> = (0..=RATES_PER_PAGE as u64)
+        .map(|offset| {
+            (first_day + chrono::Days::new(offset))
+                .format("%Y-%m-%d")
+                .to_string()
+        })
+        .collect();
+    for day in days.iter().rev() {
+        bench
+            .currencies
+            .record_currency_rate("USD".to_string(), "EUR".to_string(), day.clone(), 900_000)
+            .await
+            .expect("a rate");
+    }
+    let first = call("list_rates", json!({ "from": "usd", "to": "eur" }))
+        .await
+        .expect("listed");
+    assert_eq!(first["total"], json!(days.len()));
+    assert_eq!(first["pages"], 2);
+    assert_eq!(first["rates"][0]["date"], days[0].as_str());
+    assert_eq!(first["rates"][0]["source"], "Manual");
+    let second = call(
+        "list_rates",
+        json!({ "from": "USD", "to": "EUR", "page": 2 }),
+    )
+    .await
+    .expect("listed");
+    assert_eq!(second["rates"].as_array().expect("rates").len(), 1);
+    let past = call(
+        "list_rates",
+        json!({ "from": "USD", "to": "EUR", "page": 3 }),
+    )
+    .await
+    .expect("a page past the last is answered");
+    assert_eq!(past["rates"], json!([]));
+    let future = call(
+        "list_rates",
+        json!({ "from": "USD", "to": "EUR", "from_date": "2999-01-01" }),
+    )
+    .await
+    .expect("future bounds are not refused");
+    assert_eq!(future["total"], 0);
+
+    let bounded = call(
+        "list_rates",
+        json!({ "from": "USD", "to": "EUR", "from_date": days[2], "to_date": days[4] }),
+    )
+    .await
+    .expect("listed");
+    assert_eq!(bounded["total"], 3);
+    let inverted = call(
+        "list_rates",
+        json!({ "from": "USD", "to": "EUR", "from_date": days[4], "to_date": days[2] }),
+    )
+    .await
+    .expect("not refused");
+    assert_eq!(inverted["total"], 0);
+    for (arguments, code) in [
+        (
+            json!({ "from": "USD", "to": "EUR", "from_date": 3 }),
+            "InvalidDate",
+        ),
+        (
+            json!({ "from": "USD", "to": "EUR", "page": "2" }),
+            "InvalidArguments",
+        ),
+        (json!({ "from": "USD", "to": "USD" }), "IdentityPair"),
+    ] {
+        let refusal = call("list_rates", arguments.clone())
+            .await
+            .expect_err("refused");
+        assert_eq!(refusal.code, code, "{arguments}");
+    }
 }

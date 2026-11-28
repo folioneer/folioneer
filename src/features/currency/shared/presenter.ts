@@ -83,6 +83,9 @@ export function formatRateSource(source: CurrencyRateSource | null): string | nu
       return "currency.source_frankfurter";
     case "Ecb":
       return "currency.source_ecb";
+    // FXR-103 — a rate an AI agent recorded.
+    case "Agent":
+      return "currency.source_agent";
   }
 }
 

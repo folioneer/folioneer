@@ -14,7 +14,7 @@ use crate::context::asset::{
     Asset, AssetClass, AssetCreationDefaults, AssetError, AssetKind, AssetServiceContract,
     NamedAsset,
 };
-use crate::context::currency::CurrencyService;
+use crate::context::currency::{CurrencyError, CurrencyRate, CurrencyService};
 use crate::core::BACKEND;
 use crate::shared::domain::quantity::{stored_non_cash_quantity, FigureTextError};
 use crate::use_cases::account_creation::{AccountAskedByAgent, AccountCreationUseCase};
@@ -134,6 +134,8 @@ pub struct AgentTools {
     details: AccountDetailsUseCase,
     /// Where a removal request waits for the owner's answer (AGT-080).
     connections: Arc<AgentConnections>,
+    /// The window's currency rates (AGT-103–105).
+    currency_service: Arc<CurrencyService>,
 }
 
 impl AgentTools {
@@ -168,8 +170,9 @@ impl AgentTools {
             details: AccountDetailsUseCase::new(
                 Arc::clone(&account_service),
                 Arc::clone(&asset_service),
-                currency_service,
+                Arc::clone(&currency_service),
             ),
+            currency_service,
             account_service,
             asset_service,
             connections,
@@ -294,6 +297,9 @@ impl AgentTools {
             "describe_rules" => Ok(super::rules::described()),
             "get_price" => self.get_price(arguments).await,
             "list_prices" => self.list_prices(arguments).await,
+            "get_rate" => self.get_rate(arguments).await,
+            "list_rates" => self.list_rates(arguments).await,
+            "record_rate" => self.record_rate(granted, arguments).await,
             "list_holdings" => {
                 let account = text(arguments, "account")?;
                 // AGT-043 — a date that is not text is refused, never read as today.
@@ -399,6 +405,98 @@ impl AgentTools {
             "price": recorded.price,
             "asset": recorded.asset_reference,
             "currency": recorded.currency,
+        }))
+    }
+
+    /// AGT-103 — the rate a pair holds at a date, or the closest earlier one; `no_rate`
+    /// when it has none up to that date.
+    async fn get_rate(&self, arguments: &Value) -> Result<Value, Refusal> {
+        let (from, to) = pair_of(arguments)?;
+        // A date that is not text is refused, never read as today (AGT-043).
+        let date = optional_text(arguments, "date")
+            .map_err(|_| not_a_date("date"))?
+            .unwrap_or_else(today);
+        if !is_a_date(&date) || date > today() {
+            return Err(not_a_date("date"));
+        }
+        let rate = self
+            .currency_service
+            .rate_as_of(&from, &to, &date)
+            .await
+            .map_err(refused_rate)?;
+        Ok(serde_json::json!({
+            "status": if rate.is_some() { "rated" } else { "no_rate" },
+            "from": from,
+            "to": to,
+            "date": date,
+            "rate": rate.as_ref().map(rate_row),
+        }))
+    }
+
+    /// AGT-105 — a pair's rates between two dates, oldest first, one page at a time.
+    async fn list_rates(&self, arguments: &Value) -> Result<Value, Refusal> {
+        let (from, to) = pair_of(arguments)?;
+        let bound = |name: &str| -> Result<Option<String>, Refusal> {
+            let bound = optional_text(arguments, name).map_err(|_| not_a_date(name))?;
+            match bound {
+                Some(date) if !is_a_date(&date) => Err(not_a_date(name)),
+                bound => Ok(bound),
+            }
+        };
+        let (from_date, to_date, page) = (bound("from_date")?, bound("to_date")?, page(arguments)?);
+        let kept = self
+            .currency_service
+            .rates_between(&from, &to, from_date.as_deref(), to_date.as_deref())
+            .await
+            .map_err(refused_rate)?;
+        let total = kept.len();
+        let rates: Vec<Value> = kept
+            .iter()
+            .skip((page - 1).saturating_mul(RATES_PER_PAGE))
+            .take(RATES_PER_PAGE)
+            .map(rate_row)
+            .collect();
+        Ok(serde_json::json!({
+            "status": "listed",
+            "from": from,
+            "to": to,
+            "total": total,
+            "page": page,
+            "pages": total.div_ceil(RATES_PER_PAGE),
+            "rates": rates,
+        }))
+    }
+
+    /// AGT-104 — records the rate an agent gave, through the window form's rules, marked
+    /// `Agent`; it takes one place of the session's limit (AGT-047).
+    async fn record_rate(&self, granted: &Granted, arguments: &Value) -> Result<Value, Refusal> {
+        let from = text(arguments, "from")?.to_uppercase();
+        let to = text(arguments, "to")?.to_uppercase();
+        let rate = amount(arguments, "rate")?;
+        let date = optional_text(arguments, "date")?.unwrap_or_else(today);
+        if !granted.may_record_one_more() {
+            return Err(session_limit_reached());
+        }
+        // As a recording (AGT-049): once started, the write runs to its end.
+        let service = Arc::clone(&self.currency_service);
+        let recorded = spawn_within_profile(async move {
+            service
+                .record_currency_rate_by_agent(from, to, date, rate)
+                .await
+        })
+        .await
+        .map_err(|error| {
+            tracing::error!(target: BACKEND, err = ?error, "agent rate: the task ended early");
+            portfolio_unreadable()
+        })?
+        .map_err(refused_rate)?;
+        granted.count_recording();
+        tracing::info!(target: BACKEND, session = granted.session_id, from = %recorded.from_currency, to = %recorded.to_currency, date = %recorded.date, "agent recorded a rate");
+        Ok(serde_json::json!({
+            "status": "recorded",
+            "from": recorded.from_currency,
+            "to": recorded.to_currency,
+            "rate": rate_row(&recorded),
         }))
     }
 
@@ -1104,6 +1202,48 @@ fn price_of(arguments: &Value) -> Result<PriceAt, Refusal> {
         date: optional_text(arguments, "date")?,
         price: amount(arguments, "price")?,
     })
+}
+
+/// AGT-105 — rates to a page, as prices are (AGT-075).
+pub(super) const RATES_PER_PAGE: usize = 100;
+
+/// AGT-103 — the pair a rate tool names, its codes read with case ignored.
+fn pair_of(arguments: &Value) -> Result<(String, String), Refusal> {
+    Ok((
+        text(arguments, "from")?.to_uppercase(),
+        text(arguments, "to")?.to_uppercase(),
+    ))
+}
+
+/// AGT-103 — a rate as the tools give it: its own date, the rate as decimal text
+/// (AGT-014) and its source (FXR-100).
+fn rate_row(rate: &CurrencyRate) -> Value {
+    serde_json::json!({
+        "date": rate.date,
+        "rate": crate::use_cases::holding_transaction::decimal(rate.rate),
+        "source": rate.source,
+    })
+}
+
+/// FXR-021–023 — the rate's own refusal, with its code.
+fn refused_rate(error: CurrencyError) -> Refusal {
+    Refusal {
+        code: crate::use_cases::holding_transaction::code_of(&error),
+        message: error.to_string(),
+    }
+}
+
+/// A date written `YYYY-MM-DD`.
+fn is_a_date(text: &str) -> bool {
+    chrono::NaiveDate::parse_from_str(text, "%Y-%m-%d").is_ok()
+}
+
+/// AGT-043 — a date that is not one, refused as a read refuses it.
+fn not_a_date(name: &str) -> Refusal {
+    Refusal {
+        code: "InvalidDate".to_string(),
+        message: format!("{name} is not a past date written YYYY-MM-DD"),
+    }
 }
 
 /// AGT-072 — the calls `preview_recording` previews.

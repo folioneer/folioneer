@@ -1,7 +1,7 @@
 # Contract — Sync
 
 > Domain: `sync`
-> Last updated by: `multi-device-sync` + `sync-conflict-resolution` specs — `financial-asset-transaction` (TRX-024B), `cost-basis` (CBM-010, CBM-012A/B, CBM-033), `profile` (PFL-060), `account` (ACC-050), `cost-basis` (CBM-024)
+> Last updated by: `multi-device-sync` + `sync-conflict-resolution` specs — `financial-asset-transaction` (TRX-024B), `cost-basis` (CBM-010, CBM-012A/B, CBM-033), `profile` (PFL-060), `account` (ACC-050), `cost-basis` (CBM-024), `fx-rate` (FXR-103)
 
 > **Error model on the wire**: each command's error serializes as a flat `{ code: "VariantName", ...payload }` object. The FE matches on `code`. Per-command reachable codes are listed in the "Errors" column. Infrastructure failures surface as `{ code: "DatabaseError" }` (no payload; diagnostic chain preserved server-side via `tracing::error!`), consistent with the other contracts. Precondition guards not stated as rejections in the spec are marked _(precondition guard — inferred)_.
 >
@@ -203,6 +203,7 @@ Record identity per kind follows CFR-012: accounts, categories, assets, transact
 
 ## Changelog
 
+- 2026-11-28 — #887 (SYN-038, FXR-103): data format version 20: a synced currency rate's `source` may be `Agent`. Nothing else of the written form moves.
 - 2026-11-22 — #425: `SyncCompleted` is also raised when a run's held-back count or undismissed notice count differs from the previous run's (SYN-064).
 - 2026-11-15 — #788 (SYN-038, CBM-024): data format version 19: the synced transaction record gains `carried_lots` (a list of `{acquired_on, quantity, cost, free}`). Storage and sync only: the `Transaction` the commands return (`TransactionView`) is unchanged, and no command or type changed.
 - 2026-11-09 — #769 (SYN-038, ACC-050): data format version 18: the account record gains `holder`.

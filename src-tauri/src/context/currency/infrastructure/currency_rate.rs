@@ -112,12 +112,7 @@ impl CurrencyRateRepository for SqliteCurrencyRateRepository {
         } else {
             Operation::Created
         };
-        // CFR-016 — a rate the application fetched on its own is an application change.
-        let origin = if rate.source == CurrencyRateSource::Manual {
-            Origin::User
-        } else {
-            Origin::Application
-        };
+        let origin = origin_of(&rate.source);
         let draft = ChangeDraft::new(
             RecordKind::CurrencyRate,
             identity(&rate.from_currency, &rate.to_currency, &rate.date),
@@ -259,8 +254,33 @@ impl CurrencyRateRepository for SqliteCurrencyRateRepository {
     }
 }
 
+/// CFR-016 — a rate the owner typed or an AI agent recorded for the owner (FXR-103) is a user
+/// change; one the application fetched on its own is an application change.
+fn origin_of(source: &CurrencyRateSource) -> Origin {
+    match source {
+        CurrencyRateSource::Manual | CurrencyRateSource::Agent => Origin::User,
+        CurrencyRateSource::Frankfurter | CurrencyRateSource::Ecb => Origin::Application,
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    // CFR-016 / FXR-103 (#887) — an agent records for the owner: its rate ranks as a user
+    // change, like one the owner typed, and above one the application fetched.
+    #[test]
+    fn cfr_016_a_rate_an_agent_recorded_is_a_user_change() {
+        assert_eq!(super::origin_of(&CurrencyRateSource::Agent), Origin::User);
+        assert_eq!(super::origin_of(&CurrencyRateSource::Manual), Origin::User);
+        assert_eq!(
+            super::origin_of(&CurrencyRateSource::Frankfurter),
+            Origin::Application
+        );
+        assert_eq!(
+            super::origin_of(&CurrencyRateSource::Ecb),
+            Origin::Application
+        );
+    }
+
     use super::*;
     use sqlx::sqlite::SqlitePoolOptions;
 

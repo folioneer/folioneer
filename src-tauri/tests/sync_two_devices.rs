@@ -2276,6 +2276,7 @@ fn written_values_of_every_synced_enum() -> serde_json::Value {
         ]),
         "CurrencyRateSource": written_values!(CurrencyRateSource, [
             CurrencyRateSource::Manual, CurrencyRateSource::Frankfurter, CurrencyRateSource::Ecb,
+            CurrencyRateSource::Agent,
         ]),
         "CostBasisMethod": written_values!(CostBasisMethod, [
             CostBasisMethod::WeightedAverage, CostBasisMethod::Fifo,

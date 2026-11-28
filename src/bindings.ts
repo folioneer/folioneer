@@ -1121,9 +1121,10 @@ async recordInterest(dto: RecordInterestDTO) : Promise<Result<Transaction, Inter
  * 
  * Lazy catch-up: for each active schedule, generates one deduction per completed
  * period since `last_applied_period`, dated at the period boundary, in
- * chronological order. Skips periods where the holding quantity was 0 (FEE-047)
- * or where the deduction would oversell (FEE-044). Advances the cursor even
- * for skipped periods (FEE-043).
+ * chronological order. Skips periods where nothing is removed (FEE-070) or where the
+ * deduction would oversell a later transaction (FEE-047), and settles a period whose
+ * deduction already exists (FEE-048A). Advances the cursor even for skipped periods
+ * (FEE-043).
  */
 async applyDueFeeDeductions() : Promise<Result<null, FeeGenerationError>> {
     try {
@@ -1531,9 +1532,9 @@ event: "event"
 
 /** user-defined constants **/
 
+export const ASSET_CREATION_DEFAULTS = {"category_id":"default-uncategorized","class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"DigitalAsset","default_risk":5},{"class":"Derivatives","default_risk":5}],"kind":"Listed","kinds":[{"class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":true,"has_isin":true,"has_lookup":true,"kind":"Listed","may_bear_interest":true,"proposes_reference":false},{"class":"DigitalAsset","classes":[{"class":"DigitalAsset","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Crypto","may_bear_interest":false,"proposes_reference":false},{"class":"RealEstate","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Custom","may_bear_interest":true,"proposes_reference":true}],"risk_level":4,"risk_levels":[1,2,3,4,5]} as const;
 export const DEFAULT_PROFILE_ID = "default-profile" as const;
 export const SYSTEM_CATEGORY_IDS = ["default-uncategorized","system-cash-category"] as const;
-export const ASSET_CREATION_DEFAULTS = {"category_id":"default-uncategorized","class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"DigitalAsset","default_risk":5},{"class":"Derivatives","default_risk":5}],"kind":"Listed","kinds":[{"class":"Stocks","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":true,"has_isin":true,"has_lookup":true,"kind":"Listed","may_bear_interest":true,"proposes_reference":false},{"class":"DigitalAsset","classes":[{"class":"DigitalAsset","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Crypto","may_bear_interest":false,"proposes_reference":false},{"class":"RealEstate","classes":[{"class":"RealEstate","default_risk":2},{"class":"Stocks","default_risk":4},{"class":"Bonds","default_risk":2},{"class":"ETF","default_risk":3},{"class":"ETP","default_risk":3},{"class":"MutualFunds","default_risk":3},{"class":"Derivatives","default_risk":5}],"has_exchange":false,"has_isin":false,"has_lookup":false,"kind":"Custom","may_bear_interest":true,"proposes_reference":true}],"risk_level":4,"risk_levels":[1,2,3,4,5]} as const;
 
 /** user-defined types **/
 
@@ -3415,7 +3416,11 @@ export type CurrencyRateSource =
 /**
  * Auto-fetched from the ECB XML feed fallback (FXR-102).
  */
-"Ecb"
+"Ecb" | 
+/**
+ * Recorded by an AI agent the owner allowed (FXR-103, AGT-104).
+ */
+"Agent"
 /**
  * Flat error enum for `export_portfolio`; serializes as `{ "code": "..." }`.
  */

@@ -411,7 +411,7 @@ The action in the Currency Rates view that records one exchange rate per day, fo
 
 ### CurrencyRateSource
 
-Where a currency rate came from: `Manual` (entered by the user), or `Frankfurter` / `Ecb` (fetched from a provider). Informational only — it does not change which rate applies.
+Where a currency rate came from: `Manual` (entered by the user), `Frankfurter` / `Ecb` (fetched from a provider), or `Agent` (recorded by an AI agent the owner allowed — the mark of a rate). Informational only — it does not change which rate applies.
 
 > Status: confirmed
 

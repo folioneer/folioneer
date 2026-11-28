@@ -1277,6 +1277,7 @@
     "source_manual": "Manuell",
     "source_frankfurter": "Frankfurter",
     "source_ecb": "EZB",
+    "source_agent": "KI-Agent",
     "error": {
       "from_required": "Die Ausgangswährung ist erforderlich.",
       "to_required": "Die Zielwährung ist erforderlich.",

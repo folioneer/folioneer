@@ -101,6 +101,8 @@ pub enum CurrencyRateSource {
     Frankfurter,
     /// Auto-fetched from the ECB XML feed fallback (FXR-102).
     Ecb,
+    /// Recorded by an AI agent the owner allowed (FXR-103, AGT-104).
+    Agent,
 }
 
 /// Interface for CurrencyRate persistence.

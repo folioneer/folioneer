@@ -175,6 +175,12 @@ describe("formatRateSource (FXR-102)", () => {
     const source: CurrencyRateSource = "Ecb";
     expect(formatRateSource(source)).toBe("currency.source_ecb");
   });
+
+  // FXR-103 (#887) — a rate an AI agent recorded is labelled as a price an agent recorded is.
+  it("maps Agent to the agent i18n key (FXR-103)", () => {
+    const source: CurrencyRateSource = "Agent";
+    expect(formatRateSource(source)).toBe("currency.source_agent");
+  });
 });
 
 // ---------------------------------------------------------------------------
