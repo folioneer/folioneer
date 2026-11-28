@@ -257,7 +257,7 @@
       "yahoo_finance": "Yahoo Finance is an unofficial source. Prices are fetched from this computer, under Yahoo's terms, for your personal use, and it may stop at any time."
     },
     "price_provider_note": {
-      "yahoo_finance": "An unofficial source, under Yahoo's terms, that may stop. A failed fetch keeps the last price, shown as outdated."
+      "yahoo_finance": "An unofficial source, under Yahoo's terms, that may stop. A failed fetch keeps the last price, outdated once older than its asset allows."
     },
     "price_provider_understood_label": "I understand",
     "price_provider_understood_description": "Prices start being fetched once this is ticked. You can turn the source off at any time.",

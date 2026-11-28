@@ -257,7 +257,7 @@
       "yahoo_finance": "Yahoo Finance est une source non officielle. Les prix sont récupérés depuis cet ordinateur, selon les conditions de Yahoo, pour votre usage personnel, et cela peut s'arrêter à tout moment."
     },
     "price_provider_note": {
-      "yahoo_finance": "Une source non officielle, selon les conditions de Yahoo, qui peut s'arrêter. Une récupération échouée conserve le dernier prix, signalé comme ancien."
+      "yahoo_finance": "Une source non officielle, selon les conditions de Yahoo, qui peut s'arrêter. Une récupération échouée conserve le dernier prix, ancien une fois plus vieux que son actif ne le permet."
     },
     "price_provider_understood_label": "J'ai compris",
     "price_provider_understood_description": "La récupération des prix commence dès que cette case est cochée. Vous pouvez désactiver la source à tout moment.",

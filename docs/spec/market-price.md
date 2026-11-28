@@ -493,7 +493,7 @@ A computer has no External provider until it chooses one ([ADR-024](../adr/024-t
 
 **MKT-216 — The choice being read or saved (frontend)**: While the choice is being read or saved the section says so; while it is saved, the list and the checkbox cannot change. A read that fails is said in place of the list; the rest of Settings stays usable.
 
-**MKT-217 — With a provider chosen (frontend)**: Once a choice is saved the interface asks again what it was told (MKT-211). With a provider chosen the settings of MKT-120 and SPF-010 appear, and the section recalls what the source is and that a failed fetch keeps the last price, judged outdated (MKT-205).
+**MKT-217 — With a provider chosen (frontend)**: Once a choice is saved the interface asks again what it was told (MKT-211). With a provider chosen the settings of MKT-120 and SPF-010 appear, and the section recalls what the source is and that a failed fetch keeps the last price, outdated once older than its kind and class allow, when they allow an age at all (MKT-205).
 
 **MKT-218 — Choosing a provider starts a fetch (frontend)**: A provider just chosen starts one fetch of every active holding, whatever the auto-fetch setting (MKT-120), under the launch's trigger (MKT-121). A fetch that is refused or fails changes nothing in the choice and shows nothing in the section.
 

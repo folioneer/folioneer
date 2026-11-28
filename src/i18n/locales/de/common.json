@@ -257,7 +257,7 @@
       "yahoo_finance": "Yahoo Finance ist eine inoffizielle Quelle. Die Kurse werden von diesem Computer aus, gemäß den Bedingungen von Yahoo, für Ihre private Nutzung abgerufen, und die Quelle kann jederzeit wegfallen."
     },
     "price_provider_note": {
-      "yahoo_finance": "Eine inoffizielle Quelle, gemäß den Bedingungen von Yahoo, die wegfallen kann. Bei einem fehlgeschlagenen Abruf bleibt der letzte Kurs erhalten und wird als veraltet angezeigt."
+      "yahoo_finance": "Eine inoffizielle Quelle, gemäß den Bedingungen von Yahoo, die wegfallen kann. Bei einem fehlgeschlagenen Abruf bleibt der letzte Kurs erhalten; er gilt als veraltet, sobald er älter ist, als die Anlage erlaubt."
     },
     "price_provider_understood_label": "Ich habe verstanden",
     "price_provider_understood_description": "Die Kurse werden abgerufen, sobald dies angehakt ist. Sie können die Quelle jederzeit ausschalten.",

@@ -74,7 +74,6 @@ export function useSplitTransaction({
   const showSnackbar = useSnackbar();
 
   const isEditMode = editMode != null;
-  const hasCurrentPrice = target.currentPriceMicro !== null;
 
   const [formData, setFormData] = useState<SplitFormData>(() => ({
     date: editMode?.initialDate ?? target.prefill?.date ?? getLastOperationDate(accountId),
@@ -83,9 +82,8 @@ export function useSplitTransaction({
     factor: editMode?.initialFactor ?? "",
     note: editMode?.initialNote ?? "",
   }));
-  // SPL-040 — checked by default when a prior price exists; unchecked (and the
-  // derived field empty) when none does. Absent in edit mode.
-  const [recordPrice, setRecordPrice] = useState(!isEditMode && hasCurrentPrice);
+  // SPL-040 — the owner's own tick, once given; until then the core's carried price decides.
+  const [recordPriceChoice, setRecordPrice] = useState<boolean | null>(null);
   // The price field is a derived prefill until the user types an explicit value.
   const [priceOverride, setPriceOverride] = useState<string | null>(null);
   const [error, setError] = useState<I18nMessage | null>(null);
@@ -159,10 +157,17 @@ export function useSplitTransaction({
   );
 
   // SPL-040 — the post-split price prefill is the core's: the latest price carried
-  // across the split.
-  const priceAfterSplit = check.data?.price_after_split ?? null;
+  // across the split. The last answer stands while the next check is pending or reports a
+  // problem, so the box and the field do not flicker as the owner types (F29).
+  const [priceAfterSplit, setPriceAfterSplit] = useState<number | null>(null);
+  if (check.data !== null && check.data.price_after_split !== priceAfterSplit) {
+    setPriceAfterSplit(check.data.price_after_split);
+  }
   const priceInput =
     priceOverride ?? (priceAfterSplit === null ? "" : microToFieldDecimal(priceAfterSplit));
+  // SPL-040A — checked by default when the core carries a price before the split date;
+  // unchecked (and the derived field empty) when it carries none. Absent in edit mode.
+  const recordPrice = !isEditMode && (recordPriceChoice ?? priceAfterSplit !== null);
 
   const isFormValid = check.data !== null;
   const factorMicro = check.data?.factor ?? null;
@@ -251,7 +256,6 @@ export function useSplitTransaction({
     isSubmitting,
     isFormValid,
     isEditMode,
-    hasCurrentPrice,
     recordPrice,
     setRecordPrice,
     priceInput,

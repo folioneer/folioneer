@@ -44,9 +44,15 @@ export function useWebLookupModal(): UseWebLookupModalReturn {
   const setIsinQuery = useCallback((q: string) => setIsinQueryState(q), []);
   const setKeywordQuery = useCallback((q: string) => setKeywordQueryState(q), []);
 
+  // AST-040 / WEB-047 — a kind that shows its form keeps a pre-filled form and its way
+  // back to the search; a kind that starts from the lookup returns to the search.
   const selectKind = useCallback((next: AssetKind) => {
     setKind(next);
-    setModalStep(firstStepOf(next));
+    setModalStep((current) =>
+      current.step === "form-prefilled" && !kindFormOf(next)?.has_lookup
+        ? current
+        : firstStepOf(next),
+    );
   }, []);
 
   const submitSearch = useCallback(

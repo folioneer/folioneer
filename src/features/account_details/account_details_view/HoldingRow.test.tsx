@@ -1092,13 +1092,17 @@ describe("HoldingRow — note action (HNO-042)", () => {
     expect(onNote).toHaveBeenCalledWith("asset-1");
   });
 
-  it("hides the note button when the asset is archived", () => {
+  // HNO-042 (#812) — the Note action stays on an archived holding: its note can still be
+  // read, edited or removed (HNO-011 does not check archiving).
+  it("offers the note button when the asset is archived", () => {
     useAppStore.setState({
       assets: [{ id: "asset-1", is_archived: true, currency: "USD" }] as unknown as Asset[],
       accounts: [],
     });
-    renderWithNote(baseRow, vi.fn());
-    expect(document.querySelector("#action-note-asset-1")).toBeNull();
+    const onNote = vi.fn();
+    renderWithNote(baseRow, onNote);
+    fireEvent.click(screen.getByRole("button", { name: "account_details.action_note" }));
+    expect(onNote).toHaveBeenCalledWith("asset-1");
   });
 
   it("hides the note button in the read-only as-of view", () => {

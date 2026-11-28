@@ -61,6 +61,8 @@ interface AppState {
 
   // Error handling
   assetsError: string | null;
+  /** F29 — the asset list was read once: a later re-read keeps it on screen. */
+  assetsRead: boolean;
   categoriesError: string | null;
   accountsError: string | null;
 
@@ -116,14 +118,18 @@ export const useAppStore = create<AppState>((set, get) => {
     isLoadingAccounts: false,
     isInitialized: false,
     assetsError: null,
+    assetsRead: false,
     categoriesError: null,
     accountsError: null,
 
     fetchAssets: async () => {
-      set({ isLoadingAssets: true, assetsError: null });
+      // F29 — the loading state shows for the first read and for a Retry after a failed
+      // read; a re-read after a change keeps the listed assets on screen.
+      const { assetsRead, assetsError } = get();
+      set({ isLoadingAssets: !assetsRead || assetsError !== null, assetsError: null });
       const result = await assetGateway.getAssetsWithArchived();
       if (result.status === "ok") {
-        set({ assets: result.data, isLoadingAssets: false });
+        set({ assets: result.data, isLoadingAssets: false, assetsRead: true });
       } else {
         set({
           assetsError: `error.${result.error.code}`,

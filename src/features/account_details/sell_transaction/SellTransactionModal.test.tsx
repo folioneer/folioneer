@@ -111,3 +111,22 @@ describe("SellTransactionModal", () => {
     expect(setEntryMode).toHaveBeenCalledWith("total");
   });
 });
+
+// TDI-032 (#812) — a potential P&L of zero is neither a gain nor a loss: neutral colour.
+describe("SellTransactionModal — the potential P&L colour (TDI-032)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it.each([
+    [1_000_000, "text-m3-gain"],
+    [-1_000_000, "text-m3-loss"],
+    [0, "text-m3-on-surface-variant"],
+  ])("colours a potential P&L of %i with %s", (raw, colour) => {
+    mockUseSellTransaction.mockReturnValue(
+      makeHookReturn({ potentialPnl: { raw, formatted: "x" } }),
+    );
+    render(<SellTransactionModal {...BASE_PROPS} />);
+    expect(document.querySelector("#sell-trx-potential-pnl")?.className).toContain(colour);
+  });
+});

@@ -545,3 +545,65 @@ describe("otherAccounts (TRF-050, TRF-051)", () => {
     expect(otherAccounts([{ id: "a" }] as never, "a")).toEqual([]);
   });
 });
+
+// F29 (#812) — a re-read keeps the listed assets on screen: the loading state shows for
+// the first read and for a Retry after a failed read.
+describe("store — fetchAssets loading state (F29)", () => {
+  it("shows the loading state for the first read only", async () => {
+    const { assetGateway } = await import("../features/assets/gateway");
+    const listed = [{ id: "a1" }];
+    useAppStore.setState({
+      assets: [],
+      assetsError: null,
+      assetsRead: false,
+      isLoadingAssets: false,
+    });
+
+    let answer!: (value: unknown) => void;
+    vi.mocked(assetGateway.getAssetsWithArchived).mockReturnValueOnce(
+      new Promise((resolve) => {
+        answer = resolve;
+      }) as never,
+    );
+    const first = useAppStore.getState().fetchAssets();
+    expect(useAppStore.getState().isLoadingAssets).toBe(true);
+    answer({ status: "ok", data: listed });
+    await first;
+
+    vi.mocked(assetGateway.getAssetsWithArchived).mockReturnValueOnce(
+      new Promise(() => {}) as never,
+    );
+    void useAppStore.getState().fetchAssets();
+    expect(useAppStore.getState().isLoadingAssets).toBe(false);
+    expect(useAppStore.getState().assets).toEqual(listed);
+  });
+
+  it("keeps an empty list on screen when it is read again", async () => {
+    const { assetGateway } = await import("../features/assets/gateway");
+    useAppStore.setState({
+      assets: [],
+      assetsError: null,
+      assetsRead: true,
+      isLoadingAssets: false,
+    });
+    vi.mocked(assetGateway.getAssetsWithArchived).mockReturnValueOnce(
+      new Promise(() => {}) as never,
+    );
+    void useAppStore.getState().fetchAssets();
+    expect(useAppStore.getState().isLoadingAssets).toBe(false);
+  });
+
+  it("shows the loading state for a Retry after a failed read", async () => {
+    const { assetGateway } = await import("../features/assets/gateway");
+    useAppStore.setState({
+      assetsError: "error.DatabaseError",
+      assetsRead: true,
+      isLoadingAssets: false,
+    });
+    vi.mocked(assetGateway.getAssetsWithArchived).mockReturnValueOnce(
+      new Promise(() => {}) as never,
+    );
+    void useAppStore.getState().fetchAssets();
+    expect(useAppStore.getState().isLoadingAssets).toBe(true);
+  });
+});

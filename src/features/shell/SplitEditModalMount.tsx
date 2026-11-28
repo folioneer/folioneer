@@ -99,7 +99,6 @@ export function SplitEditModalMount() {
       target={{
         assetId,
         assetName,
-        currentPriceMicro: null,
       }}
       onSubmitSuccess={handleClose}
       editMode={{

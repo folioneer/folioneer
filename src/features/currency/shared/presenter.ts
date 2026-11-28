@@ -1,5 +1,5 @@
 import type { CurrencyError, CurrencyRateSource, RateHistoryBackfillError } from "@/bindings";
-import { decimalToDisplayed, decimalToNumber, typedToDecimal } from "@/lib/microUnits";
+import { decimalToNumber, microToFormatted, typedToDecimal } from "@/lib/microUnits";
 import type { I18nMessage } from "@/ui/format/i18n";
 import { formatStalenessLabel, type StalenessLabel } from "@/ui/format/staleness";
 
@@ -49,16 +49,14 @@ export function currencyErrorToI18n(error: CurrencyError): I18nMessage {
 }
 
 /**
- * Formats an i64-micros rate (ADR-001) as a human-readable decimal string.
- * Always shows at least 2 decimal places; trailing zeros beyond the 2nd are
- * trimmed but never below 2 (so `1_000_000` → `"1.00"`, `920_000` → `"0.920000"`).
+ * Formats an i64-micros rate (ADR-001) for display: 6 decimals below 1, 2 from 1 up,
+ * in the application's language (`1_000_000` → `"1.00"`, `920_000` → `"0.920000"`).
  */
 export function formatRateMicros(rateMicros: number): string {
-  const value = rateMicros / 1_000_000;
   // Sub-unit rates (e.g. 0.92) keep full micro precision so small differences
   // stay visible; rates ≥ 1 collapse to a 2-decimal display.
-  // NUM-013 — written with the decimal separator of the application's language.
-  return decimalToDisplayed(Math.abs(value) < 1 ? value.toFixed(6) : value.toFixed(2));
+  // NUM-013 — written in the application's language: its decimal mark and thousands grouping.
+  return microToFormatted(rateMicros, Math.abs(rateMicros) < 1_000_000 ? 6 : 2);
 }
 
 /**

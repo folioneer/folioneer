@@ -152,9 +152,10 @@ describe("AccountJournalPage", () => {
     expect(mockShowSnackbar).toHaveBeenCalledWith("transaction.success_deleted", "success");
   });
 
-  it("surfaces an error snackbar when delete fails", async () => {
+  // #812 — a refused cancellation says why, with its own message (CSH-080, DIV-045).
+  it("surfaces the refusal's own reason when delete fails", async () => {
     const refresh = vi.fn().mockResolvedValue(undefined);
-    mockCancelTransaction.mockResolvedValue({ error: { code: "DatabaseError" } });
+    mockCancelTransaction.mockResolvedValue({ error: { key: "error.CascadingOversell" } });
     mockUseAccountJournal.mockReturnValue(makeHook({ refresh }));
     render(<AccountJournalPage />);
 
@@ -163,7 +164,7 @@ describe("AccountJournalPage", () => {
 
     expect(mockCancelTransaction).toHaveBeenCalledWith("tx-1", "acc-1");
     await vi.waitFor(() =>
-      expect(mockShowSnackbar).toHaveBeenCalledWith("transaction.error_generic", "error"),
+      expect(mockShowSnackbar).toHaveBeenCalledWith("error.CascadingOversell", "error"),
     );
     expect(refresh).not.toHaveBeenCalled();
   });

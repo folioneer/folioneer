@@ -34,7 +34,9 @@ SPL reuses the TRX `Transaction` entity with a new `TransactionType::Split` vari
 
 ### Valuation continuity
 
-**SPL-040 — Post-split price record (frontend)**: Recorded market prices are point-in-time observations and are never retro-adjusted. Without a post-split observation, carrying a pre-split price forward across the split date would misvalue the rescaled position by the factor. The split modal therefore offers a **"Record post-split price"** checkbox, checked by default, pre-filled with the carried price the draft check gives (SPL-062), in the asset currency, and editable — once edited, the typed price stays whatever the date or ratio becomes; on submit it records that price at the split date through the existing price-record flow (best-effort, like MKT-055). The prefill is empty and the checkbox unchecked when no prior price exists.
+**SPL-040 — Post-split price record (frontend)**: Recorded market prices are point-in-time observations and are never retro-adjusted. Without a post-split observation, carrying a pre-split price forward across the split date would misvalue the rescaled position by the factor. The split modal therefore offers a **"Record post-split price"** checkbox, checked by default, pre-filled with the carried price the draft check gives (SPL-062), in the asset currency, and editable — once edited, the typed price stays whatever the date or ratio becomes; on submit it records that price at the split date through the existing price-record flow (best-effort, like MKT-055).
+
+**SPL-040A — When the box starts checked (frontend)**: The checkbox of SPL-040 starts checked when SPL-062 carries a price — one strictly before the split's date — and unchecked, its prefill empty, when it carries none — a split dated on or before the first price included — whatever the asset's price today. Once the owner ticks or unticks it, that choice stands.
 
 ### Performance
 
