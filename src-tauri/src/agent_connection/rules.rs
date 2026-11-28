@@ -1,5 +1,5 @@
 //! AGT-077 — the rules the application applies to a holding's cost, its realized result, its
-//! income and its value, each naming the spec rules it states, with an example the
+//! income and its value, and to a return, each naming the spec rules it states, with an example the
 //! application computes as stated where the tools can show one. They describe the arithmetic
 //! only: no tax is computed and no country's tax treatment is named.
 
@@ -9,7 +9,7 @@ use serde_json::{json, Value};
 pub(crate) fn described() -> Value {
     json!({
         "status": "described",
-        "scope": "How the application computes a holding's cost, its realized result, its income and its value. It computes no tax and states no country's tax treatment: a tax computation is yours to make from these figures and rules. Each example records on an imaginary account named Example, in EUR, holding an imaginary asset ACME, then reads the figure the last call answers; never run it on the portfolio.",
+        "scope": "How the application computes a holding's cost, its realized result, its income and its value, and a return. It computes no tax and states no country's tax treatment: a tax computation is yours to make from these figures and rules. Each example records on an imaginary account named Example, in EUR, holding an imaginary asset ACME, then reads the figure the last call answers; never run it on the portfolio.",
         "rules": rules(),
     })
 }
@@ -184,6 +184,16 @@ fn rules() -> Vec<Value> {
                 call("record_price", json!({ "asset": "ACME", "date": "2024-03-01", "price": "150" })),
                 call("list_holdings", json!({ "account": "Example" })),
             ], "/total_unrealized_pnl", "500"),
+        }),
+        json!({
+            "rules": ["PRF-030", "PRF-031", "PRF-032", "PRF-033", "PRF-034", "PRF-035", "PRF-038", "PRF-086", "PRF-087"],
+            "topic": "A return over a period",
+            "statement": "A return is a gain net of the money that came in or went out, over a base that weights each flow by the share of the period left after it (Simple Dietz): the gain is the end value, less the start value, less the deposits net of withdrawals over the period — an opening balance or a transfer in counted at its market value on its date for period over period and year to date, at its recorded cost since inception; the base is the start value plus each of those flows weighted by the share of the period left after it, and the return is the gain over the base, in percent. Purchases and sales move nothing in or out. Period over period starts from the previous period's end; year to date from the previous 31 December; since inception from nothing, against the money put in. Free shares, interest and price moves are gain, never money brought in (PRF-076). A year row also gives the annualized yield: the since-inception return as a yearly rate over the years since the first transaction, given as it is under a year. Since-inception and annualized are absent when nothing was invested — an opening balance at no cost, or more taken out than put in — and the answer says which. The example's account starts, like every example's, with 100000 deposited on 2024-01-02.",
+            "example": example("FR", "EUR", vec![
+                trade("record_purchase", "2024-02-01", "10", "100"),
+                call("record_price", json!({ "asset": "ACME", "date": "2024-12-31", "price": "110" })),
+                call("get_performance", json!({ "account": "Example", "year": 2024 })),
+            ], "/yearly/0/since_inception/pct", "0.1"),
         }),
     ]
 }

@@ -20,12 +20,14 @@ use crate::shared::domain::quantity::{stored_non_cash_quantity, FigureTextError}
 use crate::use_cases::account_creation::{AccountAskedByAgent, AccountCreationUseCase};
 use crate::use_cases::account_details::AccountDetailsUseCase;
 use crate::use_cases::account_summary::AccountSummaryUseCase;
+use crate::use_cases::global_performance::GlobalPerformanceUseCase;
 use crate::use_cases::holding_transaction::{
     code_of, decimal_to_micro, figures_as_text, CashAmount, Change, Correction, DividendAmount,
     FreeShares, HoldingTransactionUseCase, InterestCredit, ManagementFee, PriceAt, RecordedBy,
     Recording, StockSplit, Target, Trade, TradeAmount, TransactionsAsked, TypedTransaction,
     WriteOff,
 };
+use crate::use_cases::shared::performance::LifetimeUnavailable;
 use crate::use_cases::transfer::TransferUseCase;
 
 use super::connections::{
@@ -136,6 +138,8 @@ pub struct AgentTools {
     connections: Arc<AgentConnections>,
     /// The window's currency rates (AGT-103–105).
     currency_service: Arc<CurrencyService>,
+    /// The window's performance views' read (AGT-106, GPF-010).
+    performance: GlobalPerformanceUseCase,
 }
 
 impl AgentTools {
@@ -168,6 +172,11 @@ impl AgentTools {
                 Arc::clone(&currency_service),
             ),
             details: AccountDetailsUseCase::new(
+                Arc::clone(&account_service),
+                Arc::clone(&asset_service),
+                Arc::clone(&currency_service),
+            ),
+            performance: GlobalPerformanceUseCase::new(
                 Arc::clone(&account_service),
                 Arc::clone(&asset_service),
                 Arc::clone(&currency_service),
@@ -300,6 +309,7 @@ impl AgentTools {
             "get_rate" => self.get_rate(arguments).await,
             "list_rates" => self.list_rates(arguments).await,
             "record_rate" => self.record_rate(granted, arguments).await,
+            "get_performance" => self.get_performance(arguments).await,
             "list_holdings" => {
                 let account = text(arguments, "account")?;
                 // AGT-043 — a date that is not text is refused, never read as today.
@@ -470,8 +480,7 @@ impl AgentTools {
     /// AGT-104 — records the rate an agent gave, through the window form's rules, marked
     /// `Agent`; it takes one place of the session's limit (AGT-047).
     async fn record_rate(&self, granted: &Granted, arguments: &Value) -> Result<Value, Refusal> {
-        let from = text(arguments, "from")?.to_uppercase();
-        let to = text(arguments, "to")?.to_uppercase();
+        let (from, to) = pair_of(arguments)?;
         let rate = amount(arguments, "rate")?;
         let date = optional_text(arguments, "date")?.unwrap_or_else(today);
         if !granted.may_record_one_more() {
@@ -497,6 +506,110 @@ impl AgentTools {
             "from": recorded.from_currency,
             "to": recorded.to_currency,
             "rate": rate_row(&recorded),
+        }))
+    }
+
+    /// AGT-106 — the performance the window's views show: an account's or, with none, the
+    /// portfolio's, optionally one asset's position (GPF-010); the rows of one year when a
+    /// year is given.
+    async fn get_performance(&self, arguments: &Value) -> Result<Value, Refusal> {
+        let named = |name: &str| -> Result<Option<String>, Refusal> {
+            match optional_text(arguments, name)? {
+                Some(typed) if typed.trim().is_empty() => Err(Refusal {
+                    code: "InvalidArguments".to_string(),
+                    message: format!("{name} is empty"),
+                }),
+                typed => Ok(typed),
+            }
+        };
+        let account = named("account")?;
+        let asset = named("asset")?;
+        let year = match arguments.get("year") {
+            None | Some(Value::Null) => None,
+            Some(value) => Some(
+                value
+                    .as_i64()
+                    .and_then(|year| i32::try_from(year).ok())
+                    .ok_or_else(|| Refusal {
+                        code: "InvalidArguments".to_string(),
+                        message: "year is not a whole number".to_string(),
+                    })?,
+            ),
+        };
+        let account_id = match &account {
+            Some(name) => Some(self.account_named(name).await?),
+            None => None,
+        };
+        let asset = match &asset {
+            Some(name) => {
+                Some(
+                    self.recorder
+                        .asset_named(name)
+                        .await
+                        .map_err(|refusal| Refusal {
+                            code: refusal.code,
+                            message: refusal.message,
+                        })?,
+                )
+            }
+            None => None,
+        };
+        let asset_id = asset.as_ref().map(|asset| asset.id.clone());
+        let mut read = self
+            .performance
+            .get_global_performance(account_id.as_deref(), asset_id.as_deref())
+            .await
+            .map_err(|error| Refusal {
+                code: code_of(&error),
+                message: error.to_string(),
+            })?;
+        if let Some(year) = year {
+            read.yearly.retain(|row| row.year == year);
+            read.monthly.retain(|row| row.year == year);
+        }
+        let lifetime_unavailable = match read.lifetime_unavailable.take() {
+            None => Value::Null,
+            Some(LifetimeUnavailable::NoInvestedCapital) => {
+                serde_json::json!({ "reason": "NoInvestedCapital" })
+            }
+            // AGT-106 — the opening balance named as an agent names things: by name and
+            // reference, never by an id no tool takes.
+            Some(LifetimeUnavailable::ZeroCostOpeningBalance {
+                account_id,
+                asset_id,
+                date,
+            }) => {
+                let account = self
+                    .account_service
+                    .get_by_id(&account_id)
+                    .await
+                    .map_err(|error| unreadable("get_performance", &error))?
+                    .map(|account| account.name);
+                let asset = self
+                    .asset_service
+                    .get_asset_by_id(&asset_id)
+                    .await
+                    .map_err(|error| unreadable("get_performance", &error))?
+                    .map(|asset| asset.reference);
+                if account.is_none() || asset.is_none() {
+                    tracing::warn!(target: BACKEND, account = %account_id, asset = %asset_id, "get_performance: the opening balance's account or asset is gone");
+                }
+                serde_json::json!({
+                    "reason": "ZeroCostOpeningBalance",
+                    "account": account,
+                    "asset": asset,
+                    "date": date,
+                })
+            }
+        };
+        Ok(serde_json::json!({
+            "status": "read",
+            "account": account_id.map(|_| read.account_name.clone()),
+            "asset": asset.map(|asset| asset.reference),
+            "currency": read.currency,
+            "yearly": as_json(&read.yearly)?,
+            "monthly": as_json(&read.monthly)?,
+            "lifetime_unavailable": lifetime_unavailable,
         }))
     }
 

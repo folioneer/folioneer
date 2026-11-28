@@ -328,6 +328,7 @@ mod tests {
                 "list_prices",
                 "get_rate",
                 "list_rates",
+                "get_performance",
                 "record_rate",
                 "record_opening_balance",
                 "record_purchase",

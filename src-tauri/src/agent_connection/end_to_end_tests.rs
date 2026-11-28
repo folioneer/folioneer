@@ -8513,3 +8513,142 @@ async fn agt_105_an_agent_lists_a_pairs_rates_over_a_period() {
         assert_eq!(refusal.code, code, "{arguments}");
     }
 }
+
+// AGT-106 (#888) — an agent reads an account's and the portfolio's performance by period:
+// the window's own read, figures as text, never a second computation.
+#[tokio::test]
+async fn agt_106_an_agent_reads_the_performance_the_window_shows() {
+    use crate::use_cases::global_performance::GlobalPerformanceUseCase;
+    use crate::use_cases::holding_transaction::figures_as_text;
+
+    let data_dir = tempfile::tempdir().expect("tempdir");
+    let bench = workbench(data_dir.path()).await;
+    let granted = session(&bench.connections).await;
+    let call = |tool: &'static str, arguments: Value| {
+        let (tools, granted) = (&bench.tools, &granted);
+        async move { tools.call(granted, tool, &arguments).await }
+    };
+    let window = GlobalPerformanceUseCase::new(
+        Arc::clone(&bench.accounts) as Arc<dyn AccountServiceContract>,
+        Arc::clone(&bench.assets) as Arc<dyn AssetServiceContract>,
+        Arc::clone(&bench.currencies),
+    );
+    let account_id = bench
+        .accounts
+        .get_all()
+        .await
+        .expect("accounts")
+        .remove(0)
+        .id;
+
+    // An account's, as the window reads it.
+    let read = call("get_performance", json!({ "account": "pea" }))
+        .await
+        .expect("read");
+    let shown = figures_as_text(
+        serde_json::to_value(
+            window
+                .get_global_performance(Some(&account_id), None)
+                .await
+                .expect("the window's read"),
+        )
+        .expect("json"),
+    );
+    assert_eq!(read["status"], "read");
+    assert_eq!(read["account"], "PEA");
+    assert_eq!(read["currency"], shown["currency"]);
+    assert_eq!(read["yearly"], shown["yearly"]);
+    assert_eq!(read["monthly"], shown["monthly"]);
+    assert_eq!(read["yearly"][0]["year"], json!(2026));
+    assert!(read["yearly"][0]["end_value"].is_string());
+
+    // The portfolio's, with no account.
+    let portfolio = call("get_performance", json!({})).await.expect("read");
+    let whole = figures_as_text(
+        serde_json::to_value(
+            window
+                .get_global_performance(None, None)
+                .await
+                .expect("the window's read"),
+        )
+        .expect("json"),
+    );
+    assert_eq!(portfolio["account"], Value::Null);
+    assert_eq!(portfolio["yearly"], whole["yearly"]);
+
+    // One year's rows only.
+    let one_year = call("get_performance", json!({ "account": "PEA", "year": 2026 }))
+        .await
+        .expect("read");
+    assert!(one_year["monthly"]
+        .as_array()
+        .expect("rows")
+        .iter()
+        .all(|row| row["year"] == 2026));
+    let none = call("get_performance", json!({ "account": "PEA", "year": 2019 }))
+        .await
+        .expect("read");
+    assert_eq!(none["yearly"], json!([]));
+
+    // AGT-106 — the reason the lifetime metrics are absent names the opening balance by
+    // the account's name and the asset's reference.
+    call("add_account", json!({ "name": "Gift", "currency": "EUR" }))
+        .await
+        .expect("an account");
+    call(
+        "record_opening_balance",
+        json!({ "account": "Gift", "asset": "CW8", "quantity": "1", "total_cost": "0", "date": "2026-01-05" }),
+    )
+    .await
+    .expect("an opening balance at no cost");
+    let gift = call("get_performance", json!({ "account": "Gift" }))
+        .await
+        .expect("read");
+    assert_eq!(
+        gift["lifetime_unavailable"],
+        json!({ "reason": "ZeroCostOpeningBalance", "account": "Gift", "asset": "CW8", "date": "2026-01-05" })
+    );
+    let scoped = call(
+        "get_performance",
+        json!({ "account": "PEA", "asset": "cw8" }),
+    )
+    .await
+    .expect("read");
+    assert_eq!(scoped["asset"], "CW8");
+
+    // AGT-106 — a year to come keeps no row; an argument the tool does not know is ignored;
+    // an answered read counts as one (AGT-052).
+    let later = call(
+        "get_performance",
+        json!({ "account": "PEA", "year": 2999, "colour": "red" }),
+    )
+    .await
+    .expect("read");
+    assert_eq!(later["yearly"], json!([]));
+    let reads = bench.connections.sessions().remove(0).reads;
+    call("get_performance", json!({ "account": "PEA" }))
+        .await
+        .expect("read");
+    assert_eq!(bench.connections.sessions().remove(0).reads, reads + 1);
+
+    for (arguments, code) in [
+        (json!({ "account": "Nowhere" }), "AccountNotFound"),
+        (json!({ "account": "  " }), "InvalidArguments"),
+        (json!({ "account": "PEA", "asset": "" }), "InvalidArguments"),
+        (json!({ "asset": 7 }), "InvalidArguments"),
+        (
+            json!({ "account": "PEA", "asset": "NOPE" }),
+            "AssetNotFound",
+        ),
+        (
+            json!({ "account": "PEA", "year": "2026" }),
+            "InvalidArguments",
+        ),
+        (json!({ "account": 3 }), "InvalidArguments"),
+    ] {
+        let refusal = call("get_performance", arguments.clone())
+            .await
+            .expect_err("refused");
+        assert_eq!(refusal.code, code, "{arguments}");
+    }
+}
