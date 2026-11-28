@@ -6,7 +6,8 @@ use serde_json::Value;
 use super::named_recording::decimal;
 
 /// The whole numbers that are not figures: what counts things, and a split's ratio.
-pub const WHOLE_NUMBERS: [&str; 7] = [
+pub const WHOLE_NUMBERS: [&str; 9] = [
+    "month",
     "new",
     "old",
     "outdated_price_count",
@@ -14,6 +15,7 @@ pub const WHOLE_NUMBERS: [&str; 7] = [
     "pages",
     "total",
     "total_holding_count",
+    "year",
 ];
 
 /// `value` with every figure as decimal text, at any depth, and no field named after a scale.
@@ -80,7 +82,11 @@ mod tests {
             "outdated_price_count": 2,
             "total_holding_count": 4,
             "unrecorded_splits": [{ "new": 2, "old": 1 }],
+            "yearly": [{ "year": 2026, "month": 3 }],
         }));
+        // AGT-106 (#888) — a period's year and month count nothing either: whole numbers.
+        assert_eq!(read["yearly"][0]["year"], 2026);
+        assert_eq!(read["yearly"][0]["month"], 3);
 
         assert_eq!(read["total"], 3);
         assert_eq!(read["unrecorded_splits"][0]["new"], 2);

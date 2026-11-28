@@ -133,3 +133,25 @@ refused. `InvalidArguments`: a page that is not a whole number from 1, text of d
 included. Answer: `{ "status": "listed", "from", "to", "total", "page", "pages", "rates" }`
 — the rates oldest first, 100 to a page, each as `get_rate` gives one; `pages` 0 when
 `total` is 0.
+
+## get_performance
+
+AGT-106. Input: `account`, its name, optional — the portfolio's performance when left out
+or `null`; `asset`, named as a recording names it (AGT-044), archived or not, optional;
+`year`, a JSON whole number, optional. `AccountNotFound`, `AccountAmbiguous`,
+`AssetNotFound`, `AssetAmbiguous`: a name that matches no account or asset, or several.
+`InvalidArguments`: an account or an asset that is not text, or empty, or spaces only; a
+year that is not a whole number, text of digits included. `DatabaseError`: a read that
+fails. Answer: `{ "status": "read", "account", "asset", "currency", "yearly", "monthly",
+"lifetime_unavailable" }` — the account's name, or `null` for the portfolio; the asset's
+reference, or `null`; the currency the figures are in; the rows newest first, each
+`{ "year", "month", "end_value", "previous_value", "cash_flow", "asset_flow", "dividends",
+"pnl", "period_over_period", "year_to_date", "since_inception", "annualized_yield" }` —
+`month` `null` on a year row; each performance `{ "pct", "gain" }`, or `null` where it has no place or no
+baseline — `year_to_date` on a year row, `annualized_yield` on a month row or when PRF-038
+leaves it absent, a first period's `period_over_period`, a scoped window with nothing held
+(PRF-034, PRF-037, PRF-038, PRF-042, PRF-083) — and `pct` alone `null` when it cannot be
+computed (PRF-032, PRF-087); `lifetime_unavailable`, `null`, or why the
+lifetime metrics are absent: `{ "reason": "ZeroCostOpeningBalance", "account", "asset",
+"date" }` — the account's name, the asset's reference and the opening balance's date — or
+`{ "reason": "NoInvestedCapital" }`.

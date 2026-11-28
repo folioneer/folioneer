@@ -76,6 +76,7 @@ fn agt_010_the_program_started_with_mcp_lists_its_tools() {
             "list_prices",
             "get_rate",
             "list_rates",
+            "get_performance",
             "record_rate",
             "record_opening_balance",
             "record_purchase",
@@ -166,6 +167,7 @@ fn agt_013_every_tool_listed_says_whether_it_only_reads() {
             "list_prices",
             "get_rate",
             "list_rates",
+            "get_performance",
             "preview_recording"
         ]
     );

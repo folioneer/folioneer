@@ -84,7 +84,7 @@ pub fn definitions() -> Vec<ToolDefinition> {
             name: "describe_rules",
             title: "Describe the rules applied",
             only_reads: true,
-            description: "The rules the application applies to a holding's cost, its realized result, its income and its value — each account's cost basis method and what a sale takes, fees, exchange rates, rounding, write-offs, free shares, dividends, interest, transfers and valuation — each naming its spec rules, with a worked example. Read it before computing anything from these figures, a tax among them: the application computes no tax and states no country's tax treatment.",
+            description: "The rules the application applies to a holding's cost, its realized result, its income and its value, and to a return — each account's cost basis method and what a sale takes, fees, exchange rates, rounding, write-offs, free shares, dividends, interest, transfers and valuation — each naming its spec rules, with a worked example. Read it before computing anything from these figures, a tax among them: the application computes no tax and states no country's tax treatment.",
             input_schema: json!({
                 "type": "object",
                 "properties": {},
@@ -174,6 +174,21 @@ pub fn definitions() -> Vec<ToolDefinition> {
                     "page": { "type": "integer", "description": "The page, from 1. Default: 1." }
                 },
                 "required": ["from", "to"],
+                "additionalProperties": false
+            }),
+        },
+        ToolDefinition {
+            name: "get_performance",
+            title: "Get performance by period",
+            only_reads: true,
+            description: "The performance the application's performance views show, by year and by month, newest first: an account's, named, or with no account the whole portfolio's in its reference currency, optionally one asset's position. Each row has its value bridge (end_value = previous_value + cash_flow + asset_flow + dividends + pnl) and its returns in percent with their gain — period_over_period, year_to_date (month rows), since_inception, annualized_yield (year rows) — each null when it cannot be computed. describe_rules says how a return is computed. Use it to answer how an account or the portfolio did over a period instead of working a return out.",
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "account": { "type": "string", "description": "The account's name, as list_accounts gives it. Default: the whole portfolio." },
+                    "asset": { "type": "string", "description": "One asset's name, reference or ISIN: only its position. Default: everything held." },
+                    "year": { "type": "integer", "description": "Only the rows of this calendar year." }
+                },
                 "additionalProperties": false
             }),
         },

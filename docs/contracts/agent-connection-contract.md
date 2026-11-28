@@ -1,11 +1,11 @@
 # Contract — AI Agent Connection
 
 > Domain: `agent-connection`
-> Last updated by: agent-connection (AGT-022–036, AGT-039, AGT-045, AGT-052–054, AGT-064, AGT-081, AGT-082, AGT-084, AGT-088, AGT-091, AGT-103–105) — `financial-asset-transaction` (TRX-024B), `fx-rate` (FXR-103)
+> Last updated by: agent-connection (AGT-022–036, AGT-039, AGT-045, AGT-052–054, AGT-064, AGT-081, AGT-082, AGT-084, AGT-088, AGT-091, AGT-103–106) — `financial-asset-transaction` (TRX-024B), `fx-rate` (FXR-103)
 
 > **Error model on the wire**: each command's error serializes as a flat `{ code: "VariantName" }` object; a variant with fields carries them beside `code`, as `TransactionNotRemoved { reason }` does. The FE matches on `code`.
 >
-> This contract covers the commands between the window and the core. The bridge, the channel and the tools (AGT-010–021, AGT-037, AGT-038, AGT-040–044, AGT-046–051, AGT-060–063, AGT-065A, AGT-070, AGT-071, AGT-075, AGT-076, AGT-077, AGT-080, AGT-087, AGT-090, AGT-093, AGT-100–105) and the tools of AGT-064 and AGT-068 are not Tauri commands — what the window shows of an added asset is `AgentSession.assets_added` and `last_asset` here, of a created account `accounts_added` and `last_account`; what an AI agent, the bridge and the application exchange — the tools' refusal codes included — is described by the spec.
+> This contract covers the commands between the window and the core. The bridge, the channel and the tools (AGT-010–021, AGT-037, AGT-038, AGT-040–044, AGT-046–051, AGT-060–063, AGT-065A, AGT-070, AGT-071, AGT-075, AGT-076, AGT-077, AGT-080, AGT-087, AGT-090, AGT-093, AGT-100–106) and the tools of AGT-064 and AGT-068 are not Tauri commands — what the window shows of an added asset is `AgentSession.assets_added` and `last_asset` here, of a created account `accounts_added` and `last_account`; what an AI agent, the bridge and the application exchange — the tools' refusal codes included — is described by the spec.
 
 ---
 
@@ -196,6 +196,7 @@ The mark of a transaction an AI agent recorded (AGT-045) reaches the window in t
 
 ## Changelog
 
+- 2026-11-28 — #888 (AGT-106): `get_performance` reads an account's or the portfolio's performance by period, the read of `get_global_performance`, its opening balance named by name and reference; `describe_rules` states how a return is computed. No Tauri command changed.
 - 2026-11-28 — #887 (AGT-103–105): `get_rate`, `list_rates` and `record_rate` read and record a currency rate; a rate an agent records carries the source `Agent` (FXR-103). No Tauri command changed.
 - 2026-11-28 — #944 (AGT-040): `list_accounts` gives each account's management-fees parameter as `management_fees` and `list_assets` each asset's `interest_bearing`, the names `add_account` and `add_asset` take; `describe_rules` examples name it `management_fees`. The core's field keeps its name, `management_fees_enabled` (FEE-075, the data export). No command or type changed.
 - 2026-11-15 — #826 (AGT-010, AGT-077): `describe_rules` gives the rules behind the figures, and `initialize`'s instructions say so. No command or type changed.

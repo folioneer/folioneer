@@ -27,6 +27,7 @@ A single calendar period (one month or one year) within the account's lifetime. 
 | `period_over_period` | Performance versus the immediately preceding period of the same granularity (PRF-033). Gain + percentage.   |
 | `year_to_date`       | Performance from the start of the row's calendar year to the row's period end (PRF-034). Gain + percentage. |
 | `since_inception`    | Performance from the account's inception to the row's period end (PRF-035). Gain + percentage.              |
+| `annualized_yield`   | The since-inception performance as a yearly rate, year rows only (PRF-038). Gain + percentage.              |
 
 ### External Cash Flow
 
@@ -72,7 +73,7 @@ Money entering or leaving the account from outside the tracked world: a `Deposit
 
 **PRF-024 — Single-currency scope (backend)**: A non-cash holding whose asset currency differs from the account currency contributes `0` to the period value; no exchange-rate conversion is performed in this version, consistent with CSH-094 and MKT-034. Multi-currency valuation is deferred until the FX-rate feature ships.
 
-**PRF-025 — Calculation precision (backend)**: All value and performance computations use `i128` intermediates before scaling back to `i64` micro-units, per ADR-001 and ACD-024.
+**PRF-025 — Calculation precision (backend)**: All value and performance computations use `i128` intermediates before scaling back to `i64` micro-units, per ADR-001 and ACD-024, except the annualized yield's power (PRF-038).
 
 **PRF-026 — Recompute on read (backend)**: Period values and performance figures are computed on demand when the page is read; no period value is persisted to the database, per ADR-013. The single sources of truth remain the transaction history and the recorded price history.
 
@@ -100,11 +101,13 @@ Money entering or leaving the account from outside the tracked world: a `Deposit
 
 **PRF-037 — Year-to-date column omitted in year view (frontend)**: In year view the year-to-date metric (PRF-034) is exactly equal to the period-over-period metric (PRF-033) for every row, because both use the prior 31 December end value as their start value and net the same in-year flows. The year-to-date column is therefore omitted in year view as redundant; year view shows period-over-period and since-inception only. Month view shows all three.
 
+**PRF-038 — Annualized yield (backend)**: A year row carries the annualized yield of its since-inception performance (PRF-035): `(1 + cumulative)^(1 / years) − 1`, where `cumulative` is the since-inception percentage as a fraction and `years` the days from the earliest in-scope transaction to the row's period end — or to the close date of a closed position (PRF-085) — over 365.25. When `years` is under 1, the cumulative is given as it is, never extrapolated. The power is taken in floating point and rounded to the nearest micro-percent, the one exception to PRF-025's integer intermediates: it is a derived percentage, no money. Its gain is the since-inception gain. It is absent when the since-inception percentage is absent, and when the cumulative is a total loss (`1 + cumulative ≤ 0`). A month row carries none.
+
 ### Period Range and Rows (040–049)
 
 **PRF-040 — Data span (backend)**: Rows span from the period containing the account's earliest transaction date through the current period (the present month in month view, the present year in year view). No period precedes the first-transaction period — there is no leading zero-value row; the first-transaction period is the earliest row. A period in which the account holds nothing and has no cash has an end value of `0`.
 
-**PRF-041 — Row ordering (frontend)**: Rows are ordered most-recent first (descending by period).
+**PRF-041 — Row ordering (backend)**: Rows are ordered most-recent first (descending by period).
 
 **PRF-042 — Absent baseline renders as "—" (backend + frontend)**: When a metric's comparison baseline does not exist — for example the first period has no preceding period for the period-over-period metric — that metric's gain and percentage are reported as absent and rendered "—". In an asset-scoped read, a period-over-period or year-to-date "—" carries the tooltip "No figure for this period: the holding was not held throughout it, or has no price at its start" — the sentence the Account Details view shows on a windowed figure it does not give, in each language (PRF-083); the whole-account read gives no tooltip.
 
@@ -186,7 +189,7 @@ The performance read optionally narrows to one asset's position within the accou
           │     └─ gain + Simple Dietz % for period-over-period / YTD / since-inception (PRF-031–035)
           │
           └─ [Frontend: view-mode toggle + (month view) year selector]
-             [Frontend: table rows, most-recent first (PRF-041)]
+             [Core: rows most-recent first (PRF-041)]
              [Frontend: loading / empty / error states (PRF-050–052)]
 ```
 

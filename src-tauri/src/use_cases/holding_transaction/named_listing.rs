@@ -234,6 +234,14 @@ impl HoldingTransactionUseCase {
         })
     }
 
+    /// AGT-106 — the one asset `typed` names, as a recording names it (AGT-044), refused as a
+    /// read refuses a name.
+    pub async fn asset_named(&self, typed: &str) -> Result<Asset, Refusal> {
+        self.find_asset_by_name(typed)
+            .await
+            .map_err(|error| refusal_from_lookup(&error))
+    }
+
     /// AGT-071 — the price the asset named has on `date`, today when none is given, or the
     /// closest earlier one. A date in the future is refused: no price is of it yet.
     pub async fn price_named(
